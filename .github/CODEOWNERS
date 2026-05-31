@@ -1,0 +1,12 @@
+# Code owners for MindeesNative.
+# These owners are requested for review automatically. As area maintainers are
+# added (see MAINTAINERS.md), replace the default owner with per-area owners.
+
+# Default owner for everything in the repo.
+*       @aashir-athar
+
+# Examples of per-area ownership to enable later:
+# /packages/core/        @aashir-athar
+# /packages/router/      @aashir-athar
+# /packages/compiler/    @aashir-athar
+# /.github/              @aashir-athar

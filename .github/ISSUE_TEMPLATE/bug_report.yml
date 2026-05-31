@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a defect in MindeesNative
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. MindeesNative is pre-1.0 — please check
+        [STATUS.md](https://github.com/mindees/mindees/blob/main/STATUS.md) first
+        to confirm the affected area is actually implemented (not a research track).
+  - type: input
+    id: package
+    attributes:
+      label: Affected package(s)
+      placeholder: "@mindees/core"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal steps or a repository link. Smaller repros get fixed faster.
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: "`mindees doctor` output (when available), or Node/pnpm/OS versions and package versions."
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I checked STATUS.md and the affected area is implemented (not a research track).
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
