@@ -6,22 +6,20 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
-# No top-level permissions: each job grants only what it needs (below).
+# No top-level permissions: the job grants only what it needs (below).
 permissions: {}
 
 jobs:
   release:
     name: Release
-    # Only run on the canonical repo; forks won't have publish secrets.
+    # Only run on the canonical repo; forks won't have publish access.
     if: github.repository == 'mindees/mindees'
     runs-on: ubuntu-latest
     permissions:
-      contents: write # push the version commit/tags + create GitHub releases
+      contents: write # push the version commit/tags
       pull-requests: write # open the "version packages" PR
-      id-token: write # npm provenance / OIDC (optional)
     steps:
       # Third-party actions are pinned to full commit SHAs (tags are mutable).
-      # This job is privileged (holds NPM_TOKEN), so SHA-pinning is mandatory here.
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -37,16 +35,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Opens/updates a "version packages" PR when changesets are pending;
-      # publishes to npm when that PR is merged.
-      # NOTE: requires the NPM_TOKEN secret to be configured before releases.
-      - name: Create release PR or publish
+      # Phase 0 scope: this step ONLY opens/updates a "version packages" PR when
+      # changesets are pending. It deliberately does NOT publish to npm.
+      #
+      # Why no `publish:` input here: changesets/action, when given a publish
+      # command and finding no changesets, falls back to publishing unpublished
+      # packages (via NPM_TOKEN or OIDC trusted publishing) — which fails before
+      # npm release is actually set up. Publishing (NPM_TOKEN/OIDC provenance +
+      # the `id-token: write` permission + the `publish:` input) is wired up in
+      # Phase 12, when the packages are real and ready to ship. See ROADMAP.md.
+      - name: Create or update the version packages PR
         uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
         with:
           version: pnpm run version-packages
-          publish: pnpm run release
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
