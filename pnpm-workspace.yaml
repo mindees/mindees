@@ -3,8 +3,7 @@ packages:
   - "examples/*"
 
 # pnpm 11 blocks dependency build/postinstall scripts by default for
-# supply-chain safety. Empirically, pnpm@11.5.0 uses the `allowBuilds` MAP
-# (the older `onlyBuiltDependencies` list is ignored on this version).
+# supply-chain safety. pnpm@11.5.0 uses the `allowBuilds` map.
 # Only allow-list what genuinely needs a postinstall:
 #   lefthook - its postinstall installs the git-hooks binary
 allowBuilds:

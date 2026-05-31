@@ -1,6 +1,10 @@
-# @mindees/ui
+# @mindees/atlas
 
-The Atlas component library.
+The Atlas component library — MindeesNative's batteries-included UI primitives.
+
+> Note: named `@mindees/atlas` (not `@mindees/ui`) because `@mindees/ui` is a
+> separate, pre-existing React Native + Expo UI kit on npm. Atlas is this
+> framework's own component library.
 
 > Status: Scaffold (Phase 0). Not implemented yet. This package exports only
 > package metadata, the shared status types, and the re-exported

@@ -1,5 +1,5 @@
 {
-  "name": "@mindees/ui",
+  "name": "@mindees/atlas",
   "version": "0.0.0",
   "description": "MindeesNative Atlas - batteries-included component library. Scaffold.",
   "license": "MIT OR Apache-2.0",
@@ -20,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mindees/mindees.git",
-    "directory": "packages/ui"
+    "directory": "packages/atlas"
   },
   "scripts": {
     "build": "tsdown",

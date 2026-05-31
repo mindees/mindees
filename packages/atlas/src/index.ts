@@ -2,7 +2,7 @@ import type { Maturity, PackageInfo } from '@mindees/core'
 import { NotImplementedError, notImplemented } from '@mindees/core'
 
 /** The npm package name. */
-export const name = '@mindees/ui'
+export const name = '@mindees/atlas'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
 export const VERSION = '0.0.0'
