@@ -32,7 +32,7 @@ See [STATUS.md](./STATUS.md) for current maturity.
   Reactive offline store, delta sync, conflict resolution.
 - [ ] **Phase 10 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**
   Mock + server backends, guided generation, tool calling, error explainer.
-- [ ] **Phase 11 — `@mindees/ui` (Atlas) + first-party capability modules**
+- [ ] **Phase 11 — `@mindees/atlas` (Atlas) + first-party capability modules**
   Accessible primitives + recycling list (web impls; native research-track).
 - [ ] **Phase 12 — Examples, docs, benchmarks, release & governance**
   Runnable web example (offline + live OTA), docs site, enforced perf budgets,

@@ -35,7 +35,7 @@ does not work.
 | `@mindees/cli` | 🚧 Scaffold | Lands in Phase 5. |
 | `@mindees/router` | 🚧 Scaffold | Typed routing core lands in Phase 6; data/transitions Phase 7. |
 | `@mindees/renderer` | 🚧 Scaffold | Web/DOM backend lands in Phase 3. Native + GPU canvas are 🔬. |
-| `@mindees/ui` | 🚧 Scaffold | Lands in Phase 11 (web impls; native 🔬). |
+| `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 11 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 10 (mock/server backends; on-device 🔬). |
 | `@mindees/data` | 🚧 Scaffold | Lands in Phase 9. |
 | `@mindees/updates` | 🚧 Scaffold | Lands in Phase 8. WASM module runtime is 🔬. |

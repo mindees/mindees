@@ -28,7 +28,7 @@ the "help wanted" issues.
 | Data / sync | `@mindees/data` | _seeking_ |
 | Updates / OTA | `@mindees/updates` | _seeking_ |
 | AI | `@mindees/ai` | _seeking_ |
-| UI | `@mindees/ui` | _seeking_ |
+| UI (Atlas) | `@mindees/atlas` | _seeking_ |
 | CLI / DX | `@mindees/cli`, `create-mindees` | _seeking_ |
 
 ## Becoming a maintainer

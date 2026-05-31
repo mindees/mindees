@@ -57,7 +57,7 @@ scope and share **one locked version line**.
 | `@mindees/cli` | Forge | `mindees` CLI: create / dev / build / deploy | 🚧 Scaffold |
 | `@mindees/router` | Quantum | Typed, data-aware router | 🚧 Scaffold |
 | `@mindees/renderer` | Helix | Native + GPU-canvas renderer | 🚧 Scaffold |
-| `@mindees/ui` | Atlas | Batteries-included component library | 🚧 Scaffold |
+| `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
 | `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
 | `@mindees/updates` | Pulse | Signed differential OTA + SDUI | 🚧 Scaffold |
