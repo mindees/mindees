@@ -29,7 +29,7 @@
  */
 export interface Owner {
   /** Child computations created while this owner was active. */
-  owned: Computation<unknown>[] | null
+  owned: AnyComputation[] | null
   /** Cleanup callbacks registered via {@link onCleanup}. */
   cleanups: Array<() => void> | null
 }
@@ -49,18 +49,27 @@ export type EqualsFn<T> = (a: T, b: T) => boolean
 
 const equalsDefault = (a: unknown, b: unknown): boolean => a === b
 
+/**
+ * The reactive graph is intentionally type-erased: a node may observe, and be
+ * observed by, computations of unrelated value types. Internal graph links use
+ * this alias; the public API (`Signal<T>` / `Memo<T>` / `Accessor<T>`) stays
+ * fully typed.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: type-erased reactive graph links
+type AnyComputation = Computation<any>
+
 // ---------------------------------------------------------------------------
 // Globals (tracking + scheduling)
 // ---------------------------------------------------------------------------
 
 /** The computation currently executing, used for automatic dependency tracking. */
-let currentObserver: Computation<unknown> | null = null
+let currentObserver: AnyComputation | null = null
 /** The active disposal scope for onCleanup / child registration. */
 let currentOwner: Owner | null = null
 /** Outstanding `batch()` nesting depth; effects flush when this returns to 0. */
 let batchDepth = 0
 /** Effects marked stale and awaiting a flush. */
-const effectQueue: Computation<unknown>[] = []
+const effectQueue: AnyComputation[] = []
 /** Guard against re-entrant flushes. */
 let flushing = false
 /** Safety valve against accidental infinite reactive loops. */
@@ -81,9 +90,9 @@ class Computation<T> implements Owner {
   value: T
   fn: (() => T) | null
   state: State
-  sources: Computation<unknown>[] | null = null
-  observers: Computation<unknown>[] | null = null
-  owned: Computation<unknown>[] | null = null
+  sources: AnyComputation[] | null = null
+  observers: AnyComputation[] | null = null
+  owned: AnyComputation[] | null = null
   cleanups: Array<() => void> | null = null
   equals: EqualsFn<T> | false
   readonly isEffect: boolean
@@ -163,7 +172,9 @@ class Computation<T> implements Owner {
     if (changed && this.observers) {
       // Observers are already CHECK from the original push; promote them to DIRTY
       // so the in-flight pull recomputes them.
-      for (const o of this.observers) o.state = DIRTY
+      for (const o of this.observers) {
+        o.state = DIRTY
+      }
     }
   }
 }
@@ -172,7 +183,7 @@ class Computation<T> implements Owner {
 // Graph maintenance
 // ---------------------------------------------------------------------------
 
-function link(observer: Computation<unknown>, source: Computation<unknown>): void {
+function link(observer: AnyComputation, source: AnyComputation): void {
   if (observer.sources === null) observer.sources = []
   const sources = observer.sources
   if (!sources.includes(source)) {
@@ -182,7 +193,7 @@ function link(observer: Computation<unknown>, source: Computation<unknown>): voi
   }
 }
 
-function unlinkSources(node: Computation<unknown>): void {
+function unlinkSources(node: AnyComputation): void {
   if (!node.sources) return
   for (const src of node.sources) {
     const obs = src.observers
@@ -207,7 +218,7 @@ function disposeChildren(owner: Owner): void {
   }
 }
 
-function disposeComputation(node: Computation<unknown>): void {
+function disposeComputation(node: AnyComputation): void {
   if (node.state === DISPOSED) return
   disposeChildren(node)
   unlinkSources(node)
@@ -215,7 +226,7 @@ function disposeComputation(node: Computation<unknown>): void {
   node.state = DISPOSED
 }
 
-function adopt(node: Computation<unknown>): void {
+function adopt(node: AnyComputation): void {
   if (!currentOwner) return
   if (currentOwner.owned === null) currentOwner.owned = []
   currentOwner.owned.push(node)
@@ -259,13 +270,6 @@ function attachNode<T, A extends object>(accessor: A, node: Computation<T>): A {
 
 /** A read accessor for a derived/reactive value. */
 export type Accessor<T> = () => T
-
-/**
- * An effect body. May return nothing, or a cleanup function that runs before the
- * next re-run and on disposal.
- */
-// biome-ignore lint/suspicious/noConfusingVoidType: the union is intentional — an effect returns nothing OR a cleanup function (the standard Solid/React effect signature).
-export type EffectFn = () => void | (() => void)
 
 /** Options accepted by {@link signal}. */
 export interface SignalOptions<T> {
@@ -341,21 +345,31 @@ export const memo = computed
 
 /**
  * Run a side effect that re-runs whenever its reactive dependencies change.
- * Runs once immediately to establish dependencies. Return a function (or call
- * {@link onCleanup}) to clean up before each re-run and on disposal.
+ * Runs once immediately to establish dependencies.
+ *
+ * To clean up before each re-run and on disposal, either return a cleanup
+ * function from the effect, or call {@link onCleanup}. Any non-function return
+ * value is ignored (so expression-bodied effects like `() => list.push(x())`
+ * are fine).
  *
  * @returns A disposer that stops the effect and runs its cleanups.
  *
  * @example
  * const stop = effect(() => console.log(count()))
  * stop() // unsubscribe
+ *
+ * @example
+ * effect(() => {
+ *   const id = setInterval(tick, 1000)
+ *   return () => clearInterval(id) // cleanup
+ * })
  */
-export function effect(fn: EffectFn): () => void {
+export function effect(fn: () => void): () => void {
   const node = new Computation<void>(
     undefined,
     () => {
-      const result = fn()
-      if (typeof result === 'function') onCleanup(result)
+      const result: unknown = (fn as () => unknown)()
+      if (typeof result === 'function') onCleanup(result as () => void)
     },
     false,
     true,
