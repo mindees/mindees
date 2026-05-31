@@ -4,7 +4,7 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 0 (foundations) — in progress.
+**Last updated:** Phase 0 (foundations) — complete (merged to `main`, CI + Release green).
 
 ## Legend
 
@@ -20,10 +20,10 @@ does not work.
 
 | Capability | Status |
 | --- | --- |
-| Monorepo + workspaces | 🚧 in progress (Phase 0) |
+| Monorepo + workspaces | ✅ done (Phase 0) |
 | Open-source governance (license, CoC, security, contributing, RFCs) | ✅ in place |
-| Verified toolchain (pnpm/turbo/ts/biome/vitest/changesets) | 🚧 in progress (Phase 0) |
-| CI (lint + typecheck + test + build) | 🚧 in progress (Phase 0) |
+| Verified toolchain (pnpm/turbo/ts/biome/vitest/changesets) | ✅ done (Phase 0) |
+| CI (lint + typecheck + test + build) | ✅ done (Phase 0) |
 | Any framework functionality | 📋 not yet — starts Phase 1 |
 
 ## Per-package

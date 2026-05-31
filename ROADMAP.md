@@ -6,7 +6,7 @@ only when `pnpm verify` (lint + typecheck + test + build) is green in CI.
 
 See [STATUS.md](./STATUS.md) for current maturity.
 
-- [ ] **Phase 0 — Repository, governance & toolchain foundation** _(in progress)_
+- [x] **Phase 0 — Repository, governance & toolchain foundation** ✅
   Monorepo, full OSS/governance surface, verified toolchain, green CI, package
   scaffolds exporting only metadata + `NotImplementedError`.
 - [ ] **Phase 1 — `@mindees/core` I: signals & reactivity**
