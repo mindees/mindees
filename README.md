@@ -1,58 +1,93 @@
 <div align="center">
 
-<img src="./mindees-logo.png" alt="MindeesNative" width="140" height="140" />
+<img src="./mindees-logo.png" alt="MindeesNative — open-source TypeScript cross-platform app framework (React Native & Flutter alternative)" width="140" height="140" />
 
 # MindeesNative
 
-**Write TypeScript once. Aim for native everywhere. Build it honestly, in the open.**
+### ⚡ The open-source, TypeScript-first cross-platform app framework
 
-A next-generation cross-platform app framework — designed to inherit the
-strengths of React Native *and* Flutter while engineering away their forced
-trade-offs.
+**Build native iOS, Android & web apps from one TypeScript codebase.**
+A modern **React Native** and **Flutter** alternative — with fine-grained
+**signals** reactivity, true native UI, batteries-included tooling, and instant
+OTA updates. Built in the open.
 
-[Status](./STATUS.md) ·
-[Roadmap](./ROADMAP.md) ·
-[Contributing](./CONTRIBUTING.md) ·
-[RFCs](./rfcs/README.md)
+[![CI](https://github.com/mindees/mindees/actions/workflows/ci.yml/badge.svg)](https://github.com/mindees/mindees/actions/workflows/ci.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](./LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+[![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](./STATUS.md)
+
+[Status](./STATUS.md) · [Roadmap](./ROADMAP.md) · [Contributing](./CONTRIBUTING.md) · [RFCs](./rfcs/README.md) · [Discussions](https://github.com/mindees/mindees/discussions)
 
 </div>
 
 ---
 
-> ### ⚠️ Pre-alpha — Phase 0 (foundations)
+> ### ⚠️ Pre-alpha — building in the open
 >
-> **Nothing here is a usable framework yet.** This repository is currently the
-> monorepo skeleton, the open-source governance surface, and the verified
-> toolchain. We build **bottom-up**, and we follow one rule above all others:
-> **everything we ship actually works.** See [STATUS.md](./STATUS.md) for an
-> honest, per-package account of what exists today versus what is still a
-> research track.
+> MindeesNative is **not production-ready yet** — we are building it phase by
+> phase, bottom-up, and we follow one rule above all: **everything we ship
+> actually works.** [`STATUS.md`](./STATUS.md) is the honest, per-package source
+> of truth for what's real today versus what's still planned. **Phase 1 (the
+> reactive core) is done and tested** — see the live example below.
+>
+> ⭐ **Star the repo** to follow along, and check the
+> [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
+> list — contributors welcome.
 
-## Why MindeesNative
+## Why MindeesNative? (React Native & Flutter, reimagined)
 
-React Native and Flutter each made one foundational bet, and each bet created
-permanent trade-offs. MindeesNative's thesis is to inherit each one's strengths
-while engineering away the corresponding weaknesses. The short version:
+React Native and Flutter each made one foundational bet, and each created
+permanent trade-offs. MindeesNative is designed to **inherit the strengths of
+both while engineering away the weaknesses**:
 
-- **TypeScript** — the largest developer pool, not a single-purpose language.
-- **Native components by default, GPU canvas when you want it** — track the OS,
-  or paint every pixel; choose per subtree.
-- **Batteries included, dependencies excluded** — a cohesive, single-versioned
-  first-party SDK instead of dependency roulette.
-- **Instant, signed differential updates** — without bloating bundles.
-- **Intelligent and local-first by default.**
+- 🟦 **TypeScript, end to end** — the world's most popular typed language and the
+  largest developer talent pool. No new niche language to learn.
+- ⚛️ **Fine-grained signals reactivity** — the modern reactivity model (à la
+  SolidJS): update *exactly* what changed, with no virtual-DOM diffing and no
+  manual memoization. **Shipping today in [`@mindees/core`](./packages/core).**
+- 📱 **Native UI by default, GPU canvas when you want it** — render real
+  platform components *and* drop to a pixel-perfect GPU canvas, per subtree.
+- 🔋 **Batteries included, dependencies excluded** — one cohesive,
+  single-versioned SDK instead of dependency-hell roulette.
+- 🚀 **Instant OTA updates** — ship fixes without waiting on app-store review.
+- 🌍 **Truly universal** — one codebase targeting **iOS, Android, web & desktop**.
 
-We are not claiming these are done. We are building them in order, honestly, and
-labeling exactly where we are.
+> We don't claim these are all done. We're building them in order, in public, and
+> labeling exactly where we are. Honesty is a feature.
 
-## Packages
+## ✨ Live example — fine-grained signals (works today)
 
-All packages live under the [`@mindees`](https://www.npmjs.com/org/mindees) npm
-scope and share **one locked version line**.
+```ts
+import { signal, computed, effect, batch } from '@mindees/core'
+
+const count = signal(0)
+const doubled = computed(() => count() * 2)
+
+// re-runs only when something it reads actually changes
+effect(() => console.log(`count=${count()} doubled=${doubled()}`))
+
+count.set(1)                 // → count=1 doubled=2
+count.update((n) => n + 1)   // → count=2 doubled=4
+
+batch(() => {                // coalesce writes → effect runs once
+  count.set(10)
+  count.set(20)
+})                           // → count=20 doubled=40
+```
+
+Glitch-free, lazy, leak-free, and fully typed. See
+[`@mindees/core`](./packages/core) for the full API.
+
+## 📦 Packages
+
+Everything ships under the [`@mindees`](https://www.npmjs.com/org/mindees) npm
+scope and shares **one locked version line** (atomic, dependency-hell-free
+upgrades).
 
 | Package | Codename | Purpose | Status |
 | --- | --- | --- | --- |
-| `@mindees/core` | — | Runtime, reactivity, scheduler, component model | 🚧 Scaffold |
+| [`@mindees/core`](./packages/core) | — | Reactivity (signals), runtime, scheduler | 🧪 Experimental |
 | `@mindees/compiler` | MDC | Build-time optimizer & codegen | 🚧 Scaffold |
 | `@mindees/cli` | Forge | `mindees` CLI: create / dev / build / deploy | 🚧 Scaffold |
 | `@mindees/router` | Quantum | Typed, data-aware router | 🚧 Scaffold |
@@ -63,40 +98,87 @@ scope and share **one locked version line**.
 | `@mindees/updates` | Pulse | Signed differential OTA + SDUI | 🚧 Scaffold |
 | `create-mindees` | — | Project scaffolder | 🚧 Scaffold |
 
-> 🚧 **Scaffold** = the package exists and builds, but exports only package
-> metadata (`name`, `VERSION`, `maturity`, `info`), the `Maturity`/`PackageInfo`
-> status types, and the `NotImplementedError` / `notImplemented` utilities. Real
-> functionality arrives in its implementation phase (see [ROADMAP.md](./ROADMAP.md)).
+> 🧪 **Experimental** = implemented & tested, API may still change before `1.0`.
+> 🚧 **Scaffold** = exists and builds, but exports only package metadata, the
+> `Maturity`/`PackageInfo` status types, and the `NotImplementedError` /
+> `notImplemented` utilities. Real functionality lands in its phase — see
+> [ROADMAP.md](./ROADMAP.md).
 
-## Quickstart (contributors)
+## 🗺️ Roadmap at a glance
 
-There is no end-user install yet. To work on the framework:
+- ✅ **Phase 0** — Monorepo, governance, verified toolchain, green CI
+- ✅ **Phase 1** — `@mindees/core`: fine-grained signals & reactivity
+- ⏭️ **Phase 2** — Component model & scheduler
+- ⏭️ **Phase 3** — Helix renderer: web/DOM target + native backend contract
+- ⏭️ **Phases 4–12** — Compiler, CLI, Quantum Router, OTA, local-first data,
+  on-device AI, Atlas UI, examples & release
+
+Full plan: [ROADMAP.md](./ROADMAP.md).
+
+## 🚀 Quickstart (contributors)
+
+There's no end-user install yet — to hack on the framework:
 
 ```bash
 corepack enable
 git clone https://github.com/mindees/mindees.git
 cd mindees
 pnpm install
-pnpm verify   # lint + typecheck + test + build
+pnpm verify   # lint + typecheck + build + test
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide.
 
-## We're looking for help with
+## 🛠️ Tech stack
 
-MindeesNative is built in the open and actively wants contributors. Early areas:
+TypeScript (strict) · pnpm workspaces · Turborepo · tsdown (Rolldown) · Biome ·
+Vitest · Changesets · lefthook — all pinned to their latest stable releases.
 
-- The reactive **core** (signals) and **scheduler**.
-- The **compiler** pipeline (parser/transform/codegen).
-- The **router** fundamentals (typed, validated params).
-- Examples, docs, and tests.
+## 🤝 Contributing & community
 
-Check [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
-and [`help wanted`](https://github.com/mindees/mindees/labels/help%20wanted),
-read [GOVERNANCE.md](./GOVERNANCE.md), and open a draft PR — we'll help you land it.
+MindeesNative is built in the open and **actively wants contributors** — whether
+you're into language runtimes, compilers, reactivity, mobile, or docs.
 
-## License
+- 🌱 Start with a [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue) or [`help wanted`](https://github.com/mindees/mindees/labels/help%20wanted)
+- 📐 Big ideas go through the lightweight [RFC process](./rfcs/README.md)
+- 📜 Read the [Governance model](./GOVERNANCE.md) and [Code of Conduct](./CODE_OF_CONDUCT.md)
+- 💬 Ask anything in [GitHub Discussions](https://github.com/mindees/mindees/discussions)
 
-Dual-licensed under **MIT OR Apache-2.0**. See [LICENSE](./LICENSE).
+## ❓ FAQ
+
+**Is MindeesNative a React Native alternative?**
+That's the goal — a TypeScript cross-platform framework that keeps React
+Native's strengths (familiar language, native UI, OTA updates) while removing
+its pain points (dependency hell, single-thread limits, debugging). It's
+pre-alpha today.
+
+**Is it a Flutter alternative?**
+Yes — without requiring a new language (Dart). You write TypeScript, target iOS,
+Android and web, and get fine-grained reactivity and native UI.
+
+**What language does it use?**
+100% TypeScript. No new language to learn.
+
+**Can I build mobile apps with it today?**
+Not yet — it's pre-alpha. The reactive core works now; the renderer, CLI, and UI
+land in upcoming phases. ⭐ Star and watch the repo to follow progress.
+
+**Is it open source?**
+Yes — dual-licensed **MIT OR Apache-2.0**, built fully in the open.
+
+## 📄 License
+
+Dual-licensed under **MIT OR Apache-2.0** — see [LICENSE](./LICENSE).
 
 `SPDX-License-Identifier: MIT OR Apache-2.0`
+
+---
+
+<div align="center">
+
+**MindeesNative** — write TypeScript once, run native everywhere.
+Built in the open at [github.com/mindees/mindees](https://github.com/mindees/mindees) · [@mindees on npm](https://www.npmjs.com/org/mindees)
+
+⭐ Star us on GitHub if you believe cross-platform development should be simple, fast, and honest.
+
+</div>

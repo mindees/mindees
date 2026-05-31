@@ -4,7 +4,8 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 0 (foundations) — complete (merged to `main`, CI + Release green).
+**Last updated:** Phase 1 (core reactivity) — complete: signals, computed/memo,
+effect, batch, untrack, createRoot, onCleanup shipped in `@mindees/core`.
 
 ## Legend
 
@@ -24,13 +25,13 @@ does not work.
 | Open-source governance (license, CoC, security, contributing, RFCs) | ✅ in place |
 | Verified toolchain (pnpm/turbo/ts/biome/vitest/changesets) | ✅ done (Phase 0) |
 | CI (lint + typecheck + test + build) | ✅ done (Phase 0) |
-| Any framework functionality | 📋 not yet — starts Phase 1 |
+| Reactivity (signals/computed/effect/batch) | ✅ done (Phase 1) — `@mindees/core` |
 
 ## Per-package
 
 | Package | Maturity | Notes |
 | --- | --- | --- |
-| `@mindees/core` | 🚧 Scaffold | Reactivity/scheduler land in Phases 1–2. |
+| `@mindees/core` | 🧪 Experimental | Reactivity (signals/computed/effect/batch/untrack/createRoot) shipped in Phase 1. Component model + scheduler land in Phase 2. |
 | `@mindees/compiler` | 🚧 Scaffold | Optimizer/codegen lands in Phase 4. TS→native AOT is 🔬. |
 | `@mindees/cli` | 🚧 Scaffold | Lands in Phase 5. |
 | `@mindees/router` | 🚧 Scaffold | Typed routing core lands in Phase 6; data/transitions Phase 7. |
