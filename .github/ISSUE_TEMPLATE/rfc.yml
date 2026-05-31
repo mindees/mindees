@@ -1,0 +1,32 @@
+name: RFC proposal
+description: Propose a substantial change (new API, package, or architecture)
+title: "[rfc]: "
+labels: ["rfc", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For substantial changes, we use written RFCs. This issue is the
+        lightweight entry point — for non-trivial proposals you'll be asked to
+        open a PR adding a document under `rfcs/` using
+        [the template](https://github.com/mindees/mindees/blob/main/rfcs/0000-template.md).
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One paragraph explanation of the proposal.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why are we doing this? What use cases does it support? What's the expected outcome?
+    validations:
+      required: true
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Rough design sketch
+    validations:
+      required: false

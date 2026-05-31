@@ -1,0 +1,32 @@
+{
+  "name": "@mindees/ai",
+  "version": "0.0.0",
+  "description": "MindeesNative Synapse - on-device and dev-time intelligence. Scaffold.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mindees/mindees.git",
+    "directory": "packages/ai"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mindees/core": "workspace:*"
+  }
+}

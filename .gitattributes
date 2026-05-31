@@ -1,0 +1,18 @@
+# Normalize line endings to LF in the repo (critical for cross-OS contributors on Windows).
+* text=auto eol=lf
+
+# Binary files — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.wasm binary
+
+# Keep shell scripts LF even on Windows checkouts.
+*.sh text eol=lf
+
+# Lockfile: treat as generated (collapse in diffs/reviews).
+pnpm-lock.yaml linguist-generated=true -diff

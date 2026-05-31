@@ -1,0 +1,17 @@
+# Git hooks, managed by lefthook (https://lefthook.dev).
+# Wired automatically on `pnpm install` via the root "prepare" script.
+min_version: 2.0.0
+
+commit-msg:
+  commands:
+    commitlint:
+      # {1} = path to the commit message file (.git/COMMIT_EDITMSG)
+      run: pnpm exec commitlint --edit {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{js,ts,jsx,tsx,json,jsonc}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true

@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Turborepo
+.turbo/
+
+# Vite/Vitest transient config timestamp files
+*.timestamp-*.mjs
+vite.config.*.timestamp-*
+vitest.config.*.timestamp-*
+
+# Test / coverage
+coverage/
+*.lcov
+.vitest/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+lerna-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+# Misc
+*.local
+.cache/
+tmp/
+_probe_out.txt
+_probe*.txt
+
+# Local agent/editor session config (never publish)
+.claude/
+
+# Private internal working doc — not for publication
+MindeesNative_Framework_Spec.md
+
