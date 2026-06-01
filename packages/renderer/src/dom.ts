@@ -105,10 +105,21 @@ export function createDomBackend(doc?: DomDocument): HostBackend<DomNode> {
         }
         return
       }
-      if (key === 'style' && value && typeof value === 'object') {
+      if (key === 'style') {
         const style = el.style
-        for (const [prop, v] of Object.entries(value as Record<string, unknown>)) {
-          style[prop] = String(v)
+        const next = value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+        const prevObj = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : null
+        // Clear keys present in the previous style object but absent from the
+        // new one, so stale inline styles don't persist across reactive updates.
+        if (prevObj) {
+          for (const prop of Object.keys(prevObj)) {
+            if (!next || !(prop in next)) style[prop] = ''
+          }
+        }
+        if (next) {
+          for (const [prop, v] of Object.entries(next)) {
+            style[prop] = String(v)
+          }
         }
         return
       }

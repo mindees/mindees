@@ -115,7 +115,8 @@ function Counter() {
 // Server: real HTML for SEO + fast first paint
 renderToString(Counter, {})        // → '<div>clicked 0×</div>'
 
-// Client: attach reactivity, no re-render of the whole tree
+// Client (current preview): remount with live, fine-grained reactivity.
+// Adopt-in-place hydration (no remount) is tracked as follow-up work.
 hydrate(document.getElementById('app'), Counter, {})
 ```
 

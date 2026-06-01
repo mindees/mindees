@@ -140,19 +140,19 @@ describe('render — disposal', () => {
     expect(html()).toBe('')
   })
 
-  it('disposes effects created inside a component', () => {
+  it('disposes bindings created inside a component (they stop re-running)', () => {
     const { backend, root } = setup()
-    const cleanup = vi.fn()
-    const Comp = () => {
-      // effect registered during render is owned by render()'s root scope
-      const s = signal(0)
-      // create a derived binding + cleanup
-      return h('view', { 'data-v': () => s() }, () => {
-        return ''
-      })
-    }
+    const s = signal(0)
+    const read = vi.fn(() => s())
+    const Comp = () => h('view', { 'data-v': () => read() }, '')
+
     const m = render(Comp, {}, backend, root)
+    expect(read).toHaveBeenCalledTimes(1) // initial binding run
+    s.set(1)
+    expect(read).toHaveBeenCalledTimes(2) // reactive while mounted
+
     m.dispose()
-    expect(cleanup).not.toHaveBeenCalled() // (no onCleanup here; just ensure no throw)
+    s.set(2)
+    expect(read).toHaveBeenCalledTimes(2) // binding disposed → no further runs (no leak)
   })
 })

@@ -21,6 +21,14 @@ describe('renderToString (SSR)', () => {
     expect(html).toBe('<div>7</div>')
   })
 
+  it('treats a top-level accessor node as a node, not a component', () => {
+    // Regression: MindeesNode includes `() => MindeesNode`, so dispatch must not
+    // misclassify a 1-arg accessor call as the component form.
+    const n = signal(3)
+    const html = renderToString(() => h('view', null, () => n()))
+    expect(html).toBe('<div>3</div>')
+  })
+
   it('escapes text and attribute values', () => {
     const html = renderToString(h('view', { title: 'a"b' }, '<script>'))
     expect(html).toBe('<div title="a&quot;b">&lt;script&gt;</div>')
@@ -48,6 +56,15 @@ describe('hydrate', () => {
 
     m.dispose()
     expect(container.childNodes.length).toBe(0)
+  })
+
+  it('honors the options.document for a node + options call (dispatch regression)', () => {
+    // node-form hydrate with an explicit document must not treat options as props.
+    const container = document.createElement('div')
+    container.innerHTML = renderToString(h('view', null, 'x'))
+    const m = hydrate(container as never, h('view', null, 'x'), { document: document as never })
+    expect(container.textContent).toBe('x')
+    m.dispose()
   })
 
   it('hydrates a component + props', () => {

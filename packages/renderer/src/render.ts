@@ -77,22 +77,20 @@ export function render<N, P>(
   c?: HostBackend<N> | N,
   d?: N,
 ): Mounted<N> {
-  // Disambiguate the two overloads.
-  let node: MindeesNode
-  let backend: HostBackend<N>
-  let container: N
-  if (typeof a === 'function') {
-    node = (a as Component<P>)(b as P)
-    backend = c as HostBackend<N>
-    container = d as N
-  } else {
-    node = a
-    backend = b as HostBackend<N>
-    container = c as N
-  }
+  // Disambiguate by ARITY, not `typeof a`: `MindeesNode` now includes the
+  // accessor form `() => MindeesNode`, so a function `a` may be either a
+  // component (4-arg form) or a reactive node (3-arg form). The component form
+  // is the only one with a 4th argument (`container = d`).
+  const isComponentForm = d !== undefined
+  const backend = (isComponentForm ? c : b) as HostBackend<N>
+  const container = (isComponentForm ? d : c) as N
 
   let nodes: N[] = []
   const dispose = createRoot((dispose) => {
+    // Evaluate the component INSIDE the root scope so its effects/memos are
+    // owned here and disposed with us. A non-component node is mounted as-is
+    // (an accessor node becomes a reactive region during mount).
+    const node: MindeesNode = isComponentForm ? (a as Component<P>)(b as P) : (a as MindeesNode)
     nodes = mountNode(node, backend, container, null)
     return dispose
   })
@@ -121,6 +119,12 @@ function mountNode<N>(
 ): N[] {
   // Null-ish / boolean → nothing.
   if (node === null || node === undefined || typeof node === 'boolean') return []
+
+  // Function node → a reactive region (an accessor `() => MindeesNode`). Handled
+  // uniformly here so it works at the top level and as a child.
+  if (typeof node === 'function') {
+    return bindReactiveChild(node as () => MindeesNode, backend, parent, anchor)
+  }
 
   // Text-like primitives.
   if (typeof node === 'string' || typeof node === 'number') {
@@ -166,13 +170,10 @@ function mountChildren<N>(
   backend: HostBackend<N>,
   parent: N,
 ): void {
+  // mountNode handles every node kind uniformly, including function children
+  // (reactive regions) via the function-node branch.
   for (const child of children) {
-    // A function child is a reactive region.
-    if (typeof child === 'function') {
-      bindReactiveChild(child as () => MindeesNode, backend, parent)
-    } else {
-      mountNode(child, backend, parent, null)
-    }
+    mountNode(child, backend, parent, null)
   }
 }
 
@@ -203,13 +204,18 @@ function bindProp<N>(backend: HostBackend<N>, el: N, key: string, value: unknown
  * Bind a reactive child region: an effect that, when the accessor changes,
  * unmounts the previous nodes and mounts the new ones at the same position. A
  * stable text-only fast path patches the text node in place.
+ *
+ * The effect runs synchronously on creation, so `current` is populated before
+ * we return it — letting the caller report the region's initial host nodes.
  */
 function bindReactiveChild<N>(
   accessor: () => MindeesNode,
   backend: HostBackend<N>,
   parent: N,
-): void {
+  initialAnchor: N | null,
+): N[] {
   let current: N[] = []
+  let first = true
   effect(() => {
     const value = accessor()
     untrack(() => {
@@ -223,12 +229,18 @@ function bindReactiveChild<N>(
         backend.setText(current[0], String(value))
         return
       }
-      // Compute the anchor (where the region currently sits) before removing.
-      const anchor = current.length > 0 ? nextSiblingAfter(backend, current) : null
+      // First run uses the caller's anchor; later runs reuse the region's slot.
+      const anchor = first
+        ? initialAnchor
+        : current.length > 0
+          ? nextSiblingAfter(backend, current)
+          : initialAnchor
       for (const n of current) backend.remove(parent, n)
       current = mountNode(value, backend, parent, anchor)
+      first = false
     })
   })
+  return current
 }
 
 /** The sibling immediately after the last node of `group` (insertion anchor). */

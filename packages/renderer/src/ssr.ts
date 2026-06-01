@@ -26,13 +26,16 @@ import { type Mounted, render } from './render'
  */
 export function renderToString(node: MindeesNode): string
 export function renderToString<P>(component: Component<P>, props: P): string
-export function renderToString<P>(a: MindeesNode | Component<P>, b?: P): string {
+export function renderToString<P>(...args: [MindeesNode] | [Component<P>, P]): string {
   const backend = createHeadlessBackend()
   const root = createHeadlessRoot('#root')
+  // Component form is the 2-arg call (a component + its props). A 1-arg call is
+  // a node — including an accessor node `() => MindeesNode` — so we dispatch by
+  // arity, not `typeof`.
   const mounted =
-    typeof a === 'function'
-      ? render(a as Component<P>, b as P, backend, root)
-      : render(a as MindeesNode, backend, root)
+    args.length === 2
+      ? render(args[0] as Component<P>, args[1] as P, backend, root)
+      : render(args[0] as MindeesNode, backend, root)
   try {
     // Serialize with the web tag mapping so SSR HTML matches what the DOM
     // backend produces on hydration (view→div, text→span, …).
@@ -74,12 +77,25 @@ export function hydrate<P>(
   b?: P | { document?: DomDocument },
   c?: { document?: DomDocument },
 ): Mounted<DomNode> {
-  const isComponent = typeof a === 'function'
-  const options = (isComponent ? c : (b as { document?: DomDocument } | undefined)) ?? {}
+  type Options = { document?: DomDocument }
+  const looksLikeOptions = (v: unknown): v is Options =>
+    v === undefined ||
+    (typeof v === 'object' && v !== null && Object.keys(v).every((k) => k === 'document'))
+
+  // `MindeesNode` includes the accessor form `() => MindeesNode`, so `typeof a`
+  // can't tell a component from a node. Dispatch by arity/shape instead:
+  // - a 4th arg (`c`) present ⇒ component form `(container, Component, props, options?)`.
+  // - a 3rd arg (`b`) that is NOT a bare `{ document }` options object ⇒ also the
+  //   component form (props supplied without options).
+  // - otherwise ⇒ node form `(container, node, options?)` where `b` is options.
+  const isComponent = c !== undefined || (b !== undefined && !looksLikeOptions(b))
+  const props = isComponent ? (b as P) : undefined
+  const options: Options = (isComponent ? c : (b as Options | undefined)) ?? {}
+
   const backend = createDomBackend(options.document)
 
-  // Clear any server-rendered children, then render fresh and attach bindings.
-  // (Adopt-in-place hydration is a documented follow-up; see the module note.)
+  // Current preview: clear server-rendered children, then render fresh and
+  // attach bindings. Adopt-in-place hydration is a documented follow-up.
   let child = (container as DomNode & { firstChild?: DomNode | null }).firstChild ?? null
   while (child) {
     const next = child.nextSibling
@@ -88,6 +104,6 @@ export function hydrate<P>(
   }
 
   return isComponent
-    ? render(a as Component<P>, b as P, backend, container)
+    ? render(a as Component<P>, props as P, backend, container)
     : render(a as MindeesNode, backend, container)
 }
