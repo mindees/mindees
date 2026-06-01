@@ -14,7 +14,7 @@ See [STATUS.md](./STATUS.md) for current maturity.
 - [x] **Phase 2 — `@mindees/core` II: component model, scheduler & threading** ✅
   Selector-based, re-render-isolated context; priority scheduler; worker-backed
   thread abstraction (native multi-thread is research-track).
-- [ ] **Phase 3 — `@mindees/renderer` (Helix): web/DOM target + backend contract**
+- [x] **Phase 3 — `@mindees/renderer` (Helix): web/DOM target + backend contract** ✅
   Working SSR-capable DOM backend + headless test backend; `NativeBackend`
   interface defined.
 - [ ] **Phase 4 — `@mindees/compiler` (MDC): build-time optimizer**
