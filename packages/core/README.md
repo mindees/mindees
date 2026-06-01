@@ -11,7 +11,14 @@ frameworks), written in strict TypeScript.
 
 ## Install
 
+> ⚠️ **Not published to npm yet.** `@mindees/core` is pre-1.0 and not on the npm
+> registry. The command below is what you'll use **once it's published** (Phase
+> 12). For now, work with it from the monorepo via the
+> [contributor quick-start](../../README.md#-quickstart-contributors):
+> `corepack enable && pnpm install && pnpm verify`.
+
 ```bash
+# coming soon (not yet published):
 pnpm add @mindees/core
 ```
 

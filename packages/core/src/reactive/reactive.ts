@@ -213,8 +213,21 @@ function disposeChildren(owner: Owner): void {
     owner.owned = null
   }
   if (owner.cleanups) {
-    for (const c of owner.cleanups) c()
+    // Run every cleanup even if one throws, so a single faulty cleanup can't
+    // strand the rest (or leak the owner). Collect failures and surface them
+    // together afterward.
+    const cleanups = owner.cleanups
     owner.cleanups = null
+    const errors: unknown[] = []
+    for (const c of cleanups) {
+      try {
+        c()
+      } catch (err) {
+        errors.push(err)
+      }
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, 'cleanup(s) threw')
   }
 }
 
