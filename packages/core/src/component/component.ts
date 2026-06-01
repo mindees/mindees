@@ -24,7 +24,14 @@ import { computed, createRoot, getOwner, signal } from '../reactive'
 /** A component: a function from props to a renderable node. */
 export type Component<P = Record<string, unknown>> = (props: P) => MindeesNode
 
-/** Anything that can appear in the tree. */
+/**
+ * Anything that can appear in the tree.
+ *
+ * Includes an **accessor** form `() => MindeesNode`: a function child (or
+ * function prop value) is a *reactive region* — the renderer subscribes to it
+ * and patches exactly that region when its signals change (the fine-grained
+ * update model, à la SolidJS). Static trees never need it; reactive UIs do.
+ */
 export type MindeesNode =
   | MindeesElement
   | string
@@ -32,6 +39,7 @@ export type MindeesNode =
   | boolean
   | null
   | undefined
+  | (() => MindeesNode)
   | MindeesNode[]
 
 /** The tag of an element: a host string (e.g. `"view"`) or a component function. */

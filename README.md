@@ -97,6 +97,31 @@ No more "the whole screen re-rendered because one field changed." MindeesNative
 ships a **priority scheduler** and a **Web Worker thread-pool** in the same core,
 too — see [`@mindees/core`](./packages/core).
 
+### 🖥️ Render to the DOM with real SSR — crawlable, SEO-friendly (Phase 3)
+
+Unlike Flutter Web (which paints to a canvas search engines can't read),
+MindeesNative's **Helix** renderer emits real, crawlable HTML on the server and
+hydrates it into a live, fine-grained reactive tree on the client:
+
+```ts
+import { renderToString, hydrate } from '@mindees/renderer'
+import { signal, createElement as h } from '@mindees/core'
+
+function Counter() {
+  const n = signal(0)
+  return h('view', { onClick: () => n.set(n() + 1) }, () => `clicked ${n()}×`)
+}
+
+// Server: real HTML for SEO + fast first paint
+renderToString(Counter, {})        // → '<div>clicked 0×</div>'
+
+// Client: attach reactivity, no re-render of the whole tree
+hydrate(document.getElementById('app'), Counter, {})
+```
+
+One renderer, swappable **host backends**: a web/DOM backend and a headless
+backend ship today; native (iOS/Android) and a GPU canvas are on the roadmap.
+
 ## 📦 Packages
 
 Everything ships under the [`@mindees`](https://www.npmjs.com/org/mindees) npm
@@ -109,7 +134,7 @@ upgrades).
 | `@mindees/compiler` | MDC | Build-time optimizer & codegen | 🚧 Scaffold |
 | `@mindees/cli` | Forge | `mindees` CLI: create / dev / build / deploy | 🚧 Scaffold |
 | `@mindees/router` | Quantum | Typed, data-aware router | 🚧 Scaffold |
-| `@mindees/renderer` | Helix | Native + GPU-canvas renderer | 🚧 Scaffold |
+| [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration (native + GPU canvas 🔬) | 🧪 Experimental |
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
 | `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
@@ -127,8 +152,9 @@ upgrades).
 - ✅ **Phase 0** — Monorepo, governance, verified toolchain, green CI
 - ✅ **Phase 1** — `@mindees/core`: fine-grained signals & reactivity
 - ✅ **Phase 2** — Component model, selector-isolated context, priority scheduler & threading
-- ⏭️ **Phase 3** — Helix renderer: web/DOM target + native backend contract
-- ⏭️ **Phases 4–12** — Compiler, CLI, Quantum Router, OTA, local-first data,
+- ✅ **Phase 3** — Helix renderer: fine-grained web/DOM backend, **SSR + hydration**, headless test backend
+- ⏭️ **Phase 4** — Mindees Compiler (MDC): build-time optimizer
+- ⏭️ **Phases 5–12** — CLI, Quantum Router, OTA, local-first data,
   on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
