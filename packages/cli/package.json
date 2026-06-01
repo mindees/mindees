@@ -1,10 +1,13 @@
 {
   "name": "@mindees/cli",
   "version": "0.0.0",
-  "description": "MindeesNative Forge - the mindees CLI. Scaffold.",
+  "description": "MindeesNative Forge — the `mindees` CLI: create, build (via the compiler), dev (rebuild orchestrator), doctor, info.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "sideEffects": false,
+  "bin": {
+    "mindees": "./dist/bin.js"
+  },
   "files": [
     "dist"
   ],
@@ -27,6 +30,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mindees/core": "workspace:*"
+    "@mindees/core": "workspace:*",
+    "@mindees/compiler": "workspace:*"
   }
 }

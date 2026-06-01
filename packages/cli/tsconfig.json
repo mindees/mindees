@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // The CLI runs on Node (bin.ts uses node:fs/path/process); the build path
+    // imports @mindees/compiler which also needs Node ambient types.
+    "types": ["node"]
   },
   "include": ["src"]
 }

@@ -139,6 +139,20 @@ compileChecked('export const v = <view><text>hi</text></view>').stats
 
 Zero native binaries → deterministic, reproducible builds on every OS and CI.
 
+### 🛠️ One CLI to scaffold, build, and diagnose (Phase 5)
+
+`create-mindees` and the `mindees` CLI (Forge) get you from zero to a running
+app — and `mindees doctor` replaces cryptic failures with actionable fixes.
+
+```bash
+npm create mindees@latest my-app -- --template counter
+cd my-app && pnpm install
+mindees build      # type-checks + compiles your app
+mindees doctor     # ✓ Node ✓ pnpm ! node_modules missing → run `pnpm install`
+```
+
+Built on Node's own `parseArgs` — zero CLI dependencies.
+
 ## 📦 Packages
 
 Everything ships under the [`@mindees`](https://www.npmjs.com/org/mindees) npm
@@ -149,14 +163,14 @@ upgrades).
 | --- | --- | --- | --- |
 | [`@mindees/core`](./packages/core) | — | Reactivity (signals) + component model + scheduler + threading | 🧪 Experimental |
 | [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest | 🧪 Experimental |
-| `@mindees/cli` | Forge | `mindees` CLI: create / dev / build / deploy | 🚧 Scaffold |
+| [`@mindees/cli`](./packages/cli) | Forge | `mindees` CLI: create / build / doctor / info / dev | 🧪 Experimental |
 | `@mindees/router` | Quantum | Typed, data-aware router | 🚧 Scaffold |
 | [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration (native + GPU canvas 🔬) | 🧪 Experimental |
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
 | `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
 | `@mindees/updates` | Pulse | Signed differential OTA + SDUI | 🚧 Scaffold |
-| `create-mindees` | — | Project scaffolder | 🚧 Scaffold |
+| [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
 
 > 🧪 **Experimental** = implemented & tested, API may still change before `1.0`.
 > 🚧 **Scaffold** = exists and builds, but exports only package metadata, the
@@ -171,9 +185,9 @@ upgrades).
 - ✅ **Phase 2** — Component model, selector-isolated context, priority scheduler & threading
 - ✅ **Phase 3** — Helix renderer: fine-grained web/DOM backend, **SSR + hydration**, headless test backend
 - ✅ **Phase 4** — Mindees Compiler (MDC): type-check gate, TSX transform, tree-flattening, route manifest
-- ⏭️ **Phase 5** — Forge CLI + `create-mindees`
-- ⏭️ **Phases 6–12** — Quantum Router, OTA, local-first data,
-  on-device AI, Atlas UI, examples & release
+- ✅ **Phase 5** — Forge CLI + `create-mindees`: scaffold, build, doctor
+- ⏭️ **Phase 6** — Quantum Router: typed, runtime-validated routing
+- ⏭️ **Phases 7–12** — OTA, local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 

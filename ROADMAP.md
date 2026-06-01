@@ -20,7 +20,7 @@ See [STATUS.md](./STATUS.md) for current maturity.
 - [x] **Phase 4 — `@mindees/compiler` (MDC): build-time optimizer** ✅
   Type-check gate, TSX transform, tree-flattening, per-route splitting
   (TS→native AOT is a labeled research track with a working fallback).
-- [ ] **Phase 5 — `@mindees/cli` (Forge) + `create-mindees`**
+- [x] **Phase 5 — `@mindees/cli` (Forge) + `create-mindees`** ✅
   `create` / `dev` (web HMR) / `build` / `doctor`; tested templates.
 - [ ] **Phase 6 — `@mindees/router` (Quantum) I: typed routing core**
   Typed + runtime-validated params, typegen, re-render isolation.
