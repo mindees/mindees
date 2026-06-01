@@ -25,6 +25,18 @@ describe('runCreate (create-mindees)', () => {
     expect(result.template).toBe('counter')
   })
 
+  it('prefers an explicit template over a conflicting prompt', () => {
+    const fs = createMemoryFileSystem()
+    const result = runCreate(fs, {
+      appName: 'c',
+      targetDir: 'c',
+      template: 'blank',
+      prompt: 'a reactive counter',
+    })
+    expect(result.ok).toBe(true)
+    expect(result.template).toBe('blank')
+  })
+
   it('refuses a non-empty target without force', () => {
     const fs = createMemoryFileSystem({ 'c/x.txt': 'hi' })
     expect(runCreate(fs, { appName: 'c', targetDir: 'c' }).ok).toBe(false)

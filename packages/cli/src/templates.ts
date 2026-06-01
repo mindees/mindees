@@ -8,6 +8,8 @@
  * @module
  */
 
+import { VERSION } from './version'
+
 /** A template: a name, a description, and its files (relative path → contents). */
 export interface Template {
   name: string
@@ -15,13 +17,25 @@ export interface Template {
   files: Record<string, string>
 }
 
-const PKG_VERSION = '0.0.0'
+/**
+ * Version pinned for scaffolded apps. Derives from the CLI's own
+ * {@link VERSION} (the single locked `@mindees/*` version line) so generated
+ * projects always pin the framework packages to the same release that
+ * scaffolded them, instead of a hardcoded literal.
+ */
+const PKG_VERSION = VERSION
 
 function appPackageJson(appName: string, extraDeps: Record<string, string> = {}): string {
   const deps = {
     '@mindees/core': PKG_VERSION,
     '@mindees/renderer': PKG_VERSION,
     ...extraDeps,
+  }
+  // The `dev`/`build` scripts invoke the `mindees` binary, so the CLI must be a
+  // (dev) dependency of the generated app — otherwise the commands only resolve
+  // when the CLI happens to be installed globally.
+  const devDeps = {
+    '@mindees/cli': PKG_VERSION,
   }
   return `${JSON.stringify(
     {
@@ -34,6 +48,7 @@ function appPackageJson(appName: string, extraDeps: Record<string, string> = {})
         build: 'mindees build',
       },
       dependencies: deps,
+      devDependencies: devDeps,
     },
     null,
     2,
