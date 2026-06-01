@@ -1,16 +1,26 @@
 # create-mindees
 
-create-mindees, the project scaffolder.
+Scaffold a new MindeesNative app:
 
-> Status: Scaffold (Phase 0). Not implemented yet. This package exports only
-> package metadata, the shared status types, and the re-exported
-> `NotImplementedError` / `notImplemented` utilities from `@mindees/core`.
+```bash
+npm create mindees@latest my-app
+# or: pnpm create mindees my-app --template counter
+```
 
-## What it will become
+> **Status: 🧪 Experimental (Phase 5).** Implemented and tested. Delegates to
+> `@mindees/cli`'s tested `scaffold` core, so `npm create mindees` and
+> `mindees create` behave identically.
 
-The scaffolder behind npm create mindees@latest.
+## Usage
 
-See the repository [ROADMAP.md](../../ROADMAP.md) (Phase 5).
+```bash
+create-mindees <app-name> [--template blank|counter] [--prompt "..."] [--force]
+```
+
+- `--template` — pick a starter (`blank` or `counter`). Default `blank`.
+- `--prompt "a reactive counter"` — offline keyword mapping to a template
+  (real natural-language app generation arrives with `@mindees/ai` in Phase 10).
+- `--force` — overwrite a non-empty target directory.
 
 ## License
 

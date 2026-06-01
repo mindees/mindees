@@ -2,7 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // bin.ts uses node:fs/path/process for the `npm create` adapter.
+    "types": ["node"]
   },
   "include": ["src"]
 }

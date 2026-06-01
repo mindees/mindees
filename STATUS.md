@@ -4,11 +4,11 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 4 (Mindees Compiler / MDC) — complete: a build-time
-optimizer on the TypeScript Compiler API — strict **type-check gate**,
-TSX→`createElement` transform with source maps, **tree-flattening**, per-route
-**code-splitting** manifest, and a plugin API — shipped in `@mindees/compiler`.
-TS→native AOT remains a research track.
+**Last updated:** Phase 5 (Forge CLI + create-mindees) — complete: the `mindees`
+CLI (`create`, `build` via the compiler, `doctor`, `info`, a tested dev
+rebuild-orchestrator) plus `create-mindees` (`npm create mindees`) shipped. The
+live dev-server HTTP/HMR transport is a developer preview; on-device NL→app
+generation is Phase 10 (today `--prompt` maps to a template deterministically).
 
 ## Legend
 
@@ -33,6 +33,7 @@ TS→native AOT remains a research track.
 | Priority scheduler + thread-pool abstraction | ✅ done (Phase 2) — `@mindees/core` (native threads 🔬) |
 | Reactive renderer + web/DOM backend + SSR/hydration | ✅ done (Phase 3) — `@mindees/renderer` (native + GPU canvas 🔬) |
 | Compiler: type-check gate + TSX transform + tree-flatten + route manifest | ✅ done (Phase 4) — `@mindees/compiler` (TS→native AOT 🔬) |
+| CLI: create + build + doctor + info + dev orchestrator; `npm create mindees` | ✅ done (Phase 5) — `@mindees/cli` + `create-mindees` (dev HTTP/HMR transport = preview) |
 
 ## Per-package
 
@@ -40,14 +41,14 @@ TS→native AOT remains a research track.
 | --- | --- | --- |
 | `@mindees/core` | 🧪 Experimental | Phase 1 reactivity + Phase 2 component model, selector-isolated context, priority scheduler & thread-pool (Web Worker + inline). Native multi-threading is 🔬. |
 | `@mindees/compiler` | 🧪 Experimental | MDC build-time optimizer (type-check gate, TSX→createElement, tree-flattening, per-route manifest, plugin API) on the TS Compiler API shipped in Phase 4. TS→native AOT is 🔬. |
-| `@mindees/cli` | 🚧 Scaffold | Lands in Phase 5. |
+| `@mindees/cli` | 🧪 Experimental | Forge CLI shipped in Phase 5: create (+ templates), build (via the compiler), doctor, info, dev rebuild-orchestrator. Live dev-server HTTP/HMR transport is a preview. |
 | `@mindees/router` | 🚧 Scaffold | Typed routing core lands in Phase 6; data/transitions Phase 7. |
 | `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. Native (iOS/Android) + GPU canvas are 🔬. |
 | `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 11 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 10 (mock/server backends; on-device 🔬). |
 | `@mindees/data` | 🚧 Scaffold | Lands in Phase 9. |
 | `@mindees/updates` | 🚧 Scaffold | Lands in Phase 8. WASM module runtime is 🔬. |
-| `create-mindees` | 🚧 Scaffold | Lands in Phase 5. |
+| `create-mindees` | 🧪 Experimental | `npm create mindees` scaffolder shipped in Phase 5; delegates to `@mindees/cli`'s tested core. |
 
 ## Standing research tracks (the honest frontier)
 

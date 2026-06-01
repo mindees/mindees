@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { info, maturity, NotImplementedError, name, notImplemented, VERSION } from './index'
 
-describe('@mindees/cli (scaffold)', () => {
+describe('@mindees/cli', () => {
   it('exposes honest package metadata', () => {
     expect(name).toBe('@mindees/cli')
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+/)
-    expect(maturity).toBe('scaffold')
-    expect(info).toEqual({ name: '@mindees/cli', version: VERSION, maturity: 'scaffold' })
+    expect(maturity).toBe('experimental')
+    expect(info).toEqual({ name: '@mindees/cli', version: VERSION, maturity: 'experimental' })
   })
 
   it('re-exports a throwable NotImplementedError', () => {

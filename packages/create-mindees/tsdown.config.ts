@@ -1,7 +1,8 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: ['./src/index.ts'],
+  // Two entries: the library API (index) and the `create-mindees` executable (bin).
+  entry: ['./src/index.ts', './src/bin.ts'],
   format: 'esm',
   dts: true,
   platform: 'neutral',
