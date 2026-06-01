@@ -4,10 +4,11 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 3 (Helix renderer) — complete: a fine-grained reactive
-reconciler with a web/DOM backend, **SSR + hydration**, and a headless test
-backend shipped in `@mindees/renderer`. Native (iOS/Android) and the GPU canvas
-remain research tracks.
+**Last updated:** Phase 4 (Mindees Compiler / MDC) — complete: a build-time
+optimizer on the TypeScript Compiler API — strict **type-check gate**,
+TSX→`createElement` transform with source maps, **tree-flattening**, per-route
+**code-splitting** manifest, and a plugin API — shipped in `@mindees/compiler`.
+TS→native AOT remains a research track.
 
 ## Legend
 
@@ -31,13 +32,14 @@ remain research tracks.
 | Component model + selector-isolated context | ✅ done (Phase 2) — `@mindees/core` |
 | Priority scheduler + thread-pool abstraction | ✅ done (Phase 2) — `@mindees/core` (native threads 🔬) |
 | Reactive renderer + web/DOM backend + SSR/hydration | ✅ done (Phase 3) — `@mindees/renderer` (native + GPU canvas 🔬) |
+| Compiler: type-check gate + TSX transform + tree-flatten + route manifest | ✅ done (Phase 4) — `@mindees/compiler` (TS→native AOT 🔬) |
 
 ## Per-package
 
 | Package | Maturity | Notes |
 | --- | --- | --- |
 | `@mindees/core` | 🧪 Experimental | Phase 1 reactivity + Phase 2 component model, selector-isolated context, priority scheduler & thread-pool (Web Worker + inline). Native multi-threading is 🔬. |
-| `@mindees/compiler` | 🚧 Scaffold | Optimizer/codegen lands in Phase 4. TS→native AOT is 🔬. |
+| `@mindees/compiler` | 🧪 Experimental | MDC build-time optimizer (type-check gate, TSX→createElement, tree-flattening, per-route manifest, plugin API) on the TS Compiler API shipped in Phase 4. TS→native AOT is 🔬. |
 | `@mindees/cli` | 🚧 Scaffold | Lands in Phase 5. |
 | `@mindees/router` | 🚧 Scaffold | Typed routing core lands in Phase 6; data/transitions Phase 7. |
 | `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. Native (iOS/Android) + GPU canvas are 🔬. |
