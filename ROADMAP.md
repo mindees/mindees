@@ -11,7 +11,7 @@ See [STATUS.md](./STATUS.md) for current maturity.
   scaffolds exporting only metadata + `NotImplementedError`.
 - [x] **Phase 1 — `@mindees/core` I: signals & reactivity** ✅
   Glitch-free, leak-free fine-grained reactivity.
-- [x] **Phase 2 — `@mindees/core` II: component model & scheduler** ✅
+- [x] **Phase 2 — `@mindees/core` II: component model, scheduler & threading** ✅
   Selector-based, re-render-isolated context; priority scheduler; worker-backed
   thread abstraction (native multi-thread is research-track).
 - [ ] **Phase 3 — `@mindees/renderer` (Helix): web/DOM target + backend contract**

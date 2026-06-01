@@ -82,7 +82,7 @@ Custom equality is supported everywhere (`{ equals: (a, b) => … }`, or
 ```ts
 import {
   createContext, createProvider, createElement,
-  createScheduler, createWorkerPool, createInlineThreadPool,
+  createScheduler, createInlineThreadPool,
 } from '@mindees/core'
 
 // Selector-based context with re-render isolation: a consumer only re-runs
@@ -96,8 +96,9 @@ const name = session.select((s) => s.user.name) // memo; isolated from `unread`
 const scheduler = createScheduler()
 scheduler.schedule(() => paint(), { priority: 'sync', key: 'frame' })
 
-// Thread-pool abstraction: real Web Worker backend, inline fallback.
-const pool = createInlineThreadPool() // or createWorkerPool({ createWorker })
+// Thread-pool abstraction. The inline fallback runs jobs synchronously;
+// createWorkerPool({ createWorker }) runs them on real Web Workers (see API below).
+const pool = createInlineThreadPool()
 await pool.run((n) => fib(n), 40)
 ```
 
