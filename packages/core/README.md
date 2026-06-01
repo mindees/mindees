@@ -4,10 +4,12 @@ The reactive runtime foundation of MindeesNative — a fast, fine-grained
 **signals** library (the same reactivity model behind SolidJS and modern
 frameworks), written in strict TypeScript.
 
-> **Status: 🧪 Experimental (Phase 1).** The reactivity layer — `signal`,
-> `computed`/`memo`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup` — is
-> **implemented and thoroughly tested** (glitch-free, leak-free). The component
-> model and scheduler arrive in Phase 2. APIs may still change before `1.0`.
+> **Status: 🧪 Experimental (Phases 1–2).** Implemented and thoroughly tested:
+> the **reactivity** layer (`signal`, `computed`/`memo`, `effect`, `batch`,
+> `untrack`, `createRoot`, `onCleanup`), the **component model** (element tree +
+> selector-based, re-render-isolated context), the **priority scheduler**, and a
+> **thread-pool** abstraction (Web Worker backend + inline fallback). APIs may
+> still change before `1.0`.
 
 ## Install
 
@@ -74,6 +76,42 @@ depend on a changed value re-run — no virtual-DOM diffing, no manual
 
 Custom equality is supported everywhere (`{ equals: (a, b) => … }`, or
 `equals: false` to always notify).
+
+## Component model, scheduler & threading (Phase 2)
+
+```ts
+import {
+  createContext, createProvider, createElement,
+  createScheduler, createWorkerPool, createInlineThreadPool,
+} from '@mindees/core'
+
+// Selector-based context with re-render isolation: a consumer only re-runs
+// when its SELECTED slice changes, not on every context update.
+const Session = createContext({ user: { name: 'Ada' }, unread: 0 })
+const session = createProvider(Session)
+const name = session.select((s) => s.user.name) // memo; isolated from `unread`
+
+// Two-lane priority scheduler (sync vs normal), microtask-batched,
+// with cancellable + dedup-by-key tasks.
+const scheduler = createScheduler()
+scheduler.schedule(() => paint(), { priority: 'sync', key: 'frame' })
+
+// Thread-pool abstraction: real Web Worker backend, inline fallback.
+const pool = createInlineThreadPool() // or createWorkerPool({ createWorker })
+await pool.run((n) => fib(n), 40)
+```
+
+| Export | Kind | Description |
+| --- | --- | --- |
+| `createElement` / `Fragment` / `isElement` | fn | Renderer-agnostic element tree. |
+| `createContext` / `createProvider` | fn | Selector-based, **re-render-isolated** context. |
+| `renderComponent` | fn | Run a component in a disposable owner scope. |
+| `createScheduler` / `Scheduler` | fn | Two-lane priority scheduler (cancellable, dedupable). |
+| `createWorkerPool` / `createInlineThreadPool` | fn | `ThreadPool` backends (web + fallback). |
+| `createNativeThreadPool` | fn | 🔬 research track — throws `NotImplementedError`. |
+
+> Native multi-threading is a **research track** (honest `NotImplementedError`);
+> the Web Worker and inline backends work today.
 
 ## License
 

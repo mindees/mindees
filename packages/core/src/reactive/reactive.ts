@@ -96,14 +96,23 @@ class Computation<T> implements Owner {
   cleanups: Array<() => void> | null = null
   equals: EqualsFn<T> | false
   readonly isEffect: boolean
+  /**
+   * Whether {@link value} holds a real computed result yet. Derivations start
+   * uninitialized (their initial `value` is a placeholder); the first
+   * computation must NOT call `equals(oldValue, …)` against that placeholder —
+   * a custom comparator would receive `undefined` and could throw.
+   */
+  private initialized: boolean
 
   constructor(value: T, fn: (() => T) | null, equals: EqualsFn<T> | false, isEffect: boolean) {
     this.value = value
     this.fn = fn
     this.equals = equals
     this.isEffect = isEffect
-    // Signals (no fn) start CLEAN; derivations start DIRTY so they compute lazily.
+    // Signals (no fn) start CLEAN and already hold a real value; derivations
+    // start DIRTY (compute lazily) and uninitialized.
     this.state = fn ? DIRTY : CLEAN
+    this.initialized = fn === null
   }
 
   /** Read the current value, tracking a dependency if a computation is running. */
@@ -168,7 +177,12 @@ class Computation<T> implements Owner {
       currentOwner = prevOwner
     }
 
-    const changed = this.equals === false || !this.equals(oldValue, this.value)
+    // On the first computation there is no prior value to compare against, so
+    // the result is always "changed". Afterwards, apply the equality check
+    // (unless equals is false, meaning "always changed").
+    const wasInitialized = this.initialized
+    this.initialized = true
+    const changed = !wasInitialized || this.equals === false || !this.equals(oldValue, this.value)
     if (changed && this.observers) {
       // Observers are already CHECK from the original push; promote them to DIRTY
       // so the in-flight pull recomputes them.

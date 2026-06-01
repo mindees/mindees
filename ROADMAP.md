@@ -9,9 +9,9 @@ See [STATUS.md](./STATUS.md) for current maturity.
 - [x] **Phase 0 — Repository, governance & toolchain foundation** ✅
   Monorepo, full OSS/governance surface, verified toolchain, green CI, package
   scaffolds exporting only metadata + `NotImplementedError`.
-- [ ] **Phase 1 — `@mindees/core` I: signals & reactivity**
+- [x] **Phase 1 — `@mindees/core` I: signals & reactivity** ✅
   Glitch-free, leak-free fine-grained reactivity.
-- [ ] **Phase 2 — `@mindees/core` II: component model & scheduler**
+- [x] **Phase 2 — `@mindees/core` II: component model & scheduler** ✅
   Selector-based, re-render-isolated context; priority scheduler; worker-backed
   thread abstraction (native multi-thread is research-track).
 - [ ] **Phase 3 — `@mindees/renderer` (Helix): web/DOM target + backend contract**

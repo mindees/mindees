@@ -79,6 +79,24 @@ batch(() => {                // coalesce writes → effect runs once
 Glitch-free, lazy, leak-free, and fully typed. See
 [`@mindees/core`](./packages/core) for the full API.
 
+### 🧩 Re-render isolation — context that only updates what changed (Phase 2)
+
+```ts
+import { createContext, createProvider } from '@mindees/core'
+
+const Session = createContext({ user: { name: 'Ada' }, unread: 0 })
+const session = createProvider(Session)
+
+const name = session.select((s) => s.user.name)   // memo, isolated
+const unread = session.select((s) => s.unread)     // memo, isolated
+
+session.set({ user: { name: 'Ada' }, unread: 5 })  // only `unread` consumers re-run
+```
+
+No more "the whole screen re-rendered because one field changed." MindeesNative
+ships a **priority scheduler** and a **Web Worker thread-pool** in the same core,
+too — see [`@mindees/core`](./packages/core).
+
 ## 📦 Packages
 
 Everything ships under the [`@mindees`](https://www.npmjs.com/org/mindees) npm
@@ -87,7 +105,7 @@ upgrades).
 
 | Package | Codename | Purpose | Status |
 | --- | --- | --- | --- |
-| [`@mindees/core`](./packages/core) | — | Reactivity (signals), runtime, scheduler | 🧪 Experimental |
+| [`@mindees/core`](./packages/core) | — | Reactivity (signals) + component model + scheduler + threading | 🧪 Experimental |
 | `@mindees/compiler` | MDC | Build-time optimizer & codegen | 🚧 Scaffold |
 | `@mindees/cli` | Forge | `mindees` CLI: create / dev / build / deploy | 🚧 Scaffold |
 | `@mindees/router` | Quantum | Typed, data-aware router | 🚧 Scaffold |
@@ -108,7 +126,7 @@ upgrades).
 
 - ✅ **Phase 0** — Monorepo, governance, verified toolchain, green CI
 - ✅ **Phase 1** — `@mindees/core`: fine-grained signals & reactivity
-- ⏭️ **Phase 2** — Component model & scheduler
+- ✅ **Phase 2** — Component model, selector-isolated context, priority scheduler & threading
 - ⏭️ **Phase 3** — Helix renderer: web/DOM target + native backend contract
 - ⏭️ **Phases 4–12** — Compiler, CLI, Quantum Router, OTA, local-first data,
   on-device AI, Atlas UI, examples & release

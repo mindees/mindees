@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // @mindees/core is platform-neutral, but relies on the universally-available
+    // host global `queueMicrotask` (browsers, workers, Node 11+, Deno, Bun).
+    // @types/node supplies its ambient declaration for type-checking only; no
+    // Node API is used at runtime.
+    "types": ["node"]
   },
   "include": ["src"]
 }

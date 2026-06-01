@@ -4,8 +4,10 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 1 (core reactivity) — complete: signals, computed/memo,
-effect, batch, untrack, createRoot, onCleanup shipped in `@mindees/core`.
+**Last updated:** Phase 2 (component model & scheduler) — complete: element tree
++ selector-based re-render-isolated context, two-lane priority scheduler, and a
+thread-pool abstraction (Web Worker backend + inline fallback) shipped in
+`@mindees/core`. Native multi-threading remains a research track.
 
 ## Legend
 
@@ -26,12 +28,14 @@ effect, batch, untrack, createRoot, onCleanup shipped in `@mindees/core`.
 | Verified toolchain (pnpm/turbo/ts/biome/vitest/changesets) | ✅ done (Phase 0) |
 | CI (lint + typecheck + test + build) | ✅ done (Phase 0) |
 | Reactivity (signals/computed/effect/batch) | ✅ done (Phase 1) — `@mindees/core` |
+| Component model + selector-isolated context | ✅ done (Phase 2) — `@mindees/core` |
+| Priority scheduler + thread-pool abstraction | ✅ done (Phase 2) — `@mindees/core` (native threads 🔬) |
 
 ## Per-package
 
 | Package | Maturity | Notes |
 | --- | --- | --- |
-| `@mindees/core` | 🧪 Experimental | Reactivity (signals/computed/effect/batch/untrack/createRoot) shipped in Phase 1. Component model + scheduler land in Phase 2. |
+| `@mindees/core` | 🧪 Experimental | Phase 1 reactivity + Phase 2 component model, selector-isolated context, priority scheduler & thread-pool (Web Worker + inline). Native multi-threading is 🔬. |
 | `@mindees/compiler` | 🚧 Scaffold | Optimizer/codegen lands in Phase 4. TS→native AOT is 🔬. |
 | `@mindees/cli` | 🚧 Scaffold | Lands in Phase 5. |
 | `@mindees/router` | 🚧 Scaffold | Typed routing core lands in Phase 6; data/transitions Phase 7. |
