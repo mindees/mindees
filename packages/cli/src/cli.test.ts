@@ -80,6 +80,15 @@ describe('runCli — create', () => {
     expect(ctx.fs.exists('c/src/App.tsx')).toBe(true)
   })
 
+  it('prefers an explicit --template over a conflicting --prompt', () => {
+    const { ctx } = makeCtx()
+    // Prompt maps to the default (blank); explicit --template counter must win.
+    runCli(['create', 'c', '--template', 'counter', '--prompt', 'a blank screen'], ctx)
+    expect(
+      (ctx.fs as ReturnType<typeof createMemoryFileSystem>).snapshot()['c/src/App.tsx'],
+    ).toContain('signal(0)')
+  })
+
   it('fails clearly on an unknown template', () => {
     const { ctx, errText } = makeCtx()
     expect(runCli(['create', 'x', '--template', 'nope'], ctx).exitCode).toBe(1)

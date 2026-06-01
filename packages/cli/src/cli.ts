@@ -105,9 +105,17 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
 
   // NL → template: `--prompt "a counter app"` picks a template deterministically
   // (offline). Real AI generation arrives with Synapse in Phase 10; until then
-  // this is an honest keyword-based mapping that never blocks `create`.
-  let template = typeof values.template === 'string' ? values.template : DEFAULT_TEMPLATE
-  if (typeof values.prompt === 'string' && values.prompt.length > 0) {
+  // this is an honest keyword-based mapping that never blocks `create`. An
+  // explicit `--template` always wins; the prompt only resolves a template when
+  // the caller didn't choose one (mirrors `create-mindees`'s runCreate so both
+  // entrypoints agree on precedence).
+  const explicitTemplate = typeof values.template === 'string' ? values.template : undefined
+  let template = explicitTemplate ?? DEFAULT_TEMPLATE
+  if (
+    explicitTemplate === undefined &&
+    typeof values.prompt === 'string' &&
+    values.prompt.length > 0
+  ) {
     const picked = naturalLanguageToTemplate(values.prompt)
     template = picked.template
     out(ctx.write, `Interpreted prompt → "${picked.template}" template (${picked.reason}).`)
