@@ -41,6 +41,23 @@ function toSeverity(category: ts.DiagnosticCategory): 'error' | 'warning' | null
   return null
 }
 
+/**
+ * Map a file extension to its `ScriptKind`. `ts.createSourceFile` does NOT infer
+ * this — omitting it would mis-parse files — so we map it explicitly (not via
+ * any TypeScript-internal helper). A `.ts` file thus rejects JSX, while `.tsx`
+ * accepts it.
+ */
+function scriptKindForFile(fileName: string): ts.ScriptKind {
+  const lower = fileName.toLowerCase()
+  if (lower.endsWith('.tsx')) return ts.ScriptKind.TSX
+  if (lower.endsWith('.jsx')) return ts.ScriptKind.JSX
+  if (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) {
+    return ts.ScriptKind.JS
+  }
+  if (lower.endsWith('.json')) return ts.ScriptKind.JSON
+  return ts.ScriptKind.TS
+}
+
 /** Convert a TypeScript diagnostic to our structured form. */
 function convert(diag: ts.Diagnostic): Diagnostic | null {
   const severity = toSeverity(diag.category)
@@ -75,7 +92,7 @@ export function typecheck(source: string, fileName = 'module.tsx'): Diagnostic[]
     source,
     ts.ScriptTarget.ES2023,
     true,
-    ts.ScriptKind.TSX,
+    scriptKindForFile(fileName),
   )
 
   const defaultHost = ts.createCompilerHost(options)

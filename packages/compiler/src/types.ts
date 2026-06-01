@@ -62,8 +62,9 @@ export interface CompileOptions {
 
 /**
  * A transform plugin. Plugins operate on the desugared `createElement(...)` call
- * form (JSX is lowered first), so they see a stable, framework-level shape. Each
- * returns a TypeScript `before` transformer factory.
+ * form, so they see a stable, framework-level shape. Because `transpileModule`
+ * lowers JSX during the **`after`** phase, the returned factory is run as an
+ * **`after`** transformer (a `before` transformer would see raw JSX, not calls).
  *
  * Typed structurally against `unknown` here to avoid leaking the `typescript`
  * types across the package boundary; see `transform.ts` for the concrete usage.

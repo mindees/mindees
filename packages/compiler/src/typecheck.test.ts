@@ -46,6 +46,16 @@ describe('typecheck (the gate)', () => {
     expect(diags.some((d) => d.code === 'TS2304')).toBe(true)
   })
 
+  it('derives ScriptKind from the extension: a .ts file does not parse JSX as TSX', () => {
+    // ScriptKind comes from the file name. `<view />` in a `.ts` file is not a
+    // valid element (it would be a malformed type-assertion), so it errors
+    // differently than the same source in a `.tsx` file.
+    const tsDiags = typecheck('export const a = <view />', 'module.ts')
+    expect(tsDiags.length).toBeGreaterThan(0)
+    const tsxDiags = typecheck('export const a = <view />', 'module.tsx')
+    expect(tsxDiags.some((d) => d.code === 'TS2552' || d.code === 'TS2304')).toBe(true)
+  })
+
   it('enforces strict flags (noUncheckedIndexedAccess)', () => {
     const src = 'export function f(a: string[]): string { return a[0] }' // a[0] is string | undefined
     const diags = typecheck(src)

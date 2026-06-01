@@ -61,7 +61,14 @@ export function createFlattenTransformer(tsmod: typeof ts): {
     if (tsmod.isIdentifier(node) && node.text === 'undefined') return true
     if (tsmod.isObjectLiteralExpression(node)) {
       return node.properties.every(
-        (p) => tsmod.isPropertyAssignment(p) && isStaticExpression(p.initializer),
+        (p) =>
+          // Only plain `key: value` props with a NON-computed key count as
+          // static. A computed key (`{[k]: 1}`) can be dynamic/side-effectful,
+          // and shorthand/spread/method/accessor members are not statically
+          // analyzable here — any of these makes the element non-static.
+          tsmod.isPropertyAssignment(p) &&
+          !tsmod.isComputedPropertyName(p.name) &&
+          isStaticExpression(p.initializer),
       )
     }
     return false
