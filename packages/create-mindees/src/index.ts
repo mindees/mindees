@@ -24,8 +24,10 @@ export interface CreateArgs {
  * `npm create mindees` and `mindees create` behave identically.
  */
 export function runCreate(fs: FileSystem, args: CreateArgs): ScaffoldResult {
+  // An explicit `--template` always wins; the prompt only resolves a template
+  // when the caller didn't choose one.
   let template = args.template ?? DEFAULT_TEMPLATE
-  if (args.prompt && args.prompt.length > 0) {
+  if (!args.template && args.prompt && args.prompt.length > 0) {
     template = naturalLanguageToTemplate(args.prompt).template
   }
   const options: Parameters<typeof scaffold>[1] = {

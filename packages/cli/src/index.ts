@@ -1,5 +1,6 @@
 import type { Maturity, PackageInfo } from '@mindees/core'
 import { NotImplementedError, notImplemented } from '@mindees/core'
+import { VERSION } from './version'
 
 /** Project build (via @mindees/compiler). */
 export { type BuildOptions, type BuildResult, buildProject } from './build'
@@ -39,7 +40,7 @@ export type {
 export const name = '@mindees/cli'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.0.0'
+export { VERSION }
 
 /**
  * Current maturity. The CLI core — dispatch, `create` (+ templates), `build`

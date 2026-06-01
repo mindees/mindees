@@ -61,4 +61,13 @@ describe('scaffold', () => {
     expect(pkg.dependencies['@mindees/renderer']).toBeDefined()
     expect(pkg.scripts.dev).toBe('mindees dev')
   })
+
+  it('declares the mindees CLI so `mindees dev`/`build` resolve after install', () => {
+    const fs = createMemoryFileSystem()
+    scaffold(fs, { appName: 'app', targetDir: 'app' })
+    const pkg = JSON.parse(fs.snapshot()['app/package.json'] as string)
+    expect(pkg.devDependencies['@mindees/cli']).toBeDefined()
+    // All scaffolded @mindees/* deps share the one locked version line.
+    expect(pkg.devDependencies['@mindees/cli']).toBe(pkg.dependencies['@mindees/core'])
+  })
 })
