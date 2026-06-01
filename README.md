@@ -123,6 +123,22 @@ hydrate(document.getElementById('app'), Counter, {})
 One renderer, swappable **host backends**: a web/DOM backend and a headless
 backend ship today; native (iOS/Android) and a GPU canvas are on the roadmap.
 
+### ⚙️ A compiler that won't let type errors ship (Phase 4)
+
+The Mindees Compiler (MDC) is built on the TypeScript Compiler API: a strict
+**type-check gate**, a TSX→`createElement` transform, and **tree-flattening**
+that turns static UI into create-once constants.
+
+```ts
+import { compileChecked } from '@mindees/compiler'
+
+compileChecked('const a: number = "oops"').code        // '' — build refused, type error reported
+compileChecked('export const v = <view><text>hi</text></view>').stats
+// → { flattenedNodes: 1, totalElements: 2 }  ← static subtree optimized at build time
+```
+
+Zero native binaries → deterministic, reproducible builds on every OS and CI.
+
 ## 📦 Packages
 
 Everything ships under the [`@mindees`](https://www.npmjs.com/org/mindees) npm
@@ -132,7 +148,7 @@ upgrades).
 | Package | Codename | Purpose | Status |
 | --- | --- | --- | --- |
 | [`@mindees/core`](./packages/core) | — | Reactivity (signals) + component model + scheduler + threading | 🧪 Experimental |
-| `@mindees/compiler` | MDC | Build-time optimizer & codegen | 🚧 Scaffold |
+| [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest | 🧪 Experimental |
 | `@mindees/cli` | Forge | `mindees` CLI: create / dev / build / deploy | 🚧 Scaffold |
 | `@mindees/router` | Quantum | Typed, data-aware router | 🚧 Scaffold |
 | [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration (native + GPU canvas 🔬) | 🧪 Experimental |
@@ -154,8 +170,9 @@ upgrades).
 - ✅ **Phase 1** — `@mindees/core`: fine-grained signals & reactivity
 - ✅ **Phase 2** — Component model, selector-isolated context, priority scheduler & threading
 - ✅ **Phase 3** — Helix renderer: fine-grained web/DOM backend, **SSR + hydration**, headless test backend
-- ⏭️ **Phase 4** — Mindees Compiler (MDC): build-time optimizer
-- ⏭️ **Phases 5–12** — CLI, Quantum Router, OTA, local-first data,
+- ✅ **Phase 4** — Mindees Compiler (MDC): type-check gate, TSX transform, tree-flattening, route manifest
+- ⏭️ **Phase 5** — Forge CLI + `create-mindees`
+- ⏭️ **Phases 6–12** — Quantum Router, OTA, local-first data,
   on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).

@@ -1,7 +1,7 @@
 {
   "name": "@mindees/compiler",
   "version": "0.0.0",
-  "description": "MindeesNative Compiler (MDC) - build-time optimizer and codegen. Scaffold.",
+  "description": "MindeesNative Compiler (MDC) — build-time optimizer: type-check gate, TSX→createElement transform, tree-flattening, per-route code-splitting, and a plugin API. TS→native AOT is a research track.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -27,6 +27,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mindees/core": "workspace:*"
+    "@mindees/core": "workspace:*",
+    "typescript": "6.0.3"
   }
 }

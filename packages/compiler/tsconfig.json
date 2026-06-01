@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // MDC runs on the TypeScript Compiler API and uses an in-memory CompilerHost
+    // that reads lib .d.ts files from disk, so it needs Node's ambient types.
+    "types": ["node"]
   },
   "include": ["src"]
 }

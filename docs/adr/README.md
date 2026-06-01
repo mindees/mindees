@@ -27,6 +27,7 @@ What becomes easier or harder as a result?
 | ADR | Title | Status |
 | --- | ----- | ------ |
 | 0001 | Toolchain selection (pnpm, Turborepo, Biome, Vitest, Changesets) | Accepted |
+| [0002](./0002-compiler-foundation.md) | Compiler foundation — TypeScript Compiler API (not SWC/oxc) | Accepted |
 
 > ADR-0001 is finalized in Phase 0 once the research-verified tool versions are
 > pinned, so its rationale cites real current versions rather than guesses.

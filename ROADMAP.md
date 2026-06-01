@@ -17,7 +17,7 @@ See [STATUS.md](./STATUS.md) for current maturity.
 - [x] **Phase 3 — `@mindees/renderer` (Helix): web/DOM target + backend contract** ✅
   Working SSR-capable DOM backend + headless test backend; `NativeBackend`
   interface defined.
-- [ ] **Phase 4 — `@mindees/compiler` (MDC): build-time optimizer**
+- [x] **Phase 4 — `@mindees/compiler` (MDC): build-time optimizer** ✅
   Type-check gate, TSX transform, tree-flattening, per-route splitting
   (TS→native AOT is a labeled research track with a working fallback).
 - [ ] **Phase 5 — `@mindees/cli` (Forge) + `create-mindees`**

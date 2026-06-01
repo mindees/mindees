@@ -1,14 +1,46 @@
 import type { Maturity, PackageInfo } from '@mindees/core'
 import { NotImplementedError, notImplemented } from '@mindees/core'
 
+/** TS → native AOT (research track). */
+export { compileToNative, type NativeTarget } from './aot'
+/** Tree-flattening optimizer pass. */
+export { createFlattenTransformer, STATIC_MARKER } from './flatten'
+/** Per-route code-splitting manifest. */
+export {
+  buildRouteManifest,
+  chunkName,
+  fileToRoute,
+  type RouteEntry,
+  type RouteManifest,
+} from './routes'
+/** Compile pipeline (TSX → optimized JS). */
+export { compile, compileChecked } from './transform'
+/** The type-check gate. */
+export { hasErrors, typecheck } from './typecheck'
+/** Shared types. */
+export type {
+  CompileOptions,
+  CompileResult,
+  CompileStats,
+  Diagnostic,
+  DiagnosticSeverity,
+  MdcPlugin,
+  SourcePosition,
+} from './types'
+
 /** The npm package name. */
 export const name = '@mindees/compiler'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
 export const VERSION = '0.0.0'
 
-/** Current maturity of this package. See the repository `STATUS.md`. */
-export const maturity: Maturity = 'scaffold'
+/**
+ * Current maturity. The build-time optimizer — type-check gate, TSX→createElement
+ * transform, tree-flattening, per-route manifest, plugin API — is implemented
+ * and tested on the TypeScript Compiler API. TS→native AOT is a research track
+ * (throws `NotImplementedError`); the working path is TS → optimized JS.
+ */
+export const maturity: Maturity = 'experimental'
 
 /** Static identity + maturity metadata for this package. */
 export const info: PackageInfo = { name, version: VERSION, maturity }
