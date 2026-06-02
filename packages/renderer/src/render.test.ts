@@ -199,6 +199,36 @@ describe('render — disposal', () => {
     expect(root.children.length).toBe(0)
   })
 
+  it('disposes the CURRENT content of a reactive region inside a top-level array (no leak)', () => {
+    const { backend, root, html } = setup()
+    const show = signal(true)
+    // A region nested in a top-level array/fragment: render()'s disposer only
+    // captures a flattened snapshot, so the region's own cleanup must remove the
+    // post-swap content. Without it, the swapped-in <b>2</b> leaks after dispose.
+    const m = render([() => (show() ? h('a', null, '1') : h('b', null, '2'))], backend, root)
+    expect(html()).toBe('<a>1</a>')
+    show.set(false)
+    expect(html()).toBe('<b>2</b>')
+    m.dispose()
+    expect(html()).toBe('')
+    expect(root.children.length).toBe(0)
+  })
+
+  it('disposes the CURRENT content of a reactive region in a component-returned fragment (no leak)', () => {
+    const { backend, root, html } = setup()
+    const cond = signal(true)
+    // A component that returns a fragment array containing a reactive region and
+    // a trailing sibling — an idiomatic shape that exercises the same array path.
+    const App = () => [() => (cond() ? h('a', null, 'A') : h('b', null, 'B')), h('tail', null, 'T')]
+    const m = render(App, {}, backend, root)
+    expect(html()).toBe('<a>A</a><tail>T</tail>')
+    cond.set(false)
+    expect(html()).toBe('<b>B</b><tail>T</tail>')
+    m.dispose()
+    expect(html()).toBe('')
+    expect(root.children.length).toBe(0)
+  })
+
   it('disposes bindings created inside a component (they stop re-running)', () => {
     const { backend, root } = setup()
     const s = signal(0)

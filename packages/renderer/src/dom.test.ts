@@ -96,4 +96,23 @@ describe('DOM backend (happy-dom)', () => {
     m.dispose()
     expect(container.childNodes.length).toBe(0)
   })
+
+  it('disposes the current content of a reactive region in a top-level array (no leak, no throw)', () => {
+    const container = document.createElement('div')
+    const backend = createDomBackend(document as never)
+    const show = signal(true)
+    // Exercises the real removeChild path: the region's cleanup must remove the
+    // post-swap content, and must not double-remove (removeChild throws on a
+    // non-child node).
+    const m = render(
+      [() => (show() ? h('a', null, '1') : h('b', null, '2'))],
+      backend,
+      container as never,
+    )
+    expect(container.innerHTML).toBe('<a>1</a>')
+    show.set(false)
+    expect(container.innerHTML).toBe('<b>2</b>')
+    expect(() => m.dispose()).not.toThrow()
+    expect(container.childNodes.length).toBe(0)
+  })
 })
