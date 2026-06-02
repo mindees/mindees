@@ -466,7 +466,9 @@ export function createRouter(options: CreateRouterOptions): Router {
       }
       return current
     }
-    return current
+    // Redirect cap exceeded (a guard that keeps redirecting): cancel rather than
+    // commit a location the guard never approved.
+    return null
   }
 
   const navigate = (target: string | NavTargetInput, opts?: NavigateOptions): void => {

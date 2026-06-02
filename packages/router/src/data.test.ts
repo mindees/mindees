@@ -120,6 +120,28 @@ describe('loaders + data', () => {
     router.dispose()
   })
 
+  it('does not throw out of navigation when loaderDeps itself throws', async () => {
+    const loader = vi.fn(() => 'ok')
+    const router = createRouter({
+      routes: [
+        { path: '/' },
+        {
+          path: '/x',
+          loader,
+          loaderDeps: () => {
+            throw new Error('bad deps')
+          },
+        },
+      ],
+      history: createMemoryHistory(),
+    })
+    expect(() => router.navigate('/x')).not.toThrow()
+    await flush()
+    expect(router.location().pathname).toBe('/x')
+    expect(loader).toHaveBeenCalledTimes(1)
+    router.dispose()
+  })
+
   it('aborts an in-flight load when navigating away', async () => {
     let aborted = false
     const router = createRouter({
@@ -227,6 +249,18 @@ describe('navigation guards', () => {
     router.navigate('/a') // no-op (no duplicate entry)
     router.history.back()
     expect(router.location().pathname).toBe('/')
+    router.dispose()
+  })
+
+  it('cancels navigation when the guard redirect-loops past the cap', () => {
+    const router = createRouter({
+      routes: [{ path: '/' }, { path: '/a' }, { path: '/b' }],
+      history: createMemoryHistory(),
+      // A pathological guard that ping-pongs forever.
+      beforeNavigate: (to) => (to === '/a' ? '/b' : to === '/b' ? '/a' : undefined),
+    })
+    router.navigate('/a')
+    expect(router.location().pathname).toBe('/') // capped → cancelled, not committed
     router.dispose()
   })
 

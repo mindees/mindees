@@ -104,14 +104,15 @@ export function createLoaderManager(options: LoaderManagerOptions): LoaderManage
   }
 
   const innerKey = (route: RouteRecord, match: RouteMatch): string => {
-    const deps = route.loaderDeps ? route.loaderDeps({ search: match.search }) : null
     try {
+      const deps = route.loaderDeps ? route.loaderDeps({ search: match.search }) : null
       return JSON.stringify({ p: match.params, d: deps })
     } catch {
-      // Non-serializable deps (e.g. BigInt/circular): degrade to a params-only
-      // key rather than throwing out of navigation. `params` is always a
-      // Record<string, string>, so this is total. (loaderDeps should be
-      // JSON-serializable — see LoaderDepsFn.)
+      // A throwing or non-serializable loaderDeps (BigInt/circular): degrade to a
+      // params-only key rather than throwing out of navigation. `params` is
+      // always a Record<string, string>, so this is total. (loaderDeps should be
+      // pure and JSON-serializable — see LoaderDepsFn.) innerKey is also called
+      // from currentGlobalKeys/read/invalidate, so it must never throw.
       return `${JSON.stringify({ p: match.params })}::unserializable-deps`
     }
   }
