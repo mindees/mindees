@@ -4,11 +4,14 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 5 (Forge CLI + create-mindees) — complete: the `mindees`
-CLI (`create`, `build` via the compiler, `doctor`, `info`, a tested dev
-rebuild-orchestrator) plus `create-mindees` (`npm create mindees`) shipped. The
-live dev-server HTTP/HMR transport is a developer preview; on-device NL→app
-generation is Phase 10 (today `--prompt` maps to a template deterministically).
+**Last updated:** Phase 6 (Quantum Router I) — complete: `@mindees/router` ships
+the typed routing core — codegen-free typed path params (template-literal types),
+Standard-Schema-validated typed search params (any Zod/Valibot/ArkType schema,
+zero runtime dep), a signals-native router with typed + relative navigation and
+selector-isolated route state, dynamic route-table reconfiguration without state
+reset, and an injectable history (memory + browser). Renderer-bound components
+(`Link`/`Outlet`), file-based route scanning, and loaders/data are **Router II**
+(later) and are intentionally not exported yet.
 
 ## Legend
 
@@ -34,6 +37,7 @@ generation is Phase 10 (today `--prompt` maps to a template deterministically).
 | Reactive renderer + web/DOM backend + SSR/hydration | ✅ done (Phase 3) — `@mindees/renderer` (native + GPU canvas 🔬) |
 | Compiler: type-check gate + TSX transform + tree-flatten + route manifest | ✅ done (Phase 4) — `@mindees/compiler` (TS→native AOT 🔬) |
 | CLI: create + build + doctor + info + dev orchestrator; `npm create mindees` | ✅ done (Phase 5) — `@mindees/cli` + `create-mindees` (dev HTTP/HMR transport = preview) |
+| Router: typed params + validated typed search + signals-native state + typed/relative navigation | ✅ done (Phase 6) — `@mindees/router` (Router II: components/file-scan/loaders 📋) |
 
 ## Per-package
 
@@ -42,7 +46,7 @@ generation is Phase 10 (today `--prompt` maps to a template deterministically).
 | `@mindees/core` | 🧪 Experimental | Phase 1 reactivity + Phase 2 component model, selector-isolated context, priority scheduler & thread-pool (Web Worker + inline). Native multi-threading is 🔬. |
 | `@mindees/compiler` | 🧪 Experimental | MDC build-time optimizer (type-check gate, TSX→createElement, tree-flattening, per-route manifest, plugin API) on the TS Compiler API shipped in Phase 4. TS→native AOT is 🔬. |
 | `@mindees/cli` | 🧪 Experimental | Forge CLI shipped in Phase 5: create (+ templates), build (via the compiler), doctor, info, dev rebuild-orchestrator. Live dev-server HTTP/HMR transport is a preview. |
-| `@mindees/router` | 🚧 Scaffold | Typed routing core lands in Phase 6; data/transitions Phase 7. |
+| `@mindees/router` | 🧪 Experimental | Quantum Router I shipped in Phase 6: codegen-free typed path params, Standard-Schema validated typed search params, signals-native router state with selector isolation, typed + relative navigation, dynamic reconfiguration, memory + browser history. Router II (renderer-bound `Link`/`Outlet`, file-based scanning, loaders/data) is 📋. |
 | `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. Native (iOS/Android) + GPU canvas are 🔬. |
 | `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 11 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 10 (mock/server backends; on-device 🔬). |

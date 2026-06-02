@@ -1,7 +1,19 @@
 {
   "name": "@mindees/router",
   "version": "0.0.0",
-  "description": "MindeesNative Quantum Router - typed, data-aware routing. Scaffold.",
+  "description": "Quantum — the typed, signals-native router for MindeesNative: codegen-free typed path params, Standard Schema validated search params, and selector-isolated reactive route state.",
+  "keywords": [
+    "router",
+    "typed-router",
+    "type-safe-routing",
+    "typescript",
+    "signals",
+    "standard-schema",
+    "search-params",
+    "cross-platform",
+    "react-native-alternative",
+    "expo-router-alternative"
+  ],
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -28,5 +40,10 @@
   },
   "dependencies": {
     "@mindees/core": "workspace:*"
+  },
+  "devDependencies": {
+    "happy-dom": "20.9.0",
+    "valibot": "1.4.1",
+    "zod": "4.4.3"
   }
 }

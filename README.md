@@ -28,8 +28,9 @@ OTA updates. Built in the open.
 > MindeesNative is **not production-ready yet** — we are building it phase by
 > phase, bottom-up, and we follow one rule above all: **everything we ship
 > actually works.** [`STATUS.md`](./STATUS.md) is the honest, per-package source
-> of truth for what's real today versus what's still planned. **Phase 1 (the
-> reactive core) is done and tested** — see the live example below.
+> of truth for what's real today versus what's still planned. **The reactive
+> core, renderer (with SSR), compiler, CLI, and typed router are done and
+> tested** — see the live examples below.
 >
 > ⭐ **Star the repo** to follow along, and check the
 > [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
@@ -153,6 +154,39 @@ mindees doctor     # ✓ Node ✓ pnpm ! node_modules missing → run `pnpm inst
 
 Built on Node's own `parseArgs` — zero CLI dependencies.
 
+### 🧭 A typed router that beats Expo Router & React Router (Phase 6)
+
+The **Quantum** router types your path **and** search params with **zero
+codegen** — no generated type files, no dev server, no stale types. Bring any
+[Standard Schema](https://standardschema.dev) validator (Zod, Valibot, ArkType)
+for runtime-validated, fully-typed search params — the capability Expo Router and
+React Router don't have:
+
+```ts
+import { createRouter, createBrowserHistory } from '@mindees/router'
+import { z } from 'zod'
+
+const router = createRouter({
+  routes: [
+    { path: '/posts/:postId' },
+    { path: '/search', searchSchema: z.object({ q: z.string(), page: z.coerce.number() }) },
+  ],
+  history: createBrowserHistory(),
+})
+
+router.navigate({ to: '/posts/:postId', params: { postId: '42' } }) // ✓ typed; params required
+// router.navigate({ to: '/posts/:postId' })                        // ✗ compile error
+
+// Fine-grained reactive route state — re-runs ONLY when this slice changes:
+const postId = router.select((s) => s.params.postId)
+```
+
+Path params are inferred straight from the pattern string
+(`PathParams<'/posts/:postId'>` → `{ postId: string }`), route state is a
+**signals graph** (no whole-screen re-render on navigation, no global-vs-local
+hook trap), and the route table can be **reconfigured live without resetting**
+where the user is. See [`@mindees/router`](./packages/router).
+
 ## 📦 Packages
 
 Everything ships under the [`@mindees`](https://www.npmjs.com/org/mindees) npm
@@ -164,7 +198,7 @@ upgrades).
 | [`@mindees/core`](./packages/core) | — | Reactivity (signals) + component model + scheduler + threading | 🧪 Experimental |
 | [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest | 🧪 Experimental |
 | [`@mindees/cli`](./packages/cli) | Forge | `mindees` CLI: create / build / doctor / info / dev | 🧪 Experimental |
-| `@mindees/router` | Quantum | Typed, data-aware router | 🚧 Scaffold |
+| [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state | 🧪 Experimental |
 | [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration (native + GPU canvas 🔬) | 🧪 Experimental |
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
@@ -186,8 +220,9 @@ upgrades).
 - ✅ **Phase 3** — Helix renderer: fine-grained web/DOM backend, **SSR + hydration**, headless test backend
 - ✅ **Phase 4** — Mindees Compiler (MDC): type-check gate, TSX transform, tree-flattening, route manifest
 - ✅ **Phase 5** — Forge CLI + `create-mindees`: scaffold, build, doctor
-- ⏭️ **Phase 6** — Quantum Router: typed, runtime-validated routing
-- ⏭️ **Phases 7–12** — OTA, local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 6** — Quantum Router I: codegen-free typed params, Standard-Schema typed search, signals-native state
+- ⏭️ **Phase 7** — Quantum Router II: `Link`/`Outlet`, file-based routes, loaders & transitions
+- ⏭️ **Phases 8–12** — OTA, local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 

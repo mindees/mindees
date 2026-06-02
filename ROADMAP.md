@@ -22,10 +22,15 @@ See [STATUS.md](./STATUS.md) for current maturity.
   (TS→native AOT is a labeled research track with a working fallback).
 - [x] **Phase 5 — `@mindees/cli` (Forge) + `create-mindees`** ✅
   `create` / `dev` (web HMR) / `build` / `doctor`; tested templates.
-- [ ] **Phase 6 — `@mindees/router` (Quantum) I: typed routing core**
-  Typed + runtime-validated params, typegen, re-render isolation.
-- [ ] **Phase 7 — `@mindees/router` (Quantum) II: data, guards & transitions**
-  Loaders + SWR + auto-prefetch, idempotent navigation, web transitions.
+- [x] **Phase 6 — `@mindees/router` (Quantum) I: typed routing core** ✅
+  Codegen-free typed path params (template-literal types), Standard-Schema
+  validated typed search params (any Zod/Valibot/ArkType schema; zero runtime
+  dep), signals-native router state with selector-based re-render isolation, typed
+  + relative navigation, dynamic route-table reconfiguration without state reset,
+  and injectable history (memory + browser).
+- [ ] **Phase 7 — `@mindees/router` (Quantum) II: components, data & transitions**
+  Renderer-bound `Link`/`Outlet` + nested layouts, file-based route scanning,
+  loaders + SWR + auto-prefetch, idempotent navigation, web transitions.
 - [ ] **Phase 8 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
   Manifest, binary diff, Ed25519 signing, atomic rollback, reference server.
 - [ ] **Phase 9 — `@mindees/data` (Continuum): local-first store & sync**
