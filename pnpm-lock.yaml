@@ -108,6 +108,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@mindees/renderer':
+        specifier: workspace:*
+        version: link:../renderer
       happy-dom:
         specifier: 20.9.0
         version: 20.9.0

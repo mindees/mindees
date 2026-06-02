@@ -11,7 +11,15 @@
  * @module
  */
 
-import { type Component, computed, createRoot, type Memo, type Signal, signal } from '@mindees/core'
+import {
+  type Component,
+  computed,
+  createRoot,
+  type Memo,
+  type MindeesNode,
+  type Signal,
+  signal,
+} from '@mindees/core'
 import { createHref, createMemoryHistory, type RouterHistory, type RouterLocation } from './history'
 import {
   buildPath,
@@ -27,20 +35,47 @@ import type { StandardSchemaV1 } from './standard-schema'
 // Route table types
 // ---------------------------------------------------------------------------
 
-/** A route: a path pattern, an optional component, and an optional search schema. */
+/**
+ * Props a route's component receives from {@link createRouterView}. `params` and
+ * `search` are **reactive accessors** (read them in a reactive scope so a
+ * same-route param change updates in place, no re-mount); `children` is the
+ * matched **child route** — render it wherever the nested route should appear
+ * (the "outlet"). See ADR-0004.
+ */
+export interface RouteComponentProps {
+  /** The router instance (for `navigate`/`select`). */
+  router: Router
+  /** Reactive accessor for the current (merged) path params. */
+  params: () => Record<string, string>
+  /** Reactive accessor for the current search params. */
+  search: () => Record<string, unknown>
+  /** The matched child route (the outlet); render it to show nested routes. */
+  children: MindeesNode
+}
+
+/** A route: a path pattern, an optional component, optional search schema, and optional children. */
 export interface RouteRecord {
-  /** The path pattern (e.g. `/posts/:postId`, `/files/:rest*`). */
+  /**
+   * The path pattern. At the top level this is absolute (`/posts/:postId`); a
+   * nested route's path is **relative to its parent** (`settings`), and a child
+   * with `''` or `'/'` is the parent's **index** route.
+   */
   path: string
-  /** The component to render for this route (rendering is wired in Router II). */
-  component?: Component
+  /** The component to render for this route. A component-less route passes its child through. */
+  component?: Component<RouteComponentProps>
   /**
    * A Standard Schema validating this route's search params. Its **output must
    * be object-shaped** (search params are a record), so a non-object schema like
    * `z.string()` is rejected at compile time and validated results need no cast.
-   * Per-route end-to-end `InferOutput` typing through `Router.search()` arrives
-   * with the typed route registry in Router II.
+   *
+   * Note: only the **matched leaf** route's `searchSchema` is applied — a schema
+   * on a parent/layout route is currently not used (search is global to the URL;
+   * the leaf governs it). Per-route end-to-end `InferOutput` typing through
+   * `Router.search()` arrives with the typed route registry (a later phase).
    */
   searchSchema?: StandardSchemaV1<unknown, Record<string, unknown>>
+  /** Nested child routes (their `path` is relative to this route). */
+  children?: readonly RouteRecord[]
   /** Arbitrary route metadata. */
   meta?: Readonly<Record<string, unknown>>
 }
@@ -65,7 +100,12 @@ export interface RouteMatch {
 export interface RouterState {
   /** The current location. */
   location: RouterLocation
-  /** The matched route, or `null` if nothing matched. */
+  /**
+   * The matched route **chain**, root → leaf (one entry per nesting level), or
+   * empty when nothing matched. Drives nested rendering ({@link createRouterView}).
+   */
+  matches: readonly RouteMatch[]
+  /** The matched **leaf** route, or `null` if nothing matched. */
   match: RouteMatch | null
   /** Convenience: the current pathname. */
   pathname: string
@@ -135,7 +175,9 @@ export interface Router {
   state(): RouterState
   /** The current location. */
   location(): RouterLocation
-  /** The current match, or `null`. */
+  /** The matched route chain (root → leaf), or empty when unmatched. */
+  matches(): readonly RouteMatch[]
+  /** The current leaf match, or `null`. */
   match(): RouteMatch | null
   /** The current path params (`{}` when unmatched). */
   params(): Record<string, string>
@@ -166,40 +208,83 @@ export interface Router {
 
 const EMPTY_PARAMS: Record<string, string> = Object.freeze({})
 const EMPTY_SEARCH: Record<string, unknown> = Object.freeze({})
+const EMPTY_MATCHES: readonly RouteMatch[] = Object.freeze([])
 
-/** Sort routes most-specific first (static > dynamic > catch-all). */
-function sortRoutes(routes: readonly RouteRecord[]): RouteRecord[] {
-  return [...routes].sort((a, b) => compareSpecificity(a.path, b.path))
+/** A leaf route flattened from the tree: its full path and its root→leaf chain. */
+interface FlatRoute {
+  fullPath: string
+  chain: readonly RouteRecord[]
 }
 
-/** Match a location against the (pre-sorted) route table. */
-function matchLocation(
+/** Join a parent path and a (relative) child path into a normalized full path. */
+function joinPaths(parent: string, child: string): string {
+  const base = parent.endsWith('/') ? parent.slice(0, -1) : parent
+  const rel = child.startsWith('/') ? child.slice(1) : child
+  if (rel.length === 0) return base.length === 0 ? '/' : base
+  return `${base}/${rel}`
+}
+
+/**
+ * Flatten a (possibly nested) route tree into leaf entries, each carrying its
+ * full path and the root→leaf chain of records. A route with children
+ * contributes only via its children (add an index child — `path: ''` — to match
+ * the parent's own path).
+ */
+function flattenRouteTree(
   routes: readonly RouteRecord[],
-  location: RouterLocation,
-): RouteMatch | null {
+  parentPath: string,
+  parentChain: readonly RouteRecord[],
+): FlatRoute[] {
+  const out: FlatRoute[] = []
   for (const route of routes) {
-    const params = matchPattern(route.path, location.pathname)
+    const fullPath = joinPaths(parentPath, route.path)
+    const chain = [...parentChain, route]
+    if (route.children && route.children.length > 0) {
+      out.push(...flattenRouteTree(route.children, fullPath, chain))
+    } else {
+      out.push({ fullPath, chain })
+    }
+  }
+  return out
+}
+
+/** Flatten + sort a route tree most-specific first (static > dynamic > catch-all). */
+function compileRoutes(routes: readonly RouteRecord[]): FlatRoute[] {
+  return flattenRouteTree(routes, '', []).sort((a, b) => compareSpecificity(a.fullPath, b.fullPath))
+}
+
+/**
+ * Match a location against the compiled route table, returning the matched chain
+ * (root → leaf), or an empty array if nothing matched. Search is validated
+ * against the **leaf** route's schema and shared across the chain.
+ */
+function matchLocation(
+  flat: readonly FlatRoute[],
+  location: RouterLocation,
+): readonly RouteMatch[] {
+  for (const fr of flat) {
+    const params = matchPattern(fr.fullPath, location.pathname)
     if (params === null) continue
 
     const searchRaw = parseQuery(location.search)
     let search: Record<string, unknown> = searchRaw
     let issues: ReadonlyArray<StandardSchemaV1.Issue> | undefined
 
-    if (route.searchSchema) {
+    const leaf = fr.chain[fr.chain.length - 1]
+    if (leaf?.searchSchema) {
       // searchSchema's output is constrained to Record<string, unknown>, so the
       // validated value is already correctly typed — no cast needed.
-      const result = safeValidateSearch(route.searchSchema, searchRaw)
-      if (result.ok) {
-        search = result.value
-      } else {
-        issues = result.issues
-      }
+      const result = safeValidateSearch(leaf.searchSchema, searchRaw)
+      if (result.ok) search = result.value
+      else issues = result.issues
     }
 
-    const base: RouteMatch = { route, pathname: location.pathname, params, search, searchRaw }
-    return issues ? { ...base, issues } : base
+    return fr.chain.map((route) => {
+      const base: RouteMatch = { route, pathname: location.pathname, params, search, searchRaw }
+      return issues ? { ...base, issues } : base
+    })
   }
-  return null
+  return EMPTY_MATCHES
 }
 
 /**
@@ -263,22 +348,26 @@ export function createRouter(options: CreateRouterOptions): Router {
   const history = options.history ?? createMemoryHistory()
 
   let routesSig!: Signal<readonly RouteRecord[]>
+  let flatMemo!: Memo<FlatRoute[]>
   let locationSig!: Signal<RouterLocation>
   let stateMemo!: Memo<RouterState>
 
   const dispose = createRoot((disposeRoot) => {
-    routesSig = signal<readonly RouteRecord[]>(sortRoutes(options.routes), { equals: false })
+    routesSig = signal<readonly RouteRecord[]>(options.routes, { equals: false })
+    flatMemo = computed(() => compileRoutes(routesSig()))
     locationSig = signal<RouterLocation>(history.location(), { equals: false })
-    const matchMemo = computed(() => matchLocation(routesSig(), locationSig()))
+    const matchMemo = computed(() => matchLocation(flatMemo(), locationSig()))
     stateMemo = computed<RouterState>(() => {
       const location = locationSig()
-      const match = matchMemo()
+      const matches = matchMemo()
+      const leaf = matches.length > 0 ? (matches[matches.length - 1] ?? null) : null
       return {
         location,
-        match,
+        matches,
+        match: leaf,
         pathname: location.pathname,
-        params: match ? match.params : EMPTY_PARAMS,
-        search: match ? match.search : EMPTY_SEARCH,
+        params: leaf ? leaf.params : EMPTY_PARAMS,
+        search: leaf ? leaf.search : EMPTY_SEARCH,
       }
     })
     const unsubscribe = history.subscribe((loc) => locationSig.set(loc))
@@ -297,13 +386,14 @@ export function createRouter(options: CreateRouterOptions): Router {
   return {
     state: () => stateMemo(),
     location: () => locationSig(),
+    matches: () => stateMemo().matches,
     match: () => stateMemo().match,
     params: () => stateMemo().params,
     search: () => stateMemo().search,
     select: <S>(selector: (state: RouterState) => S, equals: (a: S, b: S) => boolean = Object.is) =>
       computed(() => selector(stateMemo()), { equals }),
     navigate: navigate as Router['navigate'],
-    setRoutes: (routes) => routesSig.set(sortRoutes(routes)),
+    setRoutes: (routes) => routesSig.set(routes),
     routes: () => routesSig(),
     history,
     dispose,

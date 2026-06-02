@@ -148,6 +148,64 @@ describe('createRouter — re-render isolation', () => {
   })
 })
 
+describe('createRouter — nested routes', () => {
+  const nested = [
+    {
+      path: '/dash',
+      children: [
+        { path: '', meta: { name: 'index' } },
+        { path: 'settings', meta: { name: 'settings' } },
+        { path: 'users/:userId', meta: { name: 'user' } },
+      ],
+    },
+  ]
+
+  it('matches an index child at the parent path and returns the chain', () => {
+    const r = createRouter({
+      routes: nested,
+      history: createMemoryHistory({ initialEntries: ['/dash'] }),
+    })
+    expect(r.matches().map((m) => m.route.path)).toEqual(['/dash', ''])
+    expect(r.match()?.route.meta?.name).toBe('index')
+    r.dispose()
+  })
+
+  it('matches a nested child and merges params across the chain', () => {
+    const r = createRouter({
+      routes: nested,
+      history: createMemoryHistory({ initialEntries: ['/dash/users/7'] }),
+    })
+    expect(r.matches().map((m) => m.route.path)).toEqual(['/dash', 'users/:userId'])
+    expect(r.params()).toEqual({ userId: '7' })
+    expect(r.match()?.route.meta?.name).toBe('user')
+    r.dispose()
+  })
+
+  it('exposes an empty chain and null leaf when nothing matches', () => {
+    const r = createRouter({
+      routes: nested,
+      history: createMemoryHistory({ initialEntries: ['/nope'] }),
+    })
+    expect(r.matches()).toEqual([])
+    expect(r.match()).toBeNull()
+    r.dispose()
+  })
+
+  it('validates search against the leaf route schema', () => {
+    const r = createRouter({
+      routes: [
+        {
+          path: '/app',
+          children: [{ path: 'list', searchSchema: z.object({ page: z.coerce.number() }) }],
+        },
+      ],
+      history: createMemoryHistory({ initialEntries: ['/app/list?page=3'] }),
+    })
+    expect(r.search()).toEqual({ page: 3 })
+    r.dispose()
+  })
+})
+
 describe('createRouter — dynamic reconfiguration', () => {
   it('setRoutes re-matches in place without resetting the location', () => {
     const router = createRouter({

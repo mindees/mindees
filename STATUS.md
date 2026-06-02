@@ -4,14 +4,22 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 6 (Quantum Router I) — complete: `@mindees/router` ships
-the typed routing core — codegen-free typed path params (template-literal types),
-Standard-Schema-validated typed search params (any Zod/Valibot/ArkType schema,
-zero runtime dep), a signals-native router with typed + relative navigation and
-selector-isolated route state, dynamic route-table reconfiguration without state
-reset, and an injectable history (memory + browser). Renderer-bound components
-(`Link`/`Outlet`), file-based route scanning, and loaders/data are **Router II**
-(later) and are intentionally not exported yet.
+**Last updated:** Phase 7 (Quantum Router II — render integration) — complete:
+`@mindees/router` now **renders**. `createRouterView` renders the matched route
+**chain** with **fine-grained, layout-preserving** nesting (navigating a leaf
+re-mounts only the leaf; a same-route param change re-mounts nothing — only the
+bindings that read the changed param update). Nested routes use explicit
+composition (a layout renders its `children` outlet); `createLink` gives typed
+navigation links. Built on `@mindees/core` (the renderer is a test-only
+devDependency). Still deferred (not exported): the global typed route registry,
+loaders/data/SWR, file-based route scanning + bundler plugin, and View
+Transitions.
+
+Phase 6 (Router I) shipped the typed routing core: codegen-free typed path params
+(template-literal types), Standard-Schema-validated typed search params (any
+Zod/Valibot/ArkType schema, zero runtime dep), a signals-native router with typed
++ relative navigation and selector-isolated route state, dynamic reconfiguration
+without state reset, and injectable history (memory + browser).
 
 ## Legend
 
@@ -37,7 +45,8 @@ reset, and an injectable history (memory + browser). Renderer-bound components
 | Reactive renderer + web/DOM backend + SSR/hydration | ✅ done (Phase 3) — `@mindees/renderer` (native + GPU canvas 🔬) |
 | Compiler: type-check gate + TSX transform + tree-flatten + route manifest | ✅ done (Phase 4) — `@mindees/compiler` (TS→native AOT 🔬) |
 | CLI: create + build + doctor + info + dev orchestrator; `npm create mindees` | ✅ done (Phase 5) — `@mindees/cli` + `create-mindees` (dev HTTP/HMR transport = preview) |
-| Router: typed params + validated typed search + signals-native state + typed/relative navigation | ✅ done (Phase 6) — `@mindees/router` (Router II: components/file-scan/loaders 📋) |
+| Router: typed params + validated typed search + signals-native state + typed/relative navigation | ✅ done (Phase 6) — `@mindees/router` |
+| Router render integration: nested routes, `createRouterView` (layout-preserving), typed `createLink` | ✅ done (Phase 7) — `@mindees/router` (typed registry, loaders, file-scan, transitions 📋) |
 
 ## Per-package
 
@@ -46,7 +55,7 @@ reset, and an injectable history (memory + browser). Renderer-bound components
 | `@mindees/core` | 🧪 Experimental | Phase 1 reactivity + Phase 2 component model, selector-isolated context, priority scheduler & thread-pool (Web Worker + inline). Native multi-threading is 🔬. |
 | `@mindees/compiler` | 🧪 Experimental | MDC build-time optimizer (type-check gate, TSX→createElement, tree-flattening, per-route manifest, plugin API) on the TS Compiler API shipped in Phase 4. TS→native AOT is 🔬. |
 | `@mindees/cli` | 🧪 Experimental | Forge CLI shipped in Phase 5: create (+ templates), build (via the compiler), doctor, info, dev rebuild-orchestrator. Live dev-server HTTP/HMR transport is a preview. |
-| `@mindees/router` | 🧪 Experimental | Quantum Router I shipped in Phase 6: codegen-free typed path params, Standard-Schema validated typed search params, signals-native router state with selector isolation, typed + relative navigation, dynamic reconfiguration, memory + browser history. Router II (renderer-bound `Link`/`Outlet`, file-based scanning, loaders/data) is 📋. |
+| `@mindees/router` | 🧪 Experimental | Quantum Router I (Phase 6) + II (Phase 7). I: codegen-free typed path params, Standard-Schema validated typed search params, signals-native router state with selector isolation, typed + relative navigation, dynamic reconfiguration, memory + browser history. II: nested route tree + match chain, `createRouterView` (fine-grained, layout-preserving nested rendering), typed `createLink`. Deferred 📋: global typed route registry, loaders/data/SWR, file-based scanning + bundler plugin, View Transitions. |
 | `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. Native (iOS/Android) + GPU canvas are 🔬. |
 | `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 11 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 10 (mock/server backends; on-device 🔬). |

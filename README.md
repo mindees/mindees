@@ -154,7 +154,7 @@ mindees doctor     # ✓ Node ✓ pnpm ! node_modules missing → run `pnpm inst
 
 Built on Node's own `parseArgs` — zero CLI dependencies.
 
-### 🧭 A typed router that beats Expo Router & React Router (Phase 6)
+### 🧭 A typed router that beats Expo Router & React Router (Phases 6–7)
 
 The **Quantum** router types your path **and** search params with **zero
 codegen** — no generated type files, no dev server, no stale types. Bring any
@@ -185,7 +185,14 @@ Path params are inferred straight from the pattern string
 (`PathParams<'/posts/:postId'>` → `{ postId: string }`), route state is a
 **signals graph** (no whole-screen re-render on navigation, no global-vs-local
 hook trap), and the route table can be **reconfigured live without resetting**
-where the user is. See [`@mindees/router`](./packages/router).
+where the user is.
+
+And it **renders**: `createRouterView` draws the matched route chain with
+**fine-grained, layout-preserving** nesting — switching between sibling pages
+keeps the parent layout (and its state) mounted, and a same-route param change
+(`/posts/1` → `/posts/2`) re-mounts *nothing*; only the bindings that read the
+changed param update. Plus a typed `createLink`. See
+[`@mindees/router`](./packages/router).
 
 ## 📦 Packages
 
@@ -198,7 +205,7 @@ upgrades).
 | [`@mindees/core`](./packages/core) | — | Reactivity (signals) + component model + scheduler + threading | 🧪 Experimental |
 | [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest | 🧪 Experimental |
 | [`@mindees/cli`](./packages/cli) | Forge | `mindees` CLI: create / build / doctor / info / dev | 🧪 Experimental |
-| [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state | 🧪 Experimental |
+| [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state + nested rendering | 🧪 Experimental |
 | [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration (native + GPU canvas 🔬) | 🧪 Experimental |
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
@@ -221,7 +228,7 @@ upgrades).
 - ✅ **Phase 4** — Mindees Compiler (MDC): type-check gate, TSX transform, tree-flattening, route manifest
 - ✅ **Phase 5** — Forge CLI + `create-mindees`: scaffold, build, doctor
 - ✅ **Phase 6** — Quantum Router I: codegen-free typed params, Standard-Schema typed search, signals-native state
-- ⏭️ **Phase 7** — Quantum Router II: `Link`/`Outlet`, file-based routes, loaders & transitions
+- ✅ **Phase 7** — Quantum Router II: nested routes + `createRouterView` (fine-grained, layout-preserving rendering) + typed `createLink`
 - ⏭️ **Phases 8–12** — OTA, local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).

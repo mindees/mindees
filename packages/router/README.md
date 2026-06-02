@@ -6,12 +6,14 @@ Zod / Valibot / ArkType schema), and **fine-grained reactive route state** with
 selector-based re-render isolation. A modern, type-safe alternative to Expo
 Router and React Router for TypeScript cross-platform apps.
 
-> **Status: 🧪 Experimental (Phase 6 — Quantum Router I).** The typed routing
-> core is implemented and tested: pattern matching + typed params, Standard
-> Schema search validation, the signals-native router, typed + relative
-> navigation, dynamic reconfiguration, and history (memory + browser).
-> Renderer-bound components (`Link`/`Outlet`), file-based route scanning, and
-> loaders/data are **Router II** — see [ROADMAP](../../ROADMAP.md).
+> **Status: 🧪 Experimental (Phase 6 — Router I + Phase 7 — Router II).** The
+> typed routing core (pattern matching + typed params, Standard Schema search
+> validation, the signals-native router, typed + relative navigation, dynamic
+> reconfiguration, memory + browser history) **and render integration**
+> (`createRouterView` for fine-grained, layout-preserving nested rendering, and
+> typed `createLink`) are implemented and tested. The global typed route
+> registry, loaders/data, file-based route scanning, and View Transitions are a
+> later phase — see [ROADMAP](../../ROADMAP.md).
 
 ## Why Quantum?
 
@@ -71,6 +73,45 @@ Invalid params never crash navigation — the match exposes `issues` (Standard
 Schema diagnostics) and falls back to the raw parse. Repeated keys
 (`?tag=a&tag=b`) become arrays; coercion is delegated to your schema.
 
+## Render integration — nested routes that actually render
+
+`createRouterView` renders the matched route **chain**; a layout renders its
+`children` (the outlet). Navigation is **fine-grained and layout-preserving** —
+switching between sibling pages keeps the parent layout (and its state) mounted,
+and a same-route param change (`/posts/1` → `/posts/2`) re-mounts *nothing*; only
+the bindings that read the changed param update.
+
+```ts
+import { createElement } from '@mindees/core'
+import { render, createDomBackend } from '@mindees/renderer'
+import { createRouter, createRouterView, createLink, type RouteComponentProps } from '@mindees/router'
+
+function DashLayout(props: RouteComponentProps) {
+  return createElement('view', null,
+    createElement('nav', null, 'sidebar'),
+    props.children, // ← the outlet: the matched child route renders here
+  )
+}
+const Settings = () => createElement('text', null, 'settings')
+
+const router = createRouter({
+  routes: [{ path: '/dash', component: DashLayout, children: [
+    { path: '', component: () => createElement('text', null, 'home') },
+    { path: 'settings', component: Settings },
+  ] }],
+})
+
+const Link = createLink(router)
+render(createRouterView(router, { notFound: () => createElement('text', null, '404') }),
+  createDomBackend(), document.getElementById('app')!)
+
+// Typed link — params required iff the pattern has them:
+Link({ to: '/dash/settings', children: 'Settings' })
+```
+
+Components built on `@mindees/core`'s `createElement` — the renderer just renders
+the tree, so `@mindees/router` keeps **zero renderer runtime dependency**.
+
 ## Codegen-free typed params
 
 ```ts
@@ -84,10 +125,13 @@ type D = PathParams<'/about'>                // {}
 
 No generated `.d.ts`, no dev server, no stale type files — just TypeScript.
 
-## API surface (Router I)
+## API surface
 
-- **Router** — `createRouter`, `Router`, `RouteRecord`, `RouteMatch`,
-  `RouterState`, `NavTarget`, `NavigateOptions`, `resolvePath`.
+- **Render (Router II)** — `createRouterView`, `createLink`, `RouterViewOptions`,
+  `LinkProps`, `LinkComponent`, `LinkOptions`, `RouteComponentProps`.
+- **Router** — `createRouter`, `Router`, `RouteRecord` (with `children` for
+  nesting), `RouteMatch`, `RouterState` (with `matches` chain), `NavTarget`,
+  `NavigateOptions`, `resolvePath`.
 - **Patterns** — `matchPattern`, `buildPath`, `parsePattern`,
   `compareSpecificity`, `PathParams`, `HasPathParams`.
 - **Search** — `parseQuery`, `stringifyQuery`, `validateSearch`,
