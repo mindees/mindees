@@ -23,6 +23,7 @@ import {
   effect,
   type MindeesElement,
   type MindeesNode,
+  onCleanup,
   untrack,
 } from '@mindees/core'
 import type { HostBackend } from './backend'
@@ -231,6 +232,25 @@ function bindReactiveChild<N>(
   // first-run nodes.
   const nodes: N[] = [marker]
   let content: N[] = []
+
+  // Authoritative unmount for the region. Reading the LIVE `content`/`marker` at
+  // teardown means it removes whatever is mounted NOW, regardless of how the
+  // region was composed. This is required for correctness: when the region is a
+  // child of a top-level array/fragment, render()'s disposer only captured a
+  // flattened ONE-TIME snapshot of the host nodes (the array branch in mountNode
+  // spreads `nodes` into a fresh array), so after a content swap it can no longer
+  // remove the current content — that node would leak. This owner-scoped cleanup
+  // closes that gap. It is owned by whoever mounted the region: render()'s root
+  // (fires once, on final dispose) or an enclosing region effect (fires on each
+  // re-run, tearing the nested region down). Guarded by parentOf so it is a safe
+  // no-op for nodes already detached by render()'s disposer or a swap.
+  onCleanup(() => {
+    for (const n of content) {
+      if (backend.parentOf(n)) backend.remove(parent, n)
+    }
+    if (backend.parentOf(marker)) backend.remove(parent, marker)
+  })
+
   effect(() => {
     const value = accessor()
     untrack(() => {
@@ -244,7 +264,13 @@ function bindReactiveChild<N>(
         backend.setText(content[0], String(value))
         return
       }
-      for (const n of content) backend.remove(parent, n)
+      // Guarded: when this region is nested in another region, the parent's
+      // re-run fires this region's onCleanup first (detaching `content`), so a
+      // second removal here would hit an already-detached node — the DOM
+      // backend's removeChild throws on a non-child.
+      for (const n of content) {
+        if (backend.parentOf(n)) backend.remove(parent, n)
+      }
       content = mountNode(value, backend, parent, marker)
       nodes.length = 0
       nodes.push(...content, marker)
