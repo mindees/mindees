@@ -1,0 +1,53 @@
+name: Native iOS host
+
+# Compiles + tests the reference iOS host (examples/native-hosts/ios) so the
+# "authored" Swift code is actually verified by CI — the project's dev/CI has no
+# macOS locally, so this macOS runner is the source of truth for it. Path-filtered
+# so it only runs when the iOS host (or this workflow) changes; not a required check.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/native-hosts/ios/**'
+      - '.github/workflows/native-ios.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/native-hosts/ios/**'
+      - '.github/workflows/native-ios.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-host:
+    name: iOS host (swift test + iOS compile)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: examples/native-hosts/ios
+    steps:
+      # Third-party actions pinned to full commit SHAs (see CI workflow).
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Swift version
+        run: swift --version
+
+      # Builds + runs the device-free core (Codable model, strict host, ModelRenderer)
+      # on macOS. UIKitRenderer is excluded here via `#if canImport(UIKit)`.
+      - name: Build (macOS)
+        run: swift build
+
+      - name: Test (macOS)
+        run: swift test
+
+      # Compile the full package — including UIKitRenderer — for the iOS SDK, where
+      # UIKit is available. This is the "the iOS host compiles" check.
+      - name: Compile for iOS
+        run: xcodebuild build -scheme MindeesNativeHost -destination 'generic/platform=iOS' -skipPackagePluginValidation
