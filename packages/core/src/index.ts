@@ -82,8 +82,10 @@ export const VERSION = '0.0.0'
 /**
  * Current maturity of this package. See the repository `STATUS.md`.
  *
- * The reactivity layer (signals/computed/effect) is implemented and tested;
- * the component model and scheduler arrive in Phase 2.
+ * The reactivity layer (signals/computed/effect/batch), the component model with
+ * selector-isolated context, the priority scheduler, and the thread-pool
+ * abstraction (Web Worker + inline) are all implemented and tested. Native
+ * multi-threading remains a research track (throws `NotImplementedError`).
  */
 export const maturity: Maturity = 'experimental'
 
