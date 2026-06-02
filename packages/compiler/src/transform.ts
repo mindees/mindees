@@ -62,19 +62,17 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
     transformers: { after },
   })
 
-  const diagnostics = (output.diagnostics ?? [])
-    .map((d) => {
-      const message = ts.flattenDiagnosticMessageText(d.messageText, '\n')
-      return {
-        severity:
-          d.category === ts.DiagnosticCategory.Error ? ('error' as const) : ('warning' as const),
-        code: `TS${d.code}`,
-        message,
-      }
-    })
-    // transpileModule only surfaces a few syntactic diagnostics; semantic ones
-    // come from the type-check gate. Keep whatever it reports.
-    .filter((d) => d.severity === 'error' || d.severity === 'warning')
+  // transpileModule only surfaces a few syntactic diagnostics; semantic ones
+  // come from the type-check gate. Map each to our structured form.
+  const diagnostics = (output.diagnostics ?? []).map((d) => {
+    const message = ts.flattenDiagnosticMessageText(d.messageText, '\n')
+    return {
+      severity:
+        d.category === ts.DiagnosticCategory.Error ? ('error' as const) : ('warning' as const),
+      code: `TS${d.code}`,
+      message,
+    }
+  })
 
   const result: CompileResult = {
     code: output.outputText,

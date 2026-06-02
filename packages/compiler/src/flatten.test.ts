@@ -16,6 +16,30 @@ describe('tree-flattening', () => {
     expect(stats.totalElements).toBe(2) // view + text
   })
 
+  it('emits self-contained, RUNNABLE code (defines the _static marker)', () => {
+    const { code } = flat('export const a = <view id="x"><text>hi</text></view>')
+    // The marker is hoisted into the module, so output never throws
+    // "ReferenceError: _static is not defined" at runtime.
+    expect(code).toContain('const _static =')
+    const body = code.replace(/\bexport\s+/g, '')
+    // biome-ignore lint/security/noGlobalEval: evaluate compiled output to prove it runs
+    const run = new Function('createElement', `${body}\nreturn a`) as (
+      createElement: (type: string, props: unknown, ...kids: unknown[]) => unknown,
+    ) => unknown
+    const el = run((type, props, ...kids) => ({ type, props, kids }))
+    // _static is identity, so the result is exactly the createElement tree.
+    expect(el).toEqual({
+      type: 'view',
+      props: { id: 'x' },
+      kids: [{ type: 'text', props: null, kids: ['hi'] }],
+    })
+  })
+
+  it('does not inject the marker when nothing is flattened', () => {
+    const { code } = flat('export const a = (n) => <view>{n}</view>')
+    expect(code).not.toContain('const _static =')
+  })
+
   it('does NOT flatten an element with a dynamic child', () => {
     const { code, stats } = flat('export const a = (n) => <view>{n}</view>')
     expect(code).not.toContain('_static(')

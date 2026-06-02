@@ -80,6 +80,15 @@ export function fileToRoute(file: string): {
     })
     .filter((s) => s.length > 0)
 
+  // A catch-all must terminate the path; `docs/[...rest]/edit` is structurally
+  // invalid and would otherwise emit a nonsensical `/docs/:rest*/edit`.
+  const catchAllIndex = segments.findIndex((s) => s.endsWith('*'))
+  if (catchAllIndex !== -1 && catchAllIndex !== segments.length - 1) {
+    throw new Error(
+      `Invalid route file "${file}": a catch-all segment ([...x]) must be the last segment.`,
+    )
+  }
+
   const routePath = segments.length === 0 ? '/' : `/${segments.join('/')}`
   return { routePath, params, catchAll }
 }
@@ -107,6 +116,8 @@ export function chunkName(file: string): string {
 export function buildRouteManifest(files: readonly string[]): RouteManifest {
   const routes: RouteEntry[] = []
   let notFound: string | undefined
+  // Detect collisions (e.g. `index.tsx` and `(app)/index.tsx` both map to `/`).
+  const byPath = new Map<string, string>()
 
   for (const file of [...files].sort()) {
     if (!ROUTE_FILE.test(file)) continue
@@ -120,6 +131,13 @@ export function buildRouteManifest(files: readonly string[]): RouteManifest {
     if (baseName.startsWith('_') || baseName.startsWith('+')) continue
 
     const { routePath, params, catchAll } = fileToRoute(file)
+    const prior = byPath.get(routePath)
+    if (prior !== undefined) {
+      throw new Error(
+        `Duplicate route path "${routePath}": both "${prior}" and "${file}" map to it.`,
+      )
+    }
+    byPath.set(routePath, file)
     routes.push({ routePath, file, chunk: chunkName(file), params, catchAll })
   }
 
