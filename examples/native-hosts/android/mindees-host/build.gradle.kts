@@ -34,6 +34,6 @@ kotlin {
 }
 
 dependencies {
-    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2") // JUnit 4 = AGP's default unit-test framework
     testImplementation("org.json:json:20231013") // real org.json for codec unit tests
 }

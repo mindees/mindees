@@ -9,10 +9,10 @@
 
 package dev.mindees.host
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class MindeesNativeHostTest {
     private fun makeHost(onEvent: (String) -> Unit = {}): Pair<MindeesNativeHost<ModelNode>, ModelNode> {
@@ -143,13 +143,13 @@ class MindeesNativeHostTest {
     fun rejectsDuplicateId() {
         val (host, _) = makeHost()
         host.apply(listOf(NativeCommand.CreateNode("a", "view")))
-        assertFailsWith<NativeHostException> { host.apply(listOf(NativeCommand.CreateNode("a", "view"))) }
+        assertThrows(NativeHostException::class.java) { host.apply(listOf(NativeCommand.CreateNode("a", "view"))) }
     }
 
     @Test
     fun rejectsUnknownNode() {
         val (host, _) = makeHost()
-        assertFailsWith<NativeHostException> { host.apply(listOf(NativeCommand.UpdateText("ghost", "x"))) }
+        assertThrows(NativeHostException::class.java) { host.apply(listOf(NativeCommand.UpdateText("ghost", "x"))) }
     }
 
     @Test
@@ -162,19 +162,19 @@ class MindeesNativeHostTest {
                 NativeCommand.InsertChild("host-root", "p", 0),
             ),
         )
-        assertFailsWith<NativeHostException> { host.apply(listOf(NativeCommand.RemoveChild("p", "c"))) }
+        assertThrows(NativeHostException::class.java) { host.apply(listOf(NativeCommand.RemoveChild("p", "c"))) }
     }
 
     @Test
     fun rejectsDoubleDispose() {
         val (host, _) = makeHost()
         host.apply(listOf(NativeCommand.CreateNode("a", "view"), NativeCommand.DisposeNode("a")))
-        assertFailsWith<NativeHostException> { host.apply(listOf(NativeCommand.DisposeNode("a"))) }
+        assertThrows(NativeHostException::class.java) { host.apply(listOf(NativeCommand.DisposeNode("a"))) }
     }
 
     @Test
     fun cannotDisposeRoot() {
         val (host, _) = makeHost()
-        assertFailsWith<NativeHostException> { host.apply(listOf(NativeCommand.DisposeNode("host-root"))) }
+        assertThrows(NativeHostException::class.java) { host.apply(listOf(NativeCommand.DisposeNode("host-root"))) }
     }
 }
