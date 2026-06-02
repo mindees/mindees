@@ -97,6 +97,21 @@ final class MindeesNativeHostTests: XCTestCase {
         XCTAssertTrue(fired.isEmpty)
     }
 
+    func testDisposingInteriorNodeDetachesFromRendererTree() throws {
+        let (host, root) = makeHost()
+        try host.apply([
+            .createNode(id: .init("v"), tag: "view"),
+            .createText(id: .init("t"), text: "x"),
+            .insertChild(parentId: .init("v"), childId: .init("t"), index: 0),
+            .insertChild(parentId: .init("host-root"), childId: .init("v"), index: 0),
+        ])
+        // Dispose the interior text node while its <view> parent is still present.
+        try host.apply([.disposeNode(id: .init("t"))])
+        // The renderer (model) tree must no longer contain the disposed child.
+        XCTAssertEqual(root.children.first?.children.count, 0)
+        XCTAssertEqual(inner(root), "<view></view>")
+    }
+
     // --- strict validation (the conformance contract) ---
 
     func testRejectsDuplicateId() throws {

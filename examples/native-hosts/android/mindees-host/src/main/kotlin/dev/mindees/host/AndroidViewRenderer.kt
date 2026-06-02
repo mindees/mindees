@@ -23,7 +23,9 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     override fun makeElement(tag: String): View = when (tag) {
         "text" -> TextView(context)
         "button" -> Button(context)
-        "scrollview" -> FrameLayout(context) // wrap in a ScrollView for real scrolling
+        // MVP placeholder container; swap for android.widget.ScrollView (which takes a
+        // single child) when you need real scrolling.
+        "scrollview" -> FrameLayout(context)
         else -> LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     }
 

@@ -15,9 +15,9 @@ validates it (throwing on any malformed/leaking sequence). It is the executable
 through it proves the stream is valid and non-leaking end to end. **It still does
 not draw to a screen.** Compiled iOS/Android hosts that render the stream are
 toolchain-gated (Phase 8C needs macOS/Xcode, 8D needs the Android SDK — neither is
-available in this project's dev/CI environment); reference SwiftUI/Compose host
-stubs live in `examples/native-hosts/`. **You cannot build a native mobile app
-end-to-end with MindeesNative today.**
+available in this project's dev/CI environment); authored UIKit (iOS) and
+Android-View host projects live in `examples/native-hosts/` (pending verification).
+**You cannot build a native mobile app end-to-end with MindeesNative today.**
 
 Phase 7 (Quantum Router II) — complete (render integration +
 data/guards/transitions). `@mindees/router` renders (`createRouterView` —

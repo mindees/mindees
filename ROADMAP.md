@@ -52,8 +52,8 @@ See [STATUS.md](./STATUS.md) for current maturity.
     stream, reconstructs the view tree, and **strictly validates** it (throws on
     any malformed/leaking sequence). It is the executable spec a real native host
     implements, and piping the backend through it proves the stream is valid and
-    non-leaking end to end. Reference SwiftUI/Compose host stubs in
-    `examples/native-hosts/` implement these semantics.
+    non-leaking end to end. The UIKit (iOS) and Android-View reference host projects
+    in `examples/native-hosts/` implement these semantics.
   - [ ] **Phase 8C — iOS host MVP** _(toolchain-gated: needs macOS/Xcode)_
     A real Swift package (`examples/native-hosts/ios/`) is **authored** — UIKit
     renderer + a device-free, `swift test`-able apply/validation core implementing

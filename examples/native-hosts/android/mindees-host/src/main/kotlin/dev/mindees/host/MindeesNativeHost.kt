@@ -105,8 +105,14 @@ class MindeesNativeHost<V>(
             is NativeCommand.DisposeNode -> {
                 if (command.id == rootId) throw NativeHostException("cannot dispose the root node")
                 val v = views[command.id] ?: throw NativeHostException("double dispose of ${command.id}")
-                // Interior subtree nodes are freed without an explicit removeChild — detach.
-                parentOf.remove(command.id)?.let { pid -> childrenOf[pid]?.remove(command.id) }
+                // Interior subtree nodes are freed without an explicit removeChild, so
+                // detach from BOTH the bookkeeping and the renderer tree here. (A renderer
+                // whose dispose() is a no-op — e.g. ModelRenderer — would otherwise leave
+                // the node in its parent's children even though we consider it detached.)
+                parentOf.remove(command.id)?.let { pid ->
+                    childrenOf[pid]?.remove(command.id)
+                    views[pid]?.let { parentView -> renderer.remove(parentView, v) }
+                }
                 renderer.dispose(v)
                 views.remove(command.id)
                 childrenOf.remove(command.id)

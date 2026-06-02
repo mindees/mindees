@@ -119,6 +119,24 @@ class MindeesNativeHostTest {
         assertEquals("Hi", inner(root))
     }
 
+    @Test
+    fun disposingInteriorNodeDetachesFromRendererTree() {
+        val (host, root) = makeHost()
+        host.apply(
+            listOf(
+                NativeCommand.CreateNode("v", "view"),
+                NativeCommand.CreateText("t", "x"),
+                NativeCommand.InsertChild("v", "t", 0),
+                NativeCommand.InsertChild("host-root", "v", 0),
+            ),
+        )
+        // Dispose the interior text node while its <view> parent is still present.
+        host.apply(listOf(NativeCommand.DisposeNode("t")))
+        // The renderer (model) tree must no longer contain the disposed child.
+        assertEquals(0, root.children.first().children.size)
+        assertEquals("<view></view>", inner(root))
+    }
+
     // --- strict validation (the conformance contract) ---
 
     @Test

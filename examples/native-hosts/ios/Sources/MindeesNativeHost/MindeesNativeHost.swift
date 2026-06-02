@@ -112,13 +112,19 @@ public final class MindeesNativeHost<R: HostRenderer> {
         case let .disposeNode(id):
             if id.raw == rootId { throw NativeHostError.cannotDisposeRoot }
             guard let v = views[id.raw] else { throw NativeHostError.doubleDispose(id.raw) }
-            // Interior subtree nodes are freed without an explicit removeChild — detach.
+            // Interior subtree nodes are freed without an explicit removeChild, so
+            // detach from BOTH the bookkeeping and the renderer tree here. (A renderer
+            // whose dispose() is a no-op — e.g. ModelRenderer — would otherwise leave
+            // the node in its parent's children even though we consider it detached.)
             if let pid = parentOf[id.raw] {
                 if var kids = childrenOf[pid], let at = kids.firstIndex(of: id.raw) {
                     kids.remove(at: at)
                     childrenOf[pid] = kids
                 }
                 parentOf[id.raw] = nil
+                if let parentView = views[pid] {
+                    renderer.remove(parent: parentView, child: v)
+                }
             }
             renderer.dispose(v)
             views[id.raw] = nil

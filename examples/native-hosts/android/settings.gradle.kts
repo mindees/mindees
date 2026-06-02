@@ -9,8 +9,10 @@ pluginManagement {
         gradlePluginPortal()
     }
     plugins {
-        id("com.android.library") version "8.5.2"
-        id("org.jetbrains.kotlin.android") version "1.9.24"
+        // Latest stable as of June 2026. Align with your installed Android Studio /
+        // Gradle if it complains (AGP 9.x needs JDK 17+ and a recent Gradle).
+        id("com.android.library") version "9.2.0"
+        id("org.jetbrains.kotlin.android") version "2.3.20"
     }
 }
 
