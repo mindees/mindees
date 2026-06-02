@@ -55,10 +55,14 @@ See [STATUS.md](./STATUS.md) for current maturity.
     non-leaking end to end. Reference SwiftUI/Compose host stubs in
     `examples/native-hosts/` implement these semantics.
   - [ ] **Phase 8C — iOS host MVP** _(toolchain-gated: needs macOS/Xcode)_
-    A compiled UIKit/SwiftUI host that replays the command stream to real views,
-    checked against the Phase 8B conformance contract.
+    A real Swift package (`examples/native-hosts/ios/`) is **authored** — UIKit
+    renderer + a device-free, `swift test`-able apply/validation core implementing
+    the 8B contract. Remaining: build + run it on a device and wire the JS↔native
+    bridge (the maintainers have no macOS toolchain to verify it).
   - [ ] **Phase 8D — Android host MVP** _(toolchain-gated: needs the Android SDK)_
-    A compiled Jetpack Compose/View host that replays the command stream.
+    A real Gradle/Android library (`examples/native-hosts/android/`) is **authored**
+    — `android.view` renderer + a `./gradlew test`-able core. Remaining: build + run
+    on a device and wire the bridge (no Android SDK available to verify it).
   - [ ] **Phase 8E — Native example app**
     An end-to-end runnable native example proving the full path.
 - [ ] **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**

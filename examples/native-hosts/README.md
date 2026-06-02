@@ -1,11 +1,12 @@
-# MindeesNative — Reference Native Host Stubs
+# MindeesNative — Reference Native Hosts
 
-> **Status: reference stubs, not production hosts.** These files show _how_ a
-> native platform consumes the MindeesNative **native command protocol**
-> (`@mindees/renderer`'s `native-protocol.ts`). They are intentionally minimal,
-> are **not** wired into an Xcode/Gradle project, are **not** compiled in CI, and
-> do **not** render a real app yet. They exist to make the protocol concrete and
-> to define the contract the compiled hosts (Phase 8C/8D) will implement for real.
+> **Status: authored, pending verification — not production hosts.** These are real
+> Swift / Gradle projects that show how a native platform consumes the MindeesNative
+> **native command protocol** (`@mindees/renderer`'s `native-protocol.ts`). They are
+> **not** compiled or run by the maintainers (no macOS/Android toolchain in dev/CI)
+> and do **not** render a real app yet. Each has a device-free, unit-testable core
+> (the command-apply + strict-validation logic) plus the platform renderer — build,
+> run, and verify them yourself, then the compiled+verified hosts become Phase 8C/8D.
 
 ## What this is
 
@@ -57,27 +58,37 @@ node is detached (`removeChild`) and then it **and every descendant** are
 `disposeNode`d (deepest-first), with event handlers unregistered — so a correct
 host never leaks nodes or handlers.
 
-## Files
+## Projects
 
-- [`ios/MindeesNativeHost.swift`](ios/MindeesNativeHost.swift) — a reference iOS
-  host: decodes commands, maps `view`→`UIView`, `text`→`UILabel`, stores nodes by
-  id, exposes an event callback. Props/accessibility are placeholders.
-- [`android/MindeesNativeHost.kt`](android/MindeesNativeHost.kt) — the Android
-  equivalent: `view`→`LinearLayout`, `text`→`TextView`.
+These are **real, buildable** host projects (not single-file stubs) — but they are
+**authored, pending verification**: the maintainers have no macOS/Android toolchain,
+so neither has been compiled or run here or in CI. Each has a testable, device-free
+core (the command-apply + strict-validation logic, runnable via `swift test` /
+`./gradlew test`) plus the platform renderer.
+
+- [`ios/`](ios/README.md) — a **Swift package** (`MindeesNativeHost`). Decodes the
+  command stream (`Codable`), applies + strictly validates it (mirroring the TS
+  reference host), and renders via `UIKitRenderer` (`UIView`). `swift test` runs the
+  core with an in-memory `ModelRenderer` — no simulator.
+- [`android/`](android/README.md) — a **Gradle/Android library** (`dev.mindees.host`).
+  Same host + strict validation, `NativeCommandCodec` (org.json), and an
+  `AndroidViewRenderer` (`android.view`). `./gradlew :mindees-host:test` runs the
+  core on the JVM — no device.
 
 ## What is implemented vs. future
 
-| | Status |
+| Piece | Status |
 | --- | --- |
 | Native **command protocol** (TypeScript) | ✅ implemented + tested (`@mindees/renderer`) |
 | Command-stream **backend** | ✅ implemented + tested (Phase 8A) |
 | **Reference host** + conformance contract (`createReferenceHost`) | ✅ implemented + tested (Phase 8B) |
-| Reference host stubs (this folder) | 📄 illustrative only — not compiled, not runnable |
-| Real iOS host (compiled, renders) | ⏳ Phase 8C _(needs macOS/Xcode)_ |
-| Real Android host (compiled, renders) | ⏳ Phase 8D _(needs the Android SDK)_ |
+| iOS host project (`ios/`) | 📄 authored — core unit-tested by you via `swift test`; not built here |
+| Android host project (`android/`) | 📄 authored — core unit-tested by you via `./gradlew test`; not built here |
+| iOS host **verified + runnable on a device** | ⏳ Phase 8C _(needs macOS/Xcode)_ |
+| Android host **verified + runnable on a device** | ⏳ Phase 8D _(needs the Android SDK)_ |
 | End-to-end native example app | ⏳ Phase 8E |
 
 **You cannot build a real mobile app with MindeesNative today.** The native
 rendering _path_ exists (element tree → reactive updates → native command stream,
-validated by the reference host); a real host that draws those commands to the
-screen is the next phase.
+validated by the reference host), and host projects exist for you to build/verify;
+a verified host that draws those commands on a device is the next phase.

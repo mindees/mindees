@@ -91,10 +91,12 @@ These are real seams in the architecture, deliberately **not** faked. Each has
   dynamic paths run on an embedded engine / the web target. _(Phase 4)_
 - **Native iOS/Android renderer backends.** The platform-neutral **native command
   backend** (Phase 8A) plus a strict **reference host** that replays + validates the
-  command stream (Phase 8B) are implemented and tested. What remains 🔬 is a compiled
-  host that renders the stream to real UIKit/SwiftUI and Jetpack Compose views —
-  toolchain-gated (Phase 8C needs macOS/Xcode, 8D the Android SDK). Reference host
-  stubs are in `examples/native-hosts/`. Fallback today: web/DOM. _(Phase 3, 8A, 8B)_
+  command stream (Phase 8B) are implemented and tested. Real **iOS (SwiftPM) and
+  Android (Gradle) host projects** are authored in `examples/native-hosts/` — each
+  with a device-free, unit-testable apply/validation core — but are **pending
+  verification** (no macOS/Android toolchain in dev/CI). What remains 🔬 is building +
+  running them on a device with a JS↔native bridge — toolchain-gated (Phase 8C needs
+  macOS/Xcode, 8D the Android SDK). Fallback today: web/DOM. _(Phase 3, 8A, 8B)_
 - **GPU canvas strand (wgpu/WebGPU).** _(Phase 3+)_
 - **On-device LLM runtime (ExecuTorch / Apple Foundation Models / Gemini Nano).**
   Fallback: deterministic mock + server backend. _(Phase 10)_
