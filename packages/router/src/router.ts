@@ -33,8 +33,14 @@ export interface RouteRecord {
   path: string
   /** The component to render for this route (rendering is wired in Router II). */
   component?: Component
-  /** A Standard Schema validating this route's search params. */
-  searchSchema?: StandardSchemaV1
+  /**
+   * A Standard Schema validating this route's search params. Its **output must
+   * be object-shaped** (search params are a record), so a non-object schema like
+   * `z.string()` is rejected at compile time and validated results need no cast.
+   * Per-route end-to-end `InferOutput` typing through `Router.search()` arrives
+   * with the typed route registry in Router II.
+   */
+  searchSchema?: StandardSchemaV1<unknown, Record<string, unknown>>
   /** Arbitrary route metadata. */
   meta?: Readonly<Record<string, unknown>>
 }
@@ -180,9 +186,11 @@ function matchLocation(
     let issues: ReadonlyArray<StandardSchemaV1.Issue> | undefined
 
     if (route.searchSchema) {
+      // searchSchema's output is constrained to Record<string, unknown>, so the
+      // validated value is already correctly typed — no cast needed.
       const result = safeValidateSearch(route.searchSchema, searchRaw)
       if (result.ok) {
-        search = result.value as Record<string, unknown>
+        search = result.value
       } else {
         issues = result.issues
       }
