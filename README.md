@@ -131,10 +131,10 @@ The Mindees Compiler (MDC) is built on the TypeScript Compiler API: a strict
 that turns static UI into create-once constants.
 
 ```ts
-import { compileChecked } from '@mindees/compiler'
+import { compile, compileChecked } from '@mindees/compiler'
 
 compileChecked('const a: number = "oops"').code        // '' — build refused, type error reported
-compileChecked('export const v = <view><text>hi</text></view>').stats
+compile('export const v = <view><text>hi</text></view>').stats
 // → { flattenedNodes: 1, totalElements: 2 }  ← static subtree optimized at build time
 ```
 
@@ -280,8 +280,10 @@ Android and web, and get fine-grained reactivity and native UI.
 100% TypeScript. No new language to learn.
 
 **Can I build mobile apps with it today?**
-Not yet — it's pre-alpha. The reactive core works now; the renderer, CLI, and UI
-land in upcoming phases. ⭐ Star and watch the repo to follow progress.
+Not yet — it's pre-alpha. The reactive core, **web** renderer (with SSR), the
+compiler, the CLI, and the typed router all work now; the **native (iOS/Android)
+renderer** and the Atlas UI library land in upcoming phases. ⭐ Star and watch the
+repo to follow progress.
 
 **Is it open source?**
 Yes — dual-licensed **MIT OR Apache-2.0**, built fully in the open.

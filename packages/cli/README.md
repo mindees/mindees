@@ -22,7 +22,7 @@ mindees help
 
 ```text
 $ mindees create my-app --template counter
-Created "my-app" from the counter template (5 files).
+Created "my-app" from the counter template (6 files).
 Next: cd my-app && pnpm install && mindees dev
 
 $ mindees build

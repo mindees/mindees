@@ -161,5 +161,5 @@ export function createWorkerPool(options: WorkerPoolOptions): ThreadPool {
  * @experimental
  */
 export function createNativeThreadPool(): ThreadPool {
-  throw new NotImplementedError('Native multi-threaded ThreadPool', { rfc: 'RFC-0001' })
+  throw new NotImplementedError('Native multi-threaded ThreadPool')
 }

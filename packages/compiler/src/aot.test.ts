@@ -8,14 +8,15 @@ describe('compileToNative (research track)', () => {
     expect(() => compileToNative('export const a = 1', 'x86-64')).toThrow(NotImplementedError)
   })
 
-  it('names the feature and references an RFC', () => {
+  it('names the feature as a research track (no spurious RFC reference)', () => {
     try {
       compileToNative('', 'arm64')
       expect.unreachable('should throw')
     } catch (err) {
       expect(err).toBeInstanceOf(NotImplementedError)
       expect((err as NotImplementedError).feature).toContain('native')
-      expect((err as NotImplementedError).rfc).toBe('RFC-0001')
+      // No tracking RFC exists for this research track yet — must not cite a wrong one.
+      expect((err as NotImplementedError).rfc).toBeUndefined()
     }
   })
 })

@@ -49,7 +49,7 @@ export interface CanvasBackend<N> extends HostBackend<N> {
  * @experimental
  */
 export function createNativeBackend(_platform: 'ios' | 'android'): never {
-  throw new NotImplementedError('Native (iOS/Android) renderer backend', { rfc: 'RFC-0001' })
+  throw new NotImplementedError('Native (iOS/Android) renderer backend')
 }
 
 /**
@@ -58,5 +58,5 @@ export function createNativeBackend(_platform: 'ios' | 'android'): never {
  * @experimental
  */
 export function createCanvasBackend(): never {
-  throw new NotImplementedError('GPU canvas renderer backend (wgpu/WebGPU)', { rfc: 'RFC-0001' })
+  throw new NotImplementedError('GPU canvas renderer backend (wgpu/WebGPU)')
 }

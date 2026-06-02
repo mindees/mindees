@@ -19,6 +19,13 @@ export default defineConfig({
   test: {
     include: ['packages/*/src/**/*.test.ts'],
     environment: 'node',
+    // Several tests construct a real TypeScript program (the compiler gate, the
+    // CLI build/dev orchestrator) which loads lib `.d.ts` files — ~1.5-2.5s each
+    // and slower under full-suite CPU contention. The default 5s timeout flakes
+    // on loaded / 2-core CI runners, so give generous headroom. The tests are
+    // fast in isolation; this only guards against contention, it never hangs.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
