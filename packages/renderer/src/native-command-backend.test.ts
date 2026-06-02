@@ -342,4 +342,10 @@ describe('native command backend', () => {
     // A's slot is earlier in the parent than B's, so its insert index is smaller.
     expect((insA?.index ?? -1) < (insB?.index ?? -1)).toBe(true)
   })
+
+  it('19. rejects non-finite node ids at the boundary', () => {
+    expect(() => createNativeCommandBackend({ rootId: Number.NaN })).toThrow(TypeError)
+    const backend = createNativeCommandBackend({ idFactory: () => Number.POSITIVE_INFINITY })
+    expect(() => backend.createElement('view')).toThrow(TypeError)
+  })
 })

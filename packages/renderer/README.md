@@ -71,7 +71,8 @@ const commands = backend.flushCommands() // ship this batch to a native host
 
 > This is the **foundation** for native rendering — it produces the command
 > stream, it does **not** draw pixels. A real iOS/Android host is Phase 8B/8C; see
-> the reference host stubs in [`examples/native-hosts/`](../../examples/native-hosts/).
+> the reference host stubs in
+> [`examples/native-hosts/`](https://github.com/mindees/mindees/tree/main/examples/native-hosts).
 > You cannot build a native mobile app end-to-end yet.
 
 ## API

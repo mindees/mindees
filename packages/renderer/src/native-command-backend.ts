@@ -49,7 +49,11 @@ export interface NativeCommandNode {
 export interface NativeCommandBackendOptions {
   /** Id of the host's pre-existing root container. Defaults to a per-instance id. */
   rootId?: NativeNodeId
-  /** Custom node-id generator. Defaults to a collision-free per-instance factory. */
+  /**
+   * Custom node-id generator. Must return **unique, finite** ids (a non-finite
+   * number is rejected at the boundary). Defaults to a collision-free per-instance
+   * factory; uniqueness of a custom factory is the caller's responsibility.
+   */
   idFactory?: () => NativeNodeId
   /** Called synchronously for every emitted command. */
   onCommand?: (command: NativeCommand) => void
@@ -91,6 +95,18 @@ function eventNameFor(key: string): string {
 }
 
 /**
+ * Enforce the protocol's id invariant at the backend boundary: a non-finite number
+ * id would silently corrupt to `null` through JSON and break node identity on the
+ * wire. Throws on misuse (e.g. a custom `idFactory`/`rootId` yielding `NaN`).
+ */
+function validateNodeId(id: NativeNodeId): NativeNodeId {
+  if (typeof id === 'number' && !Number.isFinite(id)) {
+    throw new TypeError(`native node id must be a string or finite number, received ${String(id)}`)
+  }
+  return id
+}
+
+/**
  * Create a {@link NativeCommandBackend}. Render against it to capture the native
  * command stream:
  *
@@ -103,9 +119,13 @@ export function createNativeCommandBackend(
   options: NativeCommandBackendOptions = {},
 ): NativeCommandBackend<NativeCommandNode> {
   const prefix = `b${backendInstanceSeq++}`
-  const nextId = options.idFactory ?? createNativeNodeIdFactory(`${prefix}n`)
+  const rawNextId = options.idFactory ?? createNativeNodeIdFactory(`${prefix}n`)
+  // Validate every id at the boundary. Uniqueness is the idFactory's contract (the
+  // default factory guarantees it); we deliberately don't track every id forever to
+  // detect duplicates, which would leak memory in the long-running apps this targets.
+  const nextId = (): NativeNodeId => validateNodeId(rawNextId())
   const nextHandlerId = createNativeNodeIdFactory(`${prefix}h`)
-  const rootId = options.rootId ?? `${prefix}root`
+  const rootId = validateNodeId(options.rootId ?? `${prefix}root`)
 
   const root: NativeCommandNode = {
     id: rootId,

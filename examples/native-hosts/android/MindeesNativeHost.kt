@@ -65,6 +65,8 @@ class MindeesNativeHost(
             "insertChild" -> {
                 val parent = nodes[id("parentId")] as? ViewGroup ?: return
                 val child = nodes[id("childId")] ?: return
+                // A child can only have one parent; detach first in case this is a move.
+                (child.parent as? ViewGroup)?.removeView(child)
                 parent.addView(child, cmd.getInt("index").coerceAtMost(parent.childCount))
             }
             "removeChild" -> {
@@ -78,7 +80,10 @@ class MindeesNativeHost(
                 handlers.remove(key)
             }
             "registerEvent" -> register(id("id"), cmd.getString("eventName"), cmd.getString("handlerId"))
-            "unregisterEvent" -> handlers[id("id")]?.remove(cmd.getString("eventName"))
+            "unregisterEvent" -> {
+                handlers[id("id")]?.remove(cmd.getString("eventName"))
+                if (cmd.getString("eventName") == "press") nodes[id("id")]?.setOnClickListener(null)
+            }
             else -> { /* unknown command — ignore in this stub */ }
         }
     }

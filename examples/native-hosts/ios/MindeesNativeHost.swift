@@ -120,6 +120,11 @@ final class MindeesNativeHost {
             register(nodeId: id, eventName: eventName, handlerId: handlerId)
         case let .unregisterEvent(id, eventName, _):
             handlers[id]?[eventName] = nil
+            if eventName == "press", let view = nodes[id],
+               let tap = objc_getAssociatedObject(view, &TapForwarder.key) as? TapForwarder {
+                view.removeGestureRecognizer(tap.recognizer)
+                objc_setAssociatedObject(view, &TapForwarder.key, nil, .OBJC_ASSOCIATION_RETAIN)
+            }
         }
     }
 
@@ -144,6 +149,10 @@ final class MindeesNativeHost {
         guard let view = nodes[nodeId], eventName == "press" else { return }
         handlers[nodeId, default: [:]][eventName] = handlerId
         view.isUserInteractionEnabled = true
+        // Replace any prior recognizer so repeated registrations don't stack up.
+        if let old = objc_getAssociatedObject(view, &TapForwarder.key) as? TapForwarder {
+            view.removeGestureRecognizer(old.recognizer)
+        }
         let tap = TapForwarder { [weak self] in self?.onEvent(handlerId, [:]) }
         view.addGestureRecognizer(tap.recognizer)
         objc_setAssociatedObject(view, &TapForwarder.key, tap, .OBJC_ASSOCIATION_RETAIN)
