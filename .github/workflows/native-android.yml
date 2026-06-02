@@ -1,0 +1,68 @@
+name: Native Android host
+
+# Compiles + tests the reference Android host (examples/native-hosts/android) so the
+# "authored" Kotlin code is actually verified by CI — the project's dev/CI has no
+# Android toolchain locally, so this Linux runner (with the Android SDK) is the
+# source of truth for it. Path-filtered; not a required check. On-device UI
+# rendering (emulator instrumented tests) remains a further step.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/native-hosts/android/**'
+      - '.github/workflows/native-android.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/native-hosts/android/**'
+      - '.github/workflows/native-android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-host:
+    name: Android host (gradle test + assemble)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/native-hosts/android
+    steps:
+      # Third-party actions pinned to full commit SHAs (see CI workflow).
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Use the runner's preinstalled JDK 17 (matches the module's Java/jvmTarget).
+      - name: Select JDK 17
+        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+
+      - name: Tool versions
+        run: |
+          java -version
+          gradle --version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+
+      # Ensure the compileSdk platform is present + licenses accepted (AGP fetches the
+      # rest, e.g. build-tools, on demand).
+      - name: Install Android SDK platform
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36"
+
+      # The project ships no Gradle wrapper jar (binary); bootstrap one at a known
+      # version with the preinstalled Gradle, then use it for the real build.
+      - name: Bootstrap Gradle wrapper
+        run: gradle wrapper --gradle-version 8.13
+
+      - name: Unit test (JVM core)
+        run: ./gradlew :mindees-host:test --no-daemon --stacktrace
+
+      - name: Assemble library (compiles AndroidViewRenderer)
+        run: ./gradlew :mindees-host:assembleDebug --no-daemon --stacktrace
