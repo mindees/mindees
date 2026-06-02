@@ -15,12 +15,26 @@ import {
   type Component,
   computed,
   createRoot,
+  effect,
   type Memo,
   type MindeesNode,
   type Signal,
   signal,
 } from '@mindees/core'
-import { createHref, createMemoryHistory, type RouterHistory, type RouterLocation } from './history'
+import {
+  createLoaderManager,
+  type LoaderData,
+  type LoaderDepsFn,
+  type LoaderFn,
+  type LoaderManager,
+} from './data'
+import {
+  createHref,
+  createMemoryHistory,
+  parseHref,
+  type RouterHistory,
+  type RouterLocation,
+} from './history'
 import {
   buildPath,
   compareSpecificity,
@@ -49,6 +63,8 @@ export interface RouteComponentProps {
   params: () => Record<string, string>
   /** Reactive accessor for the current search params. */
   search: () => Record<string, unknown>
+  /** Reactive accessor for this route's loader state (`idle` when it has no loader). */
+  data: () => LoaderData
   /** The matched child route (the outlet); render it to show nested routes. */
   children: MindeesNode
 }
@@ -74,6 +90,12 @@ export interface RouteRecord {
    * `Router.search()` arrives with the typed route registry (a later phase).
    */
   searchSchema?: StandardSchemaV1<unknown, Record<string, unknown>>
+  /** Data loader for this route (sync or async); result is exposed via `data()`. */
+  loader?: LoaderFn
+  /** Declares which inputs key this route's loader cache (e.g. specific search params). */
+  loaderDeps?: LoaderDepsFn
+  /** Stale-while-revalidate window in ms; within it a successful load is reused. */
+  staleTime?: number
   /** Nested child routes (their `path` is relative to this route). */
   children?: readonly RouteRecord[]
   /** Arbitrary route metadata. */
@@ -123,7 +145,20 @@ export interface RouterState {
 export interface NavigateOptions {
   /** Replace the current history entry instead of pushing a new one. */
   replace?: boolean
+  /** Navigate even if the target equals the current location (skips the idempotent no-op). */
+  force?: boolean
+  /**
+   * Wrap the update in `document.startViewTransition` when available (web only).
+   * Overrides the router-level `viewTransitions` default. No-op outside a DOM.
+   */
+  viewTransition?: boolean
 }
+
+/**
+ * A navigation guard. Run before each navigation with the target and current
+ * hrefs. Return `false` to cancel, a string to redirect, or nothing to proceed.
+ */
+export type BeforeNavigate = (to: string, from: string) => boolean | string | undefined
 
 /** The params/search/hash carried by a structured target, with params required iff the pattern has them. */
 type NavExtras<P extends string> = {
@@ -167,6 +202,10 @@ export interface CreateRouterOptions {
   routes: readonly RouteRecord[]
   /** The history adapter. Defaults to an in-memory history at `/`. */
   history?: RouterHistory
+  /** A guard run before each navigation (cancel with `false`, redirect with a string). */
+  beforeNavigate?: BeforeNavigate
+  /** Wrap navigations in `document.startViewTransition` by default (web only). */
+  viewTransitions?: boolean
 }
 
 /** A live router instance. */
@@ -193,6 +232,17 @@ export interface Router {
   select<S>(selector: (state: RouterState) => S, equals?: (a: S, b: S) => boolean): () => S
   /** Navigate to a typed target or a (possibly relative) href string. */
   navigate<P extends string>(target: string | NavTarget<P>, options?: NavigateOptions): void
+  /** Reactively read a match's loader state (`idle` when the route has no loader). */
+  loaderData(match: RouteMatch): LoaderData
+  /** Re-run the current chain's loaders (marks their cached data stale first). */
+  invalidate(): void
+  /**
+   * Run a target href's loaders WITHOUT navigating (intent prefetch). A
+   * still-in-flight preload is aborted if you then navigate to a *different*
+   * route; once it settles it warms the cache for that route's next visit
+   * (subject to `staleTime`).
+   */
+  preload(to: string): void
   /**
    * Replace the route table and re-match the current location **in place** — the
    * location is preserved (dynamic reconfiguration without state reset).
@@ -356,6 +406,7 @@ export function createRouter(options: CreateRouterOptions): Router {
   let flatMemo!: Memo<FlatRoute[]>
   let locationSig!: Signal<RouterLocation>
   let stateMemo!: Memo<RouterState>
+  let loaders!: LoaderManager
 
   const dispose = createRoot((disposeRoot) => {
     routesSig = signal<readonly RouteRecord[]>(options.routes, { equals: false })
@@ -375,17 +426,69 @@ export function createRouter(options: CreateRouterOptions): Router {
         search: leaf ? leaf.search : EMPTY_SEARCH,
       }
     })
+
+    // Reactive data version: bumped on any loader-cache change; loader reads
+    // subscribe to it so a component's data binding updates when its load
+    // resolves (without re-mounting the component).
+    const dataVersion = signal(0, { equals: false })
+    loaders = createLoaderManager({
+      location: () => locationSig(),
+      onChange: () => dataVersion.set(0),
+      track: () => {
+        dataVersion()
+      },
+    })
+    // Orchestrate loaders on every navigation. Owned by the router root (not a
+    // re-running region), and it never reads `dataVersion` — so no loops.
+    effect(() => loaders.sync(matchMemo()))
+
     const unsubscribe = history.subscribe((loc) => locationSig.set(loc))
     return () => {
       unsubscribe()
+      loaders.dispose()
       disposeRoot()
     }
   })
 
-  const navigate = (target: string | NavTargetInput, options?: NavigateOptions): void => {
-    const href = typeof target === 'string' ? resolveHref(target, locationSig()) : buildHref(target)
-    if (options?.replace) history.replace(href)
-    else history.push(href)
+  /** Apply the navigation guard, following redirects (capped). Returns the final href, or null to cancel. */
+  const applyGuard = (href: string): string | null => {
+    const guard = options.beforeNavigate
+    if (!guard) return href
+    let current = href
+    for (let i = 0; i < 10; i++) {
+      const result = guard(current, createHref(locationSig()))
+      if (result === false) return null
+      if (typeof result === 'string') {
+        const next = resolveHref(result, locationSig())
+        if (next === current) return current
+        current = next
+        continue
+      }
+      return current
+    }
+    return current
+  }
+
+  const navigate = (target: string | NavTargetInput, opts?: NavigateOptions): void => {
+    const initial =
+      typeof target === 'string' ? resolveHref(target, locationSig()) : buildHref(target)
+    const href = applyGuard(initial)
+    if (href === null) return
+    // Idempotent: navigating to the current location is a no-op unless forced.
+    if (opts?.force !== true && href === createHref(locationSig())) return
+
+    const commit = (): void => {
+      if (opts?.replace) history.replace(href)
+      else history.push(href)
+    }
+    const wantsTransition = opts?.viewTransition ?? options.viewTransitions ?? false
+    if (wantsTransition) startViewTransition(commit)
+    else commit()
+  }
+
+  const preload = (to: string): void => {
+    const href = resolveHref(to, locationSig())
+    loaders.preload(matchLocation(flatMemo(), parseHref(href)))
   }
 
   return {
@@ -398,11 +501,31 @@ export function createRouter(options: CreateRouterOptions): Router {
     select: <S>(selector: (state: RouterState) => S, equals: (a: S, b: S) => boolean = Object.is) =>
       computed(() => selector(stateMemo()), { equals }),
     navigate: navigate as Router['navigate'],
+    loaderData: (match) => loaders.read(match),
+    invalidate: () => loaders.invalidate(stateMemo().matches),
+    preload,
     setRoutes: (routes) => routesSig.set(routes),
     routes: () => routesSig(),
     history,
     dispose,
   }
+}
+
+/** A document that may support the View Transitions API. */
+interface ViewTransitionDocument {
+  startViewTransition?: (callback: () => void) => unknown
+}
+
+/**
+ * Run `commit` inside `document.startViewTransition` when available (web only),
+ * else run it directly. The signals re-render is synchronous, so it happens
+ * inside the transition. No-op-wrapping outside a DOM (SSR, native, tests).
+ */
+function startViewTransition(commit: () => void): void {
+  const doc =
+    typeof document === 'undefined' ? undefined : (document as unknown as ViewTransitionDocument)
+  if (doc?.startViewTransition) doc.startViewTransition(commit)
+  else commit()
 }
 
 export { createHref }

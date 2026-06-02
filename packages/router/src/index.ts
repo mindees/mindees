@@ -1,12 +1,19 @@
 /**
  * `@mindees/router` — **Quantum**, the typed router for MindeesNative.
  *
- * Router I ships the typed routing core: codegen-free typed path params
- * ({@link PathParams}), Standard-Schema validated search params, a signals-native
- * router with typed + relative navigation and selector-isolated state, and an
- * injectable history (memory + browser). See ADR-0003 and `STATUS.md` for the
- * Router II roadmap (renderer-bound `Link`/`Outlet`, file-based scanning,
- * loaders).
+ * Router I (Phase 6): codegen-free typed path params ({@link PathParams}),
+ * Standard-Schema validated search params, a signals-native router with typed +
+ * relative navigation and selector-isolated state, and an injectable history
+ * (memory + browser). See ADR-0003.
+ *
+ * Router II (Phase 7): render integration — {@link createRouterView} (nested,
+ * fine-grained, layout-preserving) and typed {@link createLink} — plus SWR data
+ * loaders (with `AbortSignal`, {@link Router.invalidate}/{@link Router.preload}),
+ * navigation guards ({@link BeforeNavigate} cancel/redirect + idempotent
+ * navigation), and web view transitions. See ADR-0004 and ADR-0005.
+ *
+ * Still a later phase (not exported): the global typed route registry and
+ * file-based route scanning + bundler plugin. See `STATUS.md`.
  *
  * @module
  */
@@ -23,6 +30,14 @@ export {
   type LinkProps,
   type RouterViewOptions,
 } from './components'
+/** Loaders + data (SWR). */
+export type {
+  LoaderContext,
+  LoaderData,
+  LoaderDepsFn,
+  LoaderFn,
+  LoaderStatus,
+} from './data'
 /** Errors. */
 export { RouterError, type RouterErrorCode } from './errors'
 /** History capability. */
@@ -47,6 +62,7 @@ export {
 } from './pattern'
 /** Router. */
 export {
+  type BeforeNavigate,
   type CreateRouterOptions,
   createRouter,
   type NavigateOptions,
@@ -77,10 +93,11 @@ export const name = '@mindees/router'
 export const VERSION = '0.0.0'
 
 /**
- * Current maturity. The typed routing core (patterns/params, Standard-Schema
- * search validation, history, the signals-native router, selector-isolated
- * state, typed + relative navigation) is implemented and tested. Renderer-bound
- * components and file-based route scanning are Router II — see `STATUS.md`.
+ * Current maturity. Router I (typed params, Standard-Schema search, history, the
+ * signals-native router, selector-isolated state, typed + relative navigation)
+ * and Router II (nested rendering, typed links, SWR loaders, navigation guards,
+ * view transitions) are implemented and tested. The global typed route registry
+ * and file-based route scanning are a later phase — see `STATUS.md`.
  */
 export const maturity: Maturity = 'experimental'
 

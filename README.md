@@ -191,8 +191,10 @@ And it **renders**: `createRouterView` draws the matched route chain with
 **fine-grained, layout-preserving** nesting — switching between sibling pages
 keeps the parent layout (and its state) mounted, and a same-route param change
 (`/posts/1` → `/posts/2`) re-mounts *nothing*; only the bindings that read the
-changed param update. Plus a typed `createLink`. See
-[`@mindees/router`](./packages/router).
+changed param update. Plus a typed `createLink`, **SWR data loaders** (with
+`AbortSignal` cancellation, `preload` intent-prefetch, and `invalidate`),
+**navigation guards** (cancel / redirect / idempotent), and **web view
+transitions**. See [`@mindees/router`](./packages/router).
 
 ## 📦 Packages
 
@@ -228,7 +230,7 @@ upgrades).
 - ✅ **Phase 4** — Mindees Compiler (MDC): type-check gate, TSX transform, tree-flattening, route manifest
 - ✅ **Phase 5** — Forge CLI + `create-mindees`: scaffold, build, doctor
 - ✅ **Phase 6** — Quantum Router I: codegen-free typed params, Standard-Schema typed search, signals-native state
-- ✅ **Phase 7** — Quantum Router II: nested routes + `createRouterView` (fine-grained, layout-preserving rendering) + typed `createLink`
+- ✅ **Phase 7** — Quantum Router II: nested routes + `createRouterView` (layout-preserving rendering) + typed `createLink` + SWR data loaders, navigation guards, and view transitions
 - ⏭️ **Phases 8–12** — OTA, local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).

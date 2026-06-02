@@ -14,9 +14,13 @@
  */
 
 import { type Component, createElement, type MindeesElement, type MindeesNode } from '@mindees/core'
+import type { LoaderData } from './data'
 import { buildPath } from './pattern'
 import type { NavTarget, Router } from './router'
 import { type QueryValue, stringifyQuery } from './search'
+
+/** Shared idle loader state for routes without a loader. */
+const IDLE_LOADER_DATA: LoaderData = Object.freeze({ status: 'idle' })
 
 // ---------------------------------------------------------------------------
 // RouterView — render the matched route chain
@@ -65,6 +69,10 @@ export function createRouterView(router: Router, options: RouterViewOptions = {}
         router,
         params: router.params,
         search: router.search,
+        data: () => {
+          const match = router.matches()[depth]
+          return match ? router.loaderData(match) : IDLE_LOADER_DATA
+        },
         children: child,
       })
     }
