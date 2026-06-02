@@ -48,6 +48,28 @@ describe('DOM backend (happy-dom)', () => {
     expect(container.textContent).toBe('42')
   })
 
+  it('keeps a conditional region in its DOM slot among siblings', () => {
+    const container = document.createElement('div')
+    const backend = createDomBackend(document as never)
+    const show = signal(false)
+    render(
+      h(
+        'view',
+        null,
+        h('text', null, 'H'),
+        () => (show() ? h('view', null, 'X') : null),
+        h('text', null, 'T'),
+      ),
+      backend,
+      container as never,
+    )
+    expect(container.innerHTML).toBe('<div><span>H</span><span>T</span></div>')
+    show.set(true)
+    expect(container.innerHTML).toBe('<div><span>H</span><div>X</div><span>T</span></div>')
+    show.set(false)
+    expect(container.innerHTML).toBe('<div><span>H</span><span>T</span></div>')
+  })
+
   it('wires event listeners from onX props', () => {
     const container = document.createElement('div')
     const backend = createDomBackend(document as never)

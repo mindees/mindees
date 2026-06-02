@@ -121,6 +121,52 @@ describe('render — fine-grained reactivity', () => {
     n.set(3)
     expect(html()).toBe('<view>odd</view>')
   })
+
+  it('keeps a conditional region in its slot among siblings (empty↔content)', () => {
+    const { backend, root, html } = setup()
+    const show = signal(false)
+    render(
+      h(
+        'view',
+        null,
+        h('head', null, 'H'),
+        () => (show() ? h('x', null, 'X') : null),
+        h('tail', null, 'T'),
+      ),
+      backend,
+      root,
+    )
+    // Empty region must not collapse to the parent's end.
+    expect(html()).toBe('<view><head>H</head><tail>T</tail></view>')
+    show.set(true)
+    expect(html()).toBe('<view><head>H</head><x>X</x><tail>T</tail></view>')
+    show.set(false) // content→empty keeps the slot
+    expect(html()).toBe('<view><head>H</head><tail>T</tail></view>')
+    show.set(true) // empty→content re-expands in the SAME slot
+    expect(html()).toBe('<view><head>H</head><x>X</x><tail>T</tail></view>')
+  })
+
+  it('keeps two adjacent regions in order even when filled out of order', () => {
+    const { backend, root, html } = setup()
+    const a = signal(false)
+    const b = signal(false)
+    render(
+      h(
+        'view',
+        null,
+        () => (a() ? h('a', null, 'A') : null),
+        () => (b() ? h('b', null, 'B') : null),
+        h('tail', null, 'T'),
+      ),
+      backend,
+      root,
+    )
+    expect(html()).toBe('<view><tail>T</tail></view>')
+    b.set(true) // fill the SECOND region first
+    expect(html()).toBe('<view><b>B</b><tail>T</tail></view>')
+    a.set(true) // first region fills into its own (earlier) slot
+    expect(html()).toBe('<view><a>A</a><b>B</b><tail>T</tail></view>')
+  })
 })
 
 describe('render — disposal', () => {
