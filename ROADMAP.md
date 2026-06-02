@@ -54,17 +54,21 @@ See [STATUS.md](./STATUS.md) for current maturity.
     implements, and piping the backend through it proves the stream is valid and
     non-leaking end to end. The UIKit (iOS) and Android-View reference host projects
     in `examples/native-hosts/` implement these semantics.
-  - [ ] **Phase 8C — iOS host MVP** _(toolchain-gated: needs macOS/Xcode)_
-    A real Swift package (`examples/native-hosts/ios/`) is **authored** — UIKit
-    renderer + a device-free, `swift test`-able apply/validation core implementing
-    the 8B contract. Remaining: build + run it on a device and wire the JS↔native
-    bridge (the maintainers have no macOS toolchain to verify it).
-  - [ ] **Phase 8D — Android host MVP** _(toolchain-gated: needs the Android SDK)_
-    A real Gradle/Android library (`examples/native-hosts/android/`) is **authored**
-    — `android.view` renderer + a `./gradlew test`-able core. Remaining: build + run
-    on a device and wire the bridge (no Android SDK available to verify it).
-  - [ ] **Phase 8E — Native example app**
-    An end-to-end runnable native example proving the full path.
+  - [x] **Phase 8C — iOS host (compiles + conformance core verified in CI)** ✅
+    A real Swift package (`examples/native-hosts/ios/`): UIKit renderer + a
+    device-free apply/validation core implementing the 8B contract. A macOS CI job
+    (`.github/workflows/native-ios.yml`) runs `swift test` and compiles the full
+    package (incl. `UIKitRenderer`) for the iOS SDK. Remaining (8E): render on a
+    real device + wire the JS↔native bridge.
+  - [x] **Phase 8D — Android host (compiles + conformance core verified in CI)** ✅
+    A real Gradle/Android library (`examples/native-hosts/android/`): `android.view`
+    renderer + a JVM-testable core. A Linux CI job (`.github/workflows/native-android.yml`,
+    Android SDK) runs `:mindees-host:test` and `:mindees-host:assembleDebug` (compiles
+    `AndroidViewRenderer`). Remaining (8E): render on a real device + wire the bridge.
+  - [ ] **Phase 8E — Native example app (on-device rendering, end to end)**
+    A runnable native example that renders the command stream on a real iOS/Android
+    device/emulator (proving on-device pixels) over a JS↔native bridge — the step
+    that makes a native MindeesNative app real end to end.
 - [ ] **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
   Manifest, binary diff, Ed25519 signing, atomic rollback, reference server.
 - [ ] **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
