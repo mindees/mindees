@@ -160,11 +160,14 @@ export function createBrowserHistory(): RouterHistory {
   return {
     location: current,
     push(to) {
-      window.history.pushState(null, '', to)
+      // Normalize via parseHref so the browser adapter treats `to` as an href
+      // (not browser-relative), matching createMemoryHistory exactly. Router
+      // navigation already passes absolute hrefs; this only affects direct calls.
+      window.history.pushState(null, '', createHref(parseHref(to)))
       notify()
     },
     replace(to) {
-      window.history.replaceState(null, '', to)
+      window.history.replaceState(null, '', createHref(parseHref(to)))
       notify()
     },
     go: (delta) => window.history.go(delta),

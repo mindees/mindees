@@ -78,18 +78,27 @@ function splitPath(path: string): string[] {
   return path.split('/').filter((s) => s.length > 0)
 }
 
+/** Reject an empty param name (`/:` or `/:*`) so downstream never sees `params['']`. */
+function requireName(name: string, pattern: string): string {
+  if (name.length === 0) {
+    throw new RouterError('INVALID_PATTERN', `Param name cannot be empty in pattern "${pattern}".`)
+  }
+  return name
+}
+
 /**
  * Parse a pattern into segments, validating it. Throws {@link RouterError}
- * (`INVALID_PATTERN`) if a catch-all is not the final segment.
+ * (`INVALID_PATTERN`) if a catch-all is not the final segment, or a param name
+ * is empty.
  */
 export function parsePattern(pattern: string): Segment[] {
   const raw = splitPath(pattern)
   const segments: Segment[] = raw.map((s) => {
     if (s.startsWith(':') && s.endsWith('*')) {
-      return { kind: 'catchAll', value: s.slice(1, -1) }
+      return { kind: 'catchAll', value: requireName(s.slice(1, -1), pattern) }
     }
     if (s.startsWith(':')) {
-      return { kind: 'param', value: s.slice(1) }
+      return { kind: 'param', value: requireName(s.slice(1), pattern) }
     }
     return { kind: 'static', value: s }
   })

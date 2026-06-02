@@ -39,3 +39,16 @@ expectTypeOf(pathname).toEqualTypeOf<() => string>()
 // validateSearch infers the schema's output type (zero codegen).
 const search = validateSearch(z.object({ page: z.number(), q: z.string() }), {})
 expectTypeOf(search).toEqualTypeOf<{ page: number; q: string }>()
+
+// A route's searchSchema must produce an object-shaped output.
+createRouter({
+  routes: [{ path: '/s', searchSchema: z.object({ q: z.string() }) }],
+  history: createMemoryHistory(),
+})
+createRouter({
+  routes: [
+    // @ts-expect-error — a non-object schema output is rejected for searchSchema.
+    { path: '/s', searchSchema: z.string() },
+  ],
+  history: createMemoryHistory(),
+})

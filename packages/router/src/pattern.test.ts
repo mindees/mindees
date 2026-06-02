@@ -25,6 +25,17 @@ describe('parsePattern', () => {
       expect((e as RouterError).code).toBe('INVALID_PATTERN')
     }
   })
+
+  it('rejects empty param names', () => {
+    for (const bad of ['/:', '/posts/:', '/:*', '/files/:*']) {
+      expect(() => parsePattern(bad)).toThrow(RouterError)
+      try {
+        parsePattern(bad)
+      } catch (e) {
+        expect((e as RouterError).code).toBe('INVALID_PATTERN')
+      }
+    }
+  })
 })
 
 describe('matchPattern', () => {

@@ -29,6 +29,16 @@ describe('createBrowserHistory', () => {
     expect(window.location.pathname).toBe('/b')
   })
 
+  it('normalizes push/replace inputs like memory history (href, not browser-relative)', () => {
+    const h = createBrowserHistory()
+    window.history.replaceState(null, '', '/start')
+    // A bare/relative-looking href is treated as an href and gets a leading slash,
+    // matching createMemoryHistory — not resolved relative to the current URL.
+    h.push('docs?x=1')
+    expect(window.location.pathname).toBe('/docs')
+    expect(window.location.search).toBe('?x=1')
+  })
+
   it('forwards popstate (back/forward) to subscribers', () => {
     const h = createBrowserHistory()
     const listener = vi.fn()
