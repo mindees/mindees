@@ -224,27 +224,33 @@ function bindReactiveChild<N>(
   const marker = backend.createText('')
   backend.insert(parent, marker, initialAnchor)
 
-  let current: N[] = []
+  // `nodes` is a STABLE, live array — the region's current content followed by
+  // the slot marker — mutated in place on every run. Returning the same array
+  // reference (not a one-time snapshot) means a caller that captures it once
+  // (e.g. render()'s root disposer) always removes the CURRENT content, not the
+  // first-run nodes.
+  const nodes: N[] = [marker]
+  let content: N[] = []
   effect(() => {
     const value = accessor()
     untrack(() => {
       // Fast path: single existing text node + new text-like value → patch.
       if (
-        current.length === 1 &&
-        current[0] !== undefined &&
-        backend.isText(current[0]) &&
+        content.length === 1 &&
+        content[0] !== undefined &&
+        backend.isText(content[0]) &&
         (typeof value === 'string' || typeof value === 'number')
       ) {
-        backend.setText(current[0], String(value))
+        backend.setText(content[0], String(value))
         return
       }
-      for (const n of current) backend.remove(parent, n)
-      current = mountNode(value, backend, parent, marker)
+      for (const n of content) backend.remove(parent, n)
+      content = mountNode(value, backend, parent, marker)
+      nodes.length = 0
+      nodes.push(...content, marker)
     })
   })
-  // The region's host nodes are its content plus the slot marker (so a parent
-  // unmount removes the marker too).
-  return [...current, marker]
+  return nodes
 }
 
 export type { MaybeReactive }

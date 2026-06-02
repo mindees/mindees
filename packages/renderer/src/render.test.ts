@@ -186,6 +186,19 @@ describe('render — disposal', () => {
     expect(html()).toBe('')
   })
 
+  it('disposes the CURRENT content of a reactive root (not a stale first-run snapshot)', () => {
+    const { backend, root, html } = setup()
+    const show = signal(true)
+    // A reactive ROOT: render()'s disposer captures the region's node list once.
+    const m = render(() => (show() ? h('a', null, '1') : h('b', null, '2')), backend, root)
+    expect(html()).toBe('<a>1</a>')
+    show.set(false) // content swapped after the initial mount
+    expect(html()).toBe('<b>2</b>')
+    m.dispose()
+    expect(html()).toBe('') // the CURRENT content (and marker) are removed — no leak
+    expect(root.children.length).toBe(0)
+  })
+
   it('disposes bindings created inside a component (they stop re-running)', () => {
     const { backend, root } = setup()
     const s = signal(0)
