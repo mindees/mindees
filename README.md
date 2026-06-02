@@ -30,7 +30,10 @@ OTA updates. Built in the open.
 > actually works.** [`STATUS.md`](./STATUS.md) is the honest, per-package source
 > of truth for what's real today versus what's still planned. **The reactive
 > core, renderer (with SSR), compiler, CLI, and typed router are done and
-> tested** — see the live examples below.
+> tested** — see the live examples below. The **native rendering foundation** — a
+> platform-neutral command backend — just landed (Phase 8A), but native
+> iOS/Android apps **do not run end-to-end yet**: a real host that draws the
+> commands is the next phase.
 >
 > ⭐ **Star the repo** to follow along, and check the
 > [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
@@ -121,8 +124,10 @@ renderToString(Counter, {})        // → '<div>clicked 0×</div>'
 hydrate(document.getElementById('app'), Counter, {})
 ```
 
-One renderer, swappable **host backends**: a web/DOM backend and a headless
-backend ship today; native (iOS/Android) and a GPU canvas are on the roadmap.
+One renderer, swappable **host backends**: a web/DOM backend, a headless backend,
+and a **native command backend** (compiles the tree + reactive updates into a
+serializable native command stream — Phase 8A) ship today; the real iOS/Android
+hosts that render that stream, and a GPU canvas, are on the roadmap.
 
 ### ⚙️ A compiler that won't let type errors ship (Phase 4)
 
@@ -208,7 +213,7 @@ upgrades).
 | [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest | 🧪 Experimental |
 | [`@mindees/cli`](./packages/cli) | Forge | `mindees` CLI: create / build / doctor / info / dev | 🧪 Experimental |
 | [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state + nested rendering | 🧪 Experimental |
-| [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration (native + GPU canvas 🔬) | 🧪 Experimental |
+| [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend (real iOS/Android hosts + GPU canvas 🔬) | 🧪 Experimental |
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
 | `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
@@ -231,7 +236,8 @@ upgrades).
 - ✅ **Phase 5** — Forge CLI + `create-mindees`: scaffold, build, doctor
 - ✅ **Phase 6** — Quantum Router I: codegen-free typed params, Standard-Schema typed search, signals-native state
 - ✅ **Phase 7** — Quantum Router II: nested routes + `createRouterView` (layout-preserving rendering) + typed `createLink` + SWR data loaders, navigation guards, and view transitions
-- ⏭️ **Phases 8–12** — OTA, local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 8A** — Helix native strand: a platform-neutral native **command backend** (element tree + reactive updates → serializable command stream; events as stable handler ids). Foundation for native rendering — real iOS/Android hosts (8B/8C) come next.
+- ⏭️ **Phases 8B–13** — native iOS/Android hosts + example, then OTA, local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
@@ -281,9 +287,11 @@ Android and web, and get fine-grained reactivity and native UI.
 
 **Can I build mobile apps with it today?**
 Not yet — it's pre-alpha. The reactive core, **web** renderer (with SSR), the
-compiler, the CLI, and the typed router all work now; the **native (iOS/Android)
-renderer** and the Atlas UI library land in upcoming phases. ⭐ Star and watch the
-repo to follow progress.
+compiler, the CLI, and the typed router all work now, and the **native rendering
+foundation** (a platform-neutral command backend) has landed (Phase 8A). But a
+real **native (iOS/Android) host** that draws those commands to the screen — and
+the Atlas UI library — land in upcoming phases, so native apps don't run
+end-to-end yet. ⭐ Star and watch the repo to follow progress.
 
 **Is it open source?**
 Yes — dual-licensed **MIT OR Apache-2.0**, built fully in the open.

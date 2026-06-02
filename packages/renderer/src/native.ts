@@ -1,20 +1,29 @@
 /**
- * Native + GPU-canvas backends — 🔬 **research tracks**.
+ * Native rendering backends.
  *
- * These define the *contracts* so the Helix architecture is real and the public
- * API is honest, but they are **not implemented**. The constructors throw
- * {@link NotImplementedError}. The web/DOM backend ({@link createDomBackend}) and
- * the headless backend are the working targets today; the reference platform is
- * the web (per ROADMAP Phase 3).
+ * Two layers live here, at different maturities:
+ *
+ * - ✅ **Native command backend** ({@link createNativeCommandBackend},
+ *   re-exported below) — **implemented today**. It turns the Helix element tree +
+ *   fine-grained reactive updates into a serializable {@link NativeCommand}
+ *   stream that a native host can replay. This is the Phase 8A foundation for
+ *   native rendering; it does not itself draw to the screen.
+ * - 🔬 **Real platform host backends** ({@link createNativeBackend},
+ *   {@link createCanvasBackend}) — **research tracks**. They define the contracts
+ *   so the Helix architecture is real and the public API is honest, but they are
+ *   **not implemented**: the constructors throw {@link NotImplementedError}.
+ *
+ * The web/DOM backend ({@link createDomBackend}) and the headless backend are the
+ * fully working render targets today.
  *
  * - **Native strand** (`NativeBackend`): real UIKit/SwiftUI (iOS) and Jetpack
- *   Compose (Android) host nodes. Implementing this is how MindeesNative gets
- *   true native UI that adopts new OS design languages automatically.
+ *   Compose (Android) host nodes. A real host will consume the native command
+ *   stream; reference host stubs live in `examples/native-hosts/`.
  * - **GPU canvas strand** (`CanvasBackend`): a wgpu/WebGPU surface with
  *   build-time-precompiled shaders, for pixel-perfect custom UI composited next
  *   to native nodes.
  *
- * Both are tracked for later phases. See ROADMAP.md and the framework spec.
+ * See ROADMAP.md and STATUS.md for the honest maturity breakdown.
  *
  * @module
  */
@@ -43,13 +52,17 @@ export interface CanvasBackend<N> extends HostBackend<N> {
 }
 
 /**
- * 🔬 Research track — not implemented. Throws {@link NotImplementedError}.
- * Use {@link createDomBackend} (web) today.
+ * 🔬 Research track — a real iOS/Android host backend that draws platform views.
+ * **Not implemented**: throws {@link NotImplementedError}.
+ *
+ * Today, drive {@link createNativeCommandBackend} to produce the native command
+ * stream a host will consume (see `examples/native-hosts/` for reference SwiftUI
+ * and Jetpack Compose host stubs), or {@link createDomBackend} for the web.
  *
  * @experimental
  */
 export function createNativeBackend(_platform: 'ios' | 'android'): never {
-  throw new NotImplementedError('Native (iOS/Android) renderer backend')
+  throw new NotImplementedError('Native (iOS/Android) platform host backend')
 }
 
 /**
@@ -60,3 +73,15 @@ export function createNativeBackend(_platform: 'ios' | 'android'): never {
 export function createCanvasBackend(): never {
   throw new NotImplementedError('GPU canvas renderer backend (wgpu/WebGPU)')
 }
+
+/**
+ * ✅ The implemented native MVP: a backend that emits a serializable
+ * {@link NativeCommand} stream for a native host to replay. See
+ * {@link import('./native-command-backend').createNativeCommandBackend}.
+ */
+export {
+  createNativeCommandBackend,
+  type NativeCommandBackend,
+  type NativeCommandBackendOptions,
+  type NativeCommandNode,
+} from './native-command-backend'

@@ -23,13 +23,41 @@ export {
   type HeadlessNode,
   isEventProp,
 } from './headless'
-/** Native + GPU-canvas backends — research tracks (throw NotImplementedError). */
+/**
+ * Native backends. `createNativeCommandBackend` is implemented (emits a native
+ * command stream); `createNativeBackend`/`createCanvasBackend` are research
+ * tracks that throw `NotImplementedError`.
+ */
 export {
   type CanvasBackend,
   createCanvasBackend,
   createNativeBackend,
+  createNativeCommandBackend,
   type NativeBackend,
+  type NativeCommandBackend,
+  type NativeCommandBackendOptions,
+  type NativeCommandNode,
 } from './native'
+/** The native command protocol: command types + serialization-safe helpers. */
+export {
+  type CreateNodeCommand,
+  type CreateTextCommand,
+  createNativeNodeIdFactory,
+  type DisposeNodeCommand,
+  type InsertChildCommand,
+  isNativeCommand,
+  isNativePropValue,
+  type NativeCommand,
+  type NativeNodeId,
+  type NativePropValue,
+  normalizeNativeProp,
+  type RegisterEventCommand,
+  type RemoveChildCommand,
+  type RemovePropCommand,
+  type SetPropCommand,
+  type UnregisterEventCommand,
+  type UpdateTextCommand,
+} from './native-protocol'
 /** The fine-grained reactive reconciler. */
 export { type Mounted, render } from './render'
 /** Server-side rendering + hydration (web). */
