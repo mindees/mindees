@@ -12,14 +12,15 @@ describe('native + canvas backends (research tracks)', () => {
     expect(() => createCanvasBackend()).toThrow(NotImplementedError)
   })
 
-  it('the error names the feature and references an RFC', () => {
+  it('the error names the feature as a research track (no spurious RFC reference)', () => {
     try {
       createNativeBackend('ios')
       expect.unreachable('should have thrown')
     } catch (err) {
       expect(err).toBeInstanceOf(NotImplementedError)
       expect((err as NotImplementedError).feature).toContain('Native')
-      expect((err as NotImplementedError).rfc).toBe('RFC-0001')
+      // No tracking RFC exists for this research track yet — must not cite a wrong one.
+      expect((err as NotImplementedError).rfc).toBeUndefined()
     }
   })
 })

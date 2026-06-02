@@ -28,5 +28,5 @@ export type NativeTarget = 'arm64' | 'x86-64'
  * @experimental
  */
 export function compileToNative(_source: string, _target: NativeTarget): never {
-  throw new NotImplementedError('TypeScript → native machine code (AOT)', { rfc: 'RFC-0001' })
+  throw new NotImplementedError('TypeScript → native machine code (AOT)')
 }

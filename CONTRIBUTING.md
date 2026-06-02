@@ -140,10 +140,13 @@ We use [Changesets](https://github.com/changesets/changesets). All `@mindees/*`
 packages share one locked version line. Flow:
 
 ```bash
-pnpm changeset            # describe the change + bump type
-pnpm changeset version    # apply version bumps + update changelogs
-pnpm changeset publish    # publish to npm (CI, on main)
+pnpm changeset            # describe the change + bump type (in your PR)
 ```
+
+On merge to `main`, the Release workflow opens/updates a **"version packages"
+PR** (applying the bumps + changelogs). **Publishing to npm is deferred to
+Phase 12** — CI does **not** run `changeset publish` today (packages are still
+`0.0.0`), so there is nothing to publish yet.
 
 ## Good first issues
 
