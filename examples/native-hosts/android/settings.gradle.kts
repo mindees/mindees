@@ -9,10 +9,11 @@ pluginManagement {
         gradlePluginPortal()
     }
     plugins {
-        // Latest stable as of June 2026. Align with your installed Android Studio /
-        // Gradle if it complains (AGP 9.x needs JDK 17+ and a recent Gradle).
+        // Latest stable as of June 2026. AGP 9 has BUILT-IN Kotlin support, so the
+        // org.jetbrains.kotlin.android plugin is no longer applied (AGP errors if it
+        // is). Align AGP with your toolchain if Gradle complains (AGP 9.x needs
+        // JDK 17+ and a recent Gradle).
         id("com.android.library") version "9.2.0"
-        id("org.jetbrains.kotlin.android") version "2.3.20"
     }
 }
 

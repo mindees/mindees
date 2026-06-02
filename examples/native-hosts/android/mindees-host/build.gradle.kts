@@ -2,8 +2,8 @@
 // Align compileSdk / Java / plugin versions with your installed toolchain if needed.
 
 plugins {
+    // AGP 9 includes built-in Kotlin support — no separate kotlin-android plugin.
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -19,10 +19,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     testOptions {
         unitTests {
             // The host + ModelRenderer are pure Kotlin; JSON-codec tests use the real
@@ -30,6 +26,11 @@ android {
             isReturnDefaultValues = true
         }
     }
+}
+
+// AGP's built-in Kotlin exposes the standard `kotlin {}` DSL.
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
