@@ -59,7 +59,7 @@ jobs:
       # The project ships no Gradle wrapper jar (binary); bootstrap one at a known
       # version with the preinstalled Gradle, then use it for the real build.
       - name: Bootstrap Gradle wrapper
-        run: gradle wrapper --gradle-version 8.13
+        run: gradle wrapper --gradle-version 9.4.1 # AGP 9.2 requires Gradle >= 9.4.1
 
       - name: Unit test (JVM core)
         run: ./gradlew :mindees-host:test --no-daemon --stacktrace
