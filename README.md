@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./mindees-logo.png" alt="MindeesNative — open-source TypeScript cross-platform app framework (React Native & Flutter alternative)" width="140" height="140" />
+<img src="./mindees-native-with-text-logo.png" alt="MindeesNative — open-source TypeScript cross-platform app framework (React Native & Flutter alternative)" width="440" />
 
 # MindeesNative
 
@@ -295,6 +295,8 @@ Dual-licensed under **MIT OR Apache-2.0** — see [LICENSE](./LICENSE).
 ---
 
 <div align="center">
+
+<img src="./mindees-native-logo.png" alt="MindeesNative logo" width="80" height="80" />
 
 **MindeesNative** — write TypeScript once, run native everywhere.
 Built in the open at [github.com/mindees/mindees](https://github.com/mindees/mindees) · [@mindees on npm](https://www.npmjs.com/org/mindees)
