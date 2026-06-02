@@ -95,12 +95,26 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     }
   }
 
-  // Per-route manifest, if a routes dir is present.
+  // Per-route manifest, if a routes dir is present. buildRouteManifest THROWS on
+  // a malformed routes dir (duplicate route path, or a non-terminal catch-all) —
+  // ordinary user misconfigurations that `mindees build` exists to report. Turn
+  // them into a build diagnostic + failing result so the CLI prints a clean error
+  // and exits non-zero, honoring runCli's "never throws for expected failures"
+  // contract instead of crashing with a raw stack trace.
   let routes: BuildResult['routes']
   const routesDir = `${srcDir}/routes`
   if (fs.exists(routesDir)) {
-    routes = buildRouteManifest(fs.readDir(routesDir))
-    fs.writeFile(`${outDir}/routes.manifest.json`, `${JSON.stringify(routes, null, 2)}\n`)
+    try {
+      routes = buildRouteManifest(fs.readDir(routesDir))
+      fs.writeFile(`${outDir}/routes.manifest.json`, `${JSON.stringify(routes, null, 2)}\n`)
+    } catch (e) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'MDC_ROUTES',
+        message: e instanceof Error ? e.message : String(e),
+        file: 'src/routes',
+      })
+    }
   }
 
   compiled.sort()

@@ -60,6 +60,40 @@ describe('buildProject', () => {
     expect(fs.snapshot()['dist/routes.manifest.json']).toContain('/blog/:slug')
   })
 
+  it('reports a duplicate route path as a build error instead of crashing', () => {
+    // `src/routes/index.tsx` and the route-group `src/routes/(app)/index.tsx`
+    // both map to "/", which makes buildRouteManifest throw. The CLI must catch
+    // it and fail cleanly, not propagate a raw exception.
+    const fs = createMemoryFileSystem({
+      'src/routes/index.tsx':
+        'import { createElement } from "@mindees/core"\nexport default () => <view/>',
+      'src/routes/(app)/index.tsx':
+        'import { createElement } from "@mindees/core"\nexport default () => <view/>',
+    })
+    let result!: ReturnType<typeof buildProject>
+    expect(() => {
+      result = buildProject(fs)
+    }).not.toThrow()
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.some((d) => d.code === 'MDC_ROUTES' && d.severity === 'error')).toBe(
+      true,
+    )
+  })
+
+  it('reports a non-terminal catch-all route as a build error instead of crashing', () => {
+    // `[...rest]` is not the last segment → fileToRoute throws; must be reported.
+    const fs = createMemoryFileSystem({
+      'src/routes/[...rest]/edit.tsx':
+        'import { createElement } from "@mindees/core"\nexport default () => <view/>',
+    })
+    let result!: ReturnType<typeof buildProject>
+    expect(() => {
+      result = buildProject(fs)
+    }).not.toThrow()
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.some((d) => d.code === 'MDC_ROUTES')).toBe(true)
+  })
+
   it('handles an empty project (no src)', () => {
     const fs = createMemoryFileSystem()
     const result = buildProject(fs)
