@@ -1,10 +1,10 @@
 # MindeesNativeHost — iOS reference host (Swift Package)
 
-> ⚠️ **Authored — pending verification.** This is a real Swift package, but it has
-> **not** been compiled or run by the MindeesNative maintainers: there is no
-> macOS/Xcode toolchain in the project's dev or CI environment. It is provided so
-> you can build, run, and verify it. Please report what needs fixing. It is **not**
-> claimed to work until someone compiles + runs it.
+> ✅ **CI-verified compile + conformance core; not yet on-device.** A GitHub Actions
+> macOS runner ([`.github/workflows/native-ios.yml`](../../../.github/workflows/native-ios.yml))
+> runs `swift build` + `swift test` and compiles the package (incl. `UIKitRenderer`)
+> for the iOS SDK on every change. What is **not** yet verified: rendering on a real
+> device/simulator and a JS↔native bridge (Phase 8E). Not a production host.
 
 A reference iOS host that replays the MindeesNative **native command stream** (from
 `@mindees/renderer`'s `createNativeCommandBackend()`) into UIKit views. It
@@ -13,7 +13,7 @@ specifies and tests (Phase 8B).
 
 ## Layout
 
-```
+```text
 Package.swift
 Sources/MindeesNativeHost/
   NativeCommand.swift     # Codable wire model (NativeCommand / NativePropValue / NativeNodeId)
@@ -58,8 +58,10 @@ try host.apply(commands)
 
 ## Status
 
-- ✅ Implements the Phase 8B conformance contract (decode → apply → strict validate).
-- 🔬 **Phase 8C** = a *verified*, runnable iOS host (this package compiled + run on a
-  device, wired to a real JS↔native bridge). The bridge transport is out of scope here.
+- ✅ **Phase 8C** — implements the 8B conformance contract (decode → apply → strict
+  validate); CI compiles the package for iOS (incl. `UIKitRenderer`) and runs
+  `swift test`.
+- 🔬 **Phase 8E** — render on a real device/simulator (UI test) + a JS↔native bridge.
+  Not done; the bridge transport is out of scope here.
 - The tag→view mapping and prop application are an intentional MVP — extend
   `UIKitRenderer.makeElement` / `setProp` for a real design system.

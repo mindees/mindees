@@ -1,12 +1,14 @@
 # MindeesNativeHost — Android reference host (Gradle)
 
-> ⚠️ **Authored — pending verification.** This is a real Gradle/Android library, but
-> it has **not** been built or run by the MindeesNative maintainers: there is no
-> Android SDK/Gradle in the project's dev or CI environment. Open it in Android
-> Studio (which provides Gradle + the wrapper), build/run it, and report what needs
-> fixing. **Align the AGP/Kotlin/SDK versions** in `settings.gradle.kts` and
-> `mindees-host/build.gradle.kts` with your installed toolchain if Gradle complains.
-> It is **not** claimed to work until someone compiles + runs it.
+> ✅ **CI-verified compile + conformance core; not yet on-device.** A GitHub Actions
+> Linux runner with the Android SDK
+> ([`.github/workflows/native-android.yml`](../../../.github/workflows/native-android.yml))
+> runs `:mindees-host:test` (JVM) and `:mindees-host:assembleDebug` (compiles
+> `AndroidViewRenderer`) on every change — AGP 9.2 / Gradle 9.4.1 / JDK 17. What is
+> **not** yet verified: rendering on a device/emulator and a JS↔native bridge
+> (Phase 8E). To open locally, use Android Studio (it provides Gradle); align the
+> AGP/SDK versions in `settings.gradle.kts` / `mindees-host/build.gradle.kts` with
+> your toolchain if Gradle complains. Not a production host.
 
 A reference Android host that replays the MindeesNative **native command stream**
 (from `@mindees/renderer`'s `createNativeCommandBackend()`) into `android.view`
@@ -15,7 +17,7 @@ widgets. It implements the exact contract that `@mindees/renderer`'s
 
 ## Layout
 
-```
+```text
 settings.gradle.kts / build.gradle.kts / gradle.properties
 mindees-host/
   build.gradle.kts
@@ -57,8 +59,10 @@ host.apply(NativeCommandCodec.decodeBatch(json))
 
 ## Status
 
-- ✅ Implements the Phase 8B conformance contract (decode → apply → strict validate).
-- 🔬 **Phase 8D** = a *verified*, runnable Android host (this library compiled + run
-  on a device, wired to a real JS↔native bridge). The bridge transport is out of scope.
+- ✅ **Phase 8D** — implements the 8B conformance contract (decode → apply → strict
+  validate); CI compiles the library (incl. `AndroidViewRenderer`) and runs
+  `:mindees-host:test`.
+- 🔬 **Phase 8E** — render on a device/emulator (instrumented UI test) + a JS↔native
+  bridge. Not done; the bridge transport is out of scope here.
 - The tag→view mapping and prop application are an intentional MVP — extend
   `AndroidViewRenderer` for a real design system.

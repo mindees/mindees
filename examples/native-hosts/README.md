@@ -1,12 +1,12 @@
 # MindeesNative — Reference Native Hosts
 
-> **Status: authored, pending verification — not production hosts.** These are real
-> Swift / Gradle projects that show how a native platform consumes the MindeesNative
-> **native command protocol** (`@mindees/renderer`'s `native-protocol.ts`). They are
-> **not** compiled or run by the maintainers (no macOS/Android toolchain in dev/CI)
-> and do **not** render a real app yet. Each has a device-free, unit-testable core
-> (the command-apply + strict-validation logic) plus the platform renderer — build,
-> run, and verify them yourself, then the compiled+verified hosts become Phase 8C/8D.
+> **Status: CI-compiled + conformance-core-tested — not yet on-device.** These are
+> real Swift / Gradle projects that show how a native platform consumes the
+> MindeesNative **native command protocol** (`@mindees/renderer`'s
+> `native-protocol.ts`). They now **compile and pass their conformance cores in CI**
+> (a macOS runner for iOS, a Linux+SDK runner for Android — Phase 8C/8D), but they do
+> **not render on a real device yet** (no simulator/emulator UI test or JS↔native
+> bridge — that's Phase 8E). Not production hosts.
 
 ## What this is
 
@@ -33,9 +33,8 @@ into the runtime via `dispatchEvent(handlerId, event)` when a native event fires
 > **The host semantics are specified executably.** `@mindees/renderer` ships
 > `createReferenceHost()` — a strict reference host (in TypeScript) that applies
 > the same command stream to a model tree and throws on any malformed/leaking
-> sequence. The stubs below implement exactly those semantics against UIKit /
-> Jetpack Compose. When a real compiled host is built (Phase 8C/8D), it is checked
-> against that contract.
+> sequence. The projects below implement exactly those semantics against UIKit /
+> Android View, and their conformance cores are checked against that contract in CI.
 
 ## The command stream
 
@@ -60,20 +59,19 @@ host never leaks nodes or handlers.
 
 ## Projects
 
-These are **real, buildable** host projects (not single-file stubs) — but they are
-**authored, pending verification**: the maintainers have no macOS/Android toolchain,
-so neither has been compiled or run here or in CI. Each has a testable, device-free
-core (the command-apply + strict-validation logic, runnable via `swift test` /
-`./gradlew test`) plus the platform renderer.
+These are **real, buildable** host projects (not single-file stubs). Each has a
+device-free, unit-tested core (command-apply + strict validation) plus the platform
+renderer, and each is **compiled + its core tested in CI**:
 
 - [`ios/`](ios/README.md) — a **Swift package** (`MindeesNativeHost`). Decodes the
   command stream (`Codable`), applies + strictly validates it (mirroring the TS
-  reference host), and renders via `UIKitRenderer` (`UIView`). `swift test` runs the
-  core with an in-memory `ModelRenderer` — no simulator.
+  reference host), and renders via `UIKitRenderer` (`UIView`). CI (macOS) runs
+  `swift test` (core, via `ModelRenderer`) and compiles the package incl.
+  `UIKitRenderer` for the iOS SDK.
 - [`android/`](android/README.md) — a **Gradle/Android library** (`dev.mindees.host`).
   Same host + strict validation, `NativeCommandCodec` (org.json), and an
-  `AndroidViewRenderer` (`android.view`). `./gradlew :mindees-host:test` runs the
-  core on the JVM — no device.
+  `AndroidViewRenderer` (`android.view`). CI (Linux + Android SDK) runs
+  `:mindees-host:test` and `:mindees-host:assembleDebug`.
 
 ## What is implemented vs. future
 
@@ -82,13 +80,12 @@ core (the command-apply + strict-validation logic, runnable via `swift test` /
 | Native **command protocol** (TypeScript) | ✅ implemented + tested (`@mindees/renderer`) |
 | Command-stream **backend** | ✅ implemented + tested (Phase 8A) |
 | **Reference host** + conformance contract (`createReferenceHost`) | ✅ implemented + tested (Phase 8B) |
-| iOS host project (`ios/`) | 📄 authored — core unit-tested by you via `swift test`; not built here |
-| Android host project (`android/`) | 📄 authored — core unit-tested by you via `./gradlew test`; not built here |
-| iOS host **verified + runnable on a device** | ⏳ Phase 8C _(needs macOS/Xcode)_ |
-| Android host **verified + runnable on a device** | ⏳ Phase 8D _(needs the Android SDK)_ |
+| iOS host project (`ios/`) — compiles + conformance core | ✅ verified in CI (macOS; Phase 8C) |
+| Android host project (`android/`) — compiles + conformance core | ✅ verified in CI (Linux; Phase 8D) |
+| Hosts **render on a real device** (simulator/emulator UI tests + JS↔native bridge) | ⏳ Phase 8E |
 | End-to-end native example app | ⏳ Phase 8E |
 
 **You cannot build a real mobile app with MindeesNative today.** The native
-rendering _path_ exists (element tree → reactive updates → native command stream,
-validated by the reference host), and host projects exist for you to build/verify;
-a verified host that draws those commands on a device is the next phase.
+rendering _path_ exists and the host projects compile + pass their conformance cores
+in CI, but **nothing renders on a device yet** — on-device rendering over a JS↔native
+bridge is the next phase.

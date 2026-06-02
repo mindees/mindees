@@ -238,7 +238,8 @@ upgrades).
 - ✅ **Phase 7** — Quantum Router II: nested routes + `createRouterView` (layout-preserving rendering) + typed `createLink` + SWR data loaders, navigation guards, and view transitions
 - ✅ **Phase 8A** — Helix native strand: a platform-neutral native **command backend** (element tree + reactive updates → serializable command stream; events as stable handler ids)
 - ✅ **Phase 8B** — native **host conformance contract**: a strict reference host (`createReferenceHost`) that replays + validates the command stream — the executable spec a real native host implements
-- ⏭️ **Phases 8C–13** — compiled iOS/Android hosts (toolchain-gated) + native example, then OTA, local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 8C / 8D** — **iOS & Android host projects** ([examples/native-hosts/](./examples/native-hosts/)) compile + pass their conformance cores in CI (macOS runner for iOS; Linux + Android SDK for Android)
+- ⏭️ **Phases 8E–13** — on-device native rendering + example, then OTA, local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
