@@ -112,7 +112,7 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
         severity: 'error',
         code: 'MDC_ROUTES',
         message: e instanceof Error ? e.message : String(e),
-        file: 'src/routes',
+        file: routesDir,
       })
     }
   }

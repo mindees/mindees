@@ -75,9 +75,9 @@ describe('buildProject', () => {
       result = buildProject(fs)
     }).not.toThrow()
     expect(result.ok).toBe(false)
-    expect(result.diagnostics.some((d) => d.code === 'MDC_ROUTES' && d.severity === 'error')).toBe(
-      true,
-    )
+    const routeErr = result.diagnostics.find((d) => d.code === 'MDC_ROUTES')
+    expect(routeErr?.severity).toBe('error')
+    expect(routeErr?.file).toBe('src/routes') // points at the routes dir, not hardcoded elsewhere
   })
 
   it('reports a non-terminal catch-all route as a build error instead of crashing', () => {
