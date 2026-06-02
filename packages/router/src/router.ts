@@ -198,7 +198,12 @@ export interface Router {
    * location is preserved (dynamic reconfiguration without state reset).
    */
   setRoutes(routes: readonly RouteRecord[]): void
-  /** The active route table, sorted most-specific first. */
+  /**
+   * The active route table, as provided to {@link createRouter} / {@link Router.setRoutes}
+   * (the nested tree, in insertion order). Matching internally flattens the tree
+   * and orders leaves by specificity (static > dynamic > catch-all); that
+   * precedence is an implementation detail, not the shape returned here.
+   */
   routes(): readonly RouteRecord[]
   /** The underlying history adapter. */
   readonly history: RouterHistory
