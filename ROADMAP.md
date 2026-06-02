@@ -38,16 +38,34 @@ See [STATUS.md](./STATUS.md) for current maturity.
   router phase: the global typed route registry, file-based route scanning + a
   bundler/Metro plugin, per-key fine-grained loader signals, native shared-element
   transitions.
-- [ ] **Phase 8 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
+- **Phase 8 — `@mindees/renderer` (Helix): the native strand**
+  The framework-defining piece — render to real native platforms, not a web view.
+  Built as a sub-phased track so each step is real and tested:
+  - [x] **Phase 8A — Native command backend foundation** ✅
+    A platform-neutral, serializable `NativeCommand` protocol + a
+    `createNativeCommandBackend()` that implements the Helix `HostBackend`
+    contract, turning the element tree + fine-grained reactive updates into a
+    command stream a native host can replay. Event handlers cross as stable
+    handler ids, never as serialized functions. Reference SwiftUI/Compose host
+    stubs in `examples/native-hosts/`. (This is the path, not yet on-screen pixels.)
+  - [ ] **Phase 8B — iOS host MVP**
+    A compiled UIKit/SwiftUI host that replays the command stream to real views.
+  - [ ] **Phase 8C — Android host MVP**
+    A compiled Jetpack Compose/View host that replays the command stream.
+  - [ ] **Phase 8D — Native example app**
+    An end-to-end runnable native example proving the full path.
+- [ ] **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
   Manifest, binary diff, Ed25519 signing, atomic rollback, reference server.
-- [ ] **Phase 9 — `@mindees/data` (Continuum): local-first store & sync**
+- [ ] **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
   Reactive offline store, delta sync, conflict resolution.
-- [ ] **Phase 10 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**
+- [ ] **Phase 11 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**
   Mock + server backends, guided generation, tool calling, error explainer.
-- [ ] **Phase 11 — `@mindees/atlas` (Atlas) + first-party capability modules**
+- [ ] **Phase 12 — `@mindees/atlas` (Atlas) + first-party capability modules**
   Accessible primitives + recycling list (web impls; native research-track).
-- [ ] **Phase 12 — Examples, docs, benchmarks, release & governance**
+- [ ] **Phase 13 — Examples, docs, benchmarks, release & governance**
   Runnable web example (offline + live OTA), docs site, enforced perf budgets,
   codemods, release pipeline, `v0.x.0`.
 
 > Phases are gated: each is completed and reviewed before the next begins.
+> Native rendering (Phase 8) is prioritized ahead of OTA/data/AI because it is the
+> framework's defining capability and the prerequisite for a real native app.

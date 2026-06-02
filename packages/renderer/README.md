@@ -5,10 +5,13 @@ into host nodes through a swappable **host backend**, with **fine-grained
 reactive bindings**: a changing signal patches exactly the affected
 attribute/text/region — no virtual-DOM diffing.
 
-> **Status: 🧪 Experimental (Phase 3).** Implemented and tested: the reconciler,
-> the **web/DOM backend**, **SSR + hydration**, and a **headless** test backend.
-> Native (iOS/Android) and the GPU canvas are **research tracks** that throw
-> `NotImplementedError`. APIs may change before `1.0`.
+> **Status: 🧪 Experimental.** Implemented and tested: the reconciler, the
+> **web/DOM backend**, **SSR + hydration**, a **headless** test backend, and — new
+> in **Phase 8A** — a **native command backend** (`createNativeCommandBackend()`)
+> that compiles the element tree + reactive updates into a serializable native
+> command stream. A real iOS/Android host that _renders_ that stream, and the GPU
+> canvas, are **research tracks** that throw `NotImplementedError`. APIs may change
+> before `1.0`.
 
 ## Why Helix
 
@@ -47,6 +50,30 @@ const html = renderToString(Counter, {}) // '<button>count: 0</button>'
 hydrate(document.getElementById('app'), Counter, {})
 ```
 
+### Native command backend (Phase 8A)
+
+The same reconciler can target a native host. `createNativeCommandBackend()`
+implements the `HostBackend` contract but, instead of touching a DOM, records a
+stream of serializable [`NativeCommand`](./src/native-protocol.ts)s
+(`createNode`, `insertChild`, `setProp`, `updateText`, `disposeNode`, …) that a
+native host (SwiftUI/UIKit, Jetpack Compose/View, …) can replay. It runs in Node
+— no DOM — so the whole native path is testable.
+
+```ts
+import { createNativeCommandBackend, render } from '@mindees/renderer'
+
+const backend = createNativeCommandBackend()
+const app = render(Counter, {}, backend, backend.root)
+const commands = backend.flushCommands() // ship this batch to a native host
+// Event handlers cross as stable ids, never as functions; the host calls back:
+// backend.dispatchEvent(handlerId, event)
+```
+
+> This is the **foundation** for native rendering — it produces the command
+> stream, it does **not** draw pixels. A real iOS/Android host is Phase 8B/8C; see
+> the reference host stubs in [`examples/native-hosts/`](../../examples/native-hosts/).
+> You cannot build a native mobile app end-to-end yet.
+
 ## API
 
 | Export | Kind | Description |
@@ -58,7 +85,9 @@ hydrate(document.getElementById('app'), Counter, {})
 | `createHeadlessBackend()` / `createHeadlessRoot()` | fn | In-memory backend (tests, snapshots, SSR). |
 | `domTagFor(tag)` | fn | Map a semantic tag to its HTML tag. |
 | `HostBackend` / `SerializableBackend` | type | The platform seam. |
-| `createNativeBackend` / `createCanvasBackend` | fn | 🔬 research tracks — throw `NotImplementedError`. |
+| `createNativeCommandBackend(opts?)` | fn | Native `HostBackend` that emits a serializable `NativeCommand` stream (Phase 8A). |
+| `NativeCommand` + `isNativeCommand` / `isNativePropValue` / `normalizeNativeProp` / `createNativeNodeIdFactory` | type/fn | The native command protocol + helpers. |
+| `createNativeBackend` / `createCanvasBackend` | fn | 🔬 research tracks (real platform hosts) — throw `NotImplementedError`. |
 
 ### Reactive bindings
 
