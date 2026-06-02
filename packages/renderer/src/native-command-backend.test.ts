@@ -19,6 +19,24 @@ function collectIds(command: NativeCommand, into: Set<NativeNodeId>): void {
   if ('childId' in command) into.add(command.childId)
 }
 
+/**
+ * Assert a disposal command stream is well-formed: every node is disposed at most
+ * once, and no `removeChild` references a parent that was already disposed (which
+ * is the host double-free / remove-of-a-non-child hazard).
+ */
+function assertCleanDisposal(batch: readonly NativeCommand[]): void {
+  const disposed = new Set<NativeNodeId>()
+  for (const c of batch) {
+    if (c.type === 'disposeNode') {
+      expect(disposed.has(c.id)).toBe(false) // no double dispose
+      disposed.add(c.id)
+    }
+    if (c.type === 'removeChild') {
+      expect(disposed.has(c.parentId)).toBe(false) // no detach from an already-freed parent
+    }
+  }
+}
+
 describe('native command backend', () => {
   it('1. emits create + insert commands for a static tree', () => {
     const backend = createNativeCommandBackend()
@@ -213,7 +231,7 @@ describe('native command backend', () => {
     expect(backend.dispatchEvent(handlerId)).toBe(false) // handler freed — no leak
   })
 
-  it('13. disposes the entire tree on mount.dispose() with no orphans', () => {
+  it('13. disposes the entire tree on mount.dispose() — each node exactly once, no orphans', () => {
     const backend = createNativeCommandBackend()
     const mounted = render(h('view', null, h('text', null, 'x')), backend, backend.root)
     backend.flushCommands()
@@ -221,7 +239,107 @@ describe('native command backend', () => {
     mounted.dispose()
     const batch = backend.flushCommands()
     expect(batch.some((c) => c.type === 'removeChild' && c.parentId === backend.rootId)).toBe(true)
-    // both the view and its text child are disposed.
-    expect(commandsOfType(batch, 'disposeNode').length).toBeGreaterThanOrEqual(2)
+    assertCleanDisposal(batch)
+    // view + <text> element + the "x" text node = 3 distinct nodes, disposed once each.
+    const disposed = commandsOfType(batch, 'disposeNode').map((c) => c.id)
+    expect(disposed).toHaveLength(3)
+    expect(new Set(disposed).size).toBe(3)
+  })
+
+  it('14. disposing a reactive region does not double-dispose or re-detach (regression)', () => {
+    const backend = createNativeCommandBackend()
+    // A reactive region mounts content + a slot marker; render()'s root disposer and
+    // the region's own cleanup both run on dispose(). Without subtree detachment the
+    // marker/content would be removed + disposed twice.
+    const mounted = render(
+      h('view', null, () => 'hello'),
+      backend,
+      backend.root,
+    )
+    backend.flushCommands()
+
+    mounted.dispose()
+    const batch = backend.flushCommands()
+    assertCleanDisposal(batch)
+    const disposed = commandsOfType(batch, 'disposeNode').map((c) => c.id)
+    expect(new Set(disposed).size).toBe(disposed.length) // no duplicate disposeNode
+  })
+
+  it('15. insert() re-parents a node: detaches from the old parent, inserts at the new index', () => {
+    const backend = createNativeCommandBackend()
+    const a = backend.createElement('a')
+    const b = backend.createElement('b')
+    const child = backend.createElement('c')
+    backend.insert(backend.root, a, null)
+    backend.insert(backend.root, b, null)
+    backend.insert(a, child, null) // child lives in `a`
+    backend.clearCommands()
+
+    backend.insert(b, child, null) // move child from `a` into `b`
+    const batch = backend.getCommands()
+    expect(
+      batch.some((c) => c.type === 'removeChild' && c.parentId === a.id && c.childId === child.id),
+    ).toBe(true)
+    expect(
+      batch.some(
+        (c) =>
+          c.type === 'insertChild' &&
+          c.parentId === b.id &&
+          c.childId === child.id &&
+          c.index === 0,
+      ),
+    ).toBe(true)
+    expect(backend.parentOf(child)).toBe(b)
+    expect(backend.nextSibling(child)).toBe(null)
+  })
+
+  it('16. onCommand fires synchronously, per command, in emission order', () => {
+    const seen: NativeCommand[] = []
+    const backend = createNativeCommandBackend({ onCommand: (c) => seen.push(c) })
+    render(h('view', null, 'x'), backend, backend.root)
+
+    expect(seen.length).toBeGreaterThan(0) // fired during render, before any flush
+    expect(seen).toEqual(backend.getCommands()) // same commands, same order
+    expect(seen[0]?.type).toBe('createNode')
+  })
+
+  it('17. clearCommands empties the buffer without firing onBatch', () => {
+    const onBatch = vi.fn()
+    const backend = createNativeCommandBackend({ onBatch })
+    render(h('view', null, 'x'), backend, backend.root)
+    expect(backend.getCommands().length).toBeGreaterThan(0)
+
+    backend.clearCommands()
+    expect(backend.getCommands()).toEqual([])
+    expect(onBatch).not.toHaveBeenCalled()
+  })
+
+  it('18. keeps adjacent reactive regions ordered via anchored insert indices', () => {
+    const backend = createNativeCommandBackend()
+    const a = signal(false)
+    const b = signal(false)
+    render(
+      h(
+        'view',
+        null,
+        'H',
+        () => (a() ? 'A' : null),
+        () => (b() ? 'B' : null),
+        'T',
+      ),
+      backend,
+      backend.root,
+    )
+    backend.clearCommands()
+
+    b.set(true) // fill the SECOND region first
+    const insB = commandsOfType(backend.flushCommands(), 'insertChild')[0]
+    a.set(true) // then the FIRST region fills into its earlier slot
+    const insA = commandsOfType(backend.flushCommands(), 'insertChild')[0]
+
+    expect(insA).toBeTruthy()
+    expect(insB).toBeTruthy()
+    // A's slot is earlier in the parent than B's, so its insert index is smaller.
+    expect((insA?.index ?? -1) < (insB?.index ?? -1)).toBe(true)
   })
 })

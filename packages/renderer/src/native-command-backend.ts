@@ -159,6 +159,12 @@ export function createNativeCommandBackend(
       nodeEvents.delete(node)
     }
     emit({ type: 'disposeNode', id: node.id })
+    // Detach every disposed node so parentOf() reports it removed. The reconciler's
+    // region cleanup re-checks parentOf before removing (render.ts bindReactiveChild),
+    // so without this a descendant whose parent pointer still pointed at the (already
+    // removed) parent would be removed + disposed a SECOND time — a host double-free.
+    node.parent = null
+    node.children = []
   }
 
   return {

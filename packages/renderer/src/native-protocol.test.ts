@@ -111,3 +111,48 @@ describe('createNativeNodeIdFactory', () => {
     expect(ids.size).toBe(4)
   })
 })
+
+describe('protocol robustness (adversarial inputs)', () => {
+  it('handles cyclic objects/arrays without throwing', () => {
+    const obj: Record<string, unknown> = {}
+    obj.self = obj
+    expect(isNativePropValue(obj)).toBe(false)
+    // object policy: the unrepresentable (cyclic) key is dropped — never throws
+    expect(normalizeNativeProp(obj)).toEqual({})
+
+    const arr: unknown[] = []
+    arr.push(arr)
+    expect(isNativePropValue(arr)).toBe(false)
+    // array policy: rejected wholesale if any element is unrepresentable
+    expect(normalizeNativeProp(arr)).toBeUndefined()
+  })
+
+  it('allows shared (non-cyclic / diamond) references', () => {
+    const shared = { a: 1 }
+    expect(isNativePropValue({ x: shared, y: shared })).toBe(true)
+    expect(normalizeNativeProp([shared, shared])).toEqual([{ a: 1 }, { a: 1 }])
+  })
+
+  it('treats sparse arrays consistently — both guard and normalizer reject', () => {
+    const holey = new Array(3)
+    holey[0] = 1
+    holey[2] = 3 // index 1 is a hole
+    expect(isNativePropValue(holey)).toBe(false)
+    expect(normalizeNativeProp(holey)).toBeUndefined()
+  })
+
+  it('keeps an own __proto__ key as data, not a prototype mutation', () => {
+    const src = JSON.parse('{"__proto__":{"a":1},"b":2}')
+    const out = normalizeNativeProp(src)
+    expect(out).toBeTruthy()
+    expect(isNativePropValue(out)).toBe(true) // normalize → validate round-trips
+    expect((out as Record<string, unknown>).b).toBe(2)
+    expect(Object.getPrototypeOf(out as object)).toBe(null) // prototype not corrupted
+  })
+
+  it('isNativeCommand rejects non-finite ids (they do not round-trip through JSON)', () => {
+    expect(isNativeCommand({ type: 'createNode', id: Number.NaN, tag: 'view' })).toBe(false)
+    expect(isNativeCommand({ type: 'disposeNode', id: Number.POSITIVE_INFINITY })).toBe(false)
+    expect(isNativeCommand({ type: 'createNode', id: 5, tag: 'view' })).toBe(true) // finite is ok
+  })
+})

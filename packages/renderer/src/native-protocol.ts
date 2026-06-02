@@ -90,7 +90,14 @@ export interface UpdateTextCommand {
   readonly text: string
 }
 
-/** Free a node's host resources. Emitted for a removed node and each descendant. */
+/**
+ * Free a node's host resources. When a subtree is removed, exactly one
+ * {@link RemoveChildCommand} detaches the subtree's **root**, then a `disposeNode`
+ * is emitted for the root **and every descendant** (deepest-first). Interior nodes
+ * are not individually detached — they are freed in the same batch as their parent
+ * — so a host should treat `disposeNode` as "free this node (and remove it from any
+ * parent it still holds)". No surviving node ever references a freed one.
+ */
 export interface DisposeNodeCommand {
   readonly type: 'disposeNode'
   readonly id: NativeNodeId
@@ -154,7 +161,9 @@ function isPlainObject(value: object): boolean {
 }
 
 function isId(value: unknown): value is NativeNodeId {
-  return typeof value === 'string' || typeof value === 'number'
+  // Reject NaN/Infinity: they don't round-trip through JSON (→ null), which would
+  // corrupt the most identity-critical field on the wire.
+  return typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value))
 }
 
 /**
@@ -163,6 +172,10 @@ function isId(value: unknown): value is NativeNodeId {
  * (recursively).
  */
 export function isNativePropValue(value: unknown): value is NativePropValue {
+  return isPropValue(value, new WeakSet())
+}
+
+function isPropValue(value: unknown, seen: WeakSet<object>): boolean {
   switch (typeof value) {
     case 'string':
     case 'boolean':
@@ -171,9 +184,23 @@ export function isNativePropValue(value: unknown): value is NativePropValue {
       return Number.isFinite(value)
     case 'object': {
       if (value === null) return true
-      if (Array.isArray(value)) return value.every(isNativePropValue)
-      if (isPlainObject(value)) return Object.values(value).every(isNativePropValue)
-      return false
+      if (seen.has(value)) return false // a cycle is not serializable
+      seen.add(value)
+      try {
+        // for…of yields `undefined` for array holes, so sparse arrays are rejected
+        // (matching normalizeNativeProp — the two stay a consistent accept/coerce pair).
+        if (Array.isArray(value)) {
+          for (const item of value) if (!isPropValue(item, seen)) return false
+          return true
+        }
+        if (isPlainObject(value)) {
+          for (const v of Object.values(value)) if (!isPropValue(v, seen)) return false
+          return true
+        }
+        return false
+      } finally {
+        seen.delete(value) // shared (diamond) references are fine — only true cycles fail
+      }
     }
     default:
       return false
@@ -191,6 +218,10 @@ export function isNativePropValue(value: unknown): value is NativePropValue {
  *   drops that key); non-plain objects (Date, Map, class instances, …) are rejected.
  */
 export function normalizeNativeProp(value: unknown): NativePropValue | undefined {
+  return normalizeProp(value, new WeakSet())
+}
+
+function normalizeProp(value: unknown, seen: WeakSet<object>): NativePropValue | undefined {
   switch (typeof value) {
     case 'string':
     case 'boolean':
@@ -199,24 +230,32 @@ export function normalizeNativeProp(value: unknown): NativePropValue | undefined
       return Number.isFinite(value) ? value : undefined
     case 'object': {
       if (value === null) return null
-      if (Array.isArray(value)) {
-        const out: NativePropValue[] = []
-        for (const item of value) {
-          const n = normalizeNativeProp(item)
-          if (n === undefined) return undefined
-          out.push(n)
+      if (seen.has(value)) return undefined // a cycle can't be represented — drop it
+      seen.add(value)
+      try {
+        if (Array.isArray(value)) {
+          const out: NativePropValue[] = []
+          for (const item of value) {
+            const n = normalizeProp(item, seen)
+            if (n === undefined) return undefined
+            out.push(n)
+          }
+          return out
         }
-        return out
-      }
-      if (isPlainObject(value)) {
-        const out: Record<string, NativePropValue> = {}
-        for (const [k, v] of Object.entries(value)) {
-          const n = normalizeNativeProp(v)
-          if (n !== undefined) out[k] = n
+        if (isPlainObject(value)) {
+          // Null-prototype accumulator so an own `__proto__` key (e.g. from
+          // JSON.parse) becomes a real data key instead of mutating the prototype.
+          const out: Record<string, NativePropValue> = Object.create(null)
+          for (const [k, v] of Object.entries(value)) {
+            const n = normalizeProp(v, seen)
+            if (n !== undefined) out[k] = n
+          }
+          return out
         }
-        return out
+        return undefined
+      } finally {
+        seen.delete(value)
       }
-      return undefined
     }
     default:
       return undefined
