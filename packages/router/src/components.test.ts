@@ -199,6 +199,55 @@ describe('createRouterView — fine-grained params', () => {
   })
 })
 
+describe('createRouterView — loader data', () => {
+  it('exposes loader data to the route component, updating reactively (no re-mount)', async () => {
+    let invocations = 0
+    const Page = (props: RouteComponentProps) => {
+      invocations++
+      return createElement('text', null, () => {
+        const d = props.data()
+        return d.status === 'success' ? `data:${d.data}` : `status:${d.status}`
+      })
+    }
+    const { router, backend, root } = setup([{ path: '/', component: Page, loader: () => 'hi' }])
+    render(createRouterView(router), backend, root)
+    expect(backend.serialize(root)).toContain('status:pending')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(backend.serialize(root)).toContain('data:hi')
+    // The component was rendered once; only the reactive data binding updated.
+    expect(invocations).toBe(1)
+    router.dispose()
+  })
+
+  it('keeps loader data reactive across REPEATED navigations (A→B→A, no freeze)', async () => {
+    const flush = () => new Promise((r) => setTimeout(r, 0))
+    const page = (label: string) => (props: RouteComponentProps) =>
+      createElement('text', null, () => {
+        const d = props.data()
+        return d.status === 'success' ? `${label}:${d.data}` : `${label}:${d.status}`
+      })
+    const { router, backend, root } = setup(
+      [
+        { path: '/a', component: page('A'), loader: () => 'AA' },
+        { path: '/b', component: page('B'), loader: () => 'BB' },
+      ],
+      '/a',
+    )
+    render(createRouterView(router), backend, root)
+    await flush()
+    expect(backend.serialize(root)).toContain('A:AA')
+
+    router.navigate('/b')
+    await flush()
+    expect(backend.serialize(root)).toContain('B:BB')
+
+    router.navigate('/a')
+    await flush()
+    expect(backend.serialize(root)).toContain('A:AA') // data() still resolves after multiple navs
+    router.dispose()
+  })
+})
+
 describe('createLink', () => {
   it('renders an anchor with the built href and navigates on click', () => {
     const { router, backend, root } = setup([{ path: '/' }, { path: '/posts/:postId' }])

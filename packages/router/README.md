@@ -7,13 +7,14 @@ selector-based re-render isolation. A modern, type-safe alternative to Expo
 Router and React Router for TypeScript cross-platform apps.
 
 > **Status: 🧪 Experimental (Phase 6 — Router I + Phase 7 — Router II).** The
-> typed routing core (pattern matching + typed params, Standard Schema search
-> validation, the signals-native router, typed + relative navigation, dynamic
-> reconfiguration, memory + browser history) **and render integration**
-> (`createRouterView` for fine-grained, layout-preserving nested rendering, and
-> typed `createLink`) are implemented and tested. The global typed route
-> registry, loaders/data, file-based route scanning, and View Transitions are a
-> later phase — see [ROADMAP](../../ROADMAP.md).
+> typed routing core (typed params, Standard Schema search validation, the
+> signals-native router, typed + relative navigation, dynamic reconfiguration,
+> memory + browser history), **render integration** (`createRouterView` —
+> fine-grained, layout-preserving nested rendering; typed `createLink`), and
+> **data/guards/transitions** (SWR loaders + `preload`/`invalidate`, navigation
+> guards, web view transitions) are implemented and tested. The global typed
+> route registry and file-based route scanning are a later phase — see
+> [ROADMAP](../../ROADMAP.md).
 
 ## Why Quantum?
 
@@ -125,10 +126,47 @@ type D = PathParams<'/about'>                // {}
 
 No generated `.d.ts`, no dev server, no stale type files — just TypeScript.
 
+## Data, guards & transitions
+
+```ts
+const router = createRouter({
+  routes: [
+    {
+      path: '/posts/:postId',
+      // SWR loader: cached, revalidated, abortable; result flows to props.data()
+      loader: async ({ params, signal }) => fetch(`/api/posts/${params.postId}`, { signal }).then((r) => r.json()),
+      loaderDeps: ({ search }) => search.page, // re-load when ?page changes
+      staleTime: 30_000,
+    },
+  ],
+  // Guard: cancel (false) or redirect (string); idempotent nav is automatic
+  beforeNavigate: (to) => (isLoggedIn() ? undefined : '/login'),
+  viewTransitions: true, // wrap navigations in document.startViewTransition (web)
+})
+
+router.preload('/posts/42')   // intent prefetch — runs the loader, no navigation
+router.invalidate()           // re-run the current chain's loaders
+
+function Post(props: RouteComponentProps) {
+  const d = props.data()      // reactive: { status, data?, error? } — updates in place
+  // ...
+}
+```
+
+Loaders run for every route in the matched chain, cache by route + params +
+`loaderDeps` (stale-while-revalidate), abort superseded loads via `AbortSignal`,
+and surface results reactively — a resolved load updates the component's data
+binding **without re-mounting** it. View transitions are feature-detected and a
+transparent no-op outside a DOM (SSR / native).
+
 ## API surface
 
 - **Render (Router II)** — `createRouterView`, `createLink`, `RouterViewOptions`,
   `LinkProps`, `LinkComponent`, `LinkOptions`, `RouteComponentProps`.
+- **Data / guards / transitions** — route `loader` / `loaderDeps` / `staleTime`,
+  `router.loaderData` / `invalidate` / `preload`, `LoaderContext`, `LoaderData`,
+  `LoaderFn`, `LoaderStatus`; `BeforeNavigate`, `NavigateOptions` (`force`,
+  `viewTransition`), `CreateRouterOptions` (`beforeNavigate`, `viewTransitions`).
 - **Router** — `createRouter`, `Router`, `RouteRecord` (with `children` for
   nesting), `RouteMatch`, `RouterState` (with `matches` chain), `NavTarget`,
   `NavigateOptions`, `resolvePath`.
