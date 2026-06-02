@@ -70,10 +70,29 @@ const commands = backend.flushCommands() // ship this batch to a native host
 ```
 
 > This is the **foundation** for native rendering — it produces the command
-> stream, it does **not** draw pixels. A real iOS/Android host is Phase 8B/8C; see
-> the reference host stubs in
+> stream, it does **not** draw pixels. A compiled iOS/Android host is Phase 8C/8D
+> (toolchain-gated); see the reference host stubs in
 > [`examples/native-hosts/`](https://github.com/mindees/mindees/tree/main/examples/native-hosts).
 > You cannot build a native mobile app end-to-end yet.
+
+### Reference host + conformance contract (Phase 8B)
+
+`createReferenceHost()` is the **inverse** of the command backend: it consumes a
+`NativeCommand` stream, reconstructs the view tree, and **strictly validates** it
+(throws `NativeHostError` on any malformed/leaking sequence). It is the executable
+**contract** a real native host implements (in Swift/Kotlin against platform
+views). Piping the backend through it proves the stream is valid and non-leaking
+end to end:
+
+```ts
+import { createNativeCommandBackend, createReferenceHost, render } from '@mindees/renderer'
+
+const host = createReferenceHost()
+const backend = createNativeCommandBackend({ rootId: host.rootId, onCommand: (c) => host.apply(c) })
+const app = render(Counter, {}, backend, backend.root)
+host.serialize()      // the reconstructed tree, e.g. '<button>count: 0</button>'
+host.liveNodeCount()  // 0 after app.dispose() — no orphaned/leaked nodes
+```
 
 ## API
 
@@ -87,6 +106,7 @@ const commands = backend.flushCommands() // ship this batch to a native host
 | `domTagFor(tag)` | fn | Map a semantic tag to its HTML tag. |
 | `HostBackend` / `SerializableBackend` | type | The platform seam. |
 | `createNativeCommandBackend(opts?)` | fn | Native `HostBackend` that emits a serializable `NativeCommand` stream (Phase 8A). |
+| `createReferenceHost(rootId?)` | fn | Strict reference host: replays + validates a `NativeCommand` stream (Phase 8B). |
 | `NativeCommand` + `isNativeCommand` / `isNativePropValue` / `normalizeNativeProp` / `createNativeNodeIdFactory` | type/fn | The native command protocol + helpers. |
 | `createNativeBackend` / `createCanvasBackend` | fn | 🔬 research tracks (real platform hosts) — throw `NotImplementedError`. |
 

@@ -1,11 +1,11 @@
 # MindeesNative — Reference Native Host Stubs
 
-> **Status: reference stubs, not production hosts.** These files show *how* a
+> **Status: reference stubs, not production hosts.** These files show _how_ a
 > native platform consumes the MindeesNative **native command protocol**
 > (`@mindees/renderer`'s `native-protocol.ts`). They are intentionally minimal,
 > are **not** wired into an Xcode/Gradle project, are **not** compiled in CI, and
 > do **not** render a real app yet. They exist to make the protocol concrete and
-> to define the contract Phase 8B/8C will implement for real.
+> to define the contract the compiled hosts (Phase 8C/8D) will implement for real.
 
 ## What this is
 
@@ -29,10 +29,17 @@ replays it against real platform views. The protocol carries **no functions** �
 event handlers are registered by a stable `handlerId`, and the host calls back
 into the runtime via `dispatchEvent(handlerId, event)` when a native event fires.
 
+> **The host semantics are specified executably.** `@mindees/renderer` ships
+> `createReferenceHost()` — a strict reference host (in TypeScript) that applies
+> the same command stream to a model tree and throws on any malformed/leaking
+> sequence. The stubs below implement exactly those semantics against UIKit /
+> Jetpack Compose. When a real compiled host is built (Phase 8C/8D), it is checked
+> against that contract.
+
 ## The command stream
 
 | Command | Host action |
-|---|---|
+| --- | --- |
 | `createNode { id, tag }` | Create a container view for `tag` (`view`, `text`, `button`, …), store it by `id` |
 | `createText { id, text }` | Create a text/label node, store it by `id` |
 | `setProp { id, name, value }` | Apply a serializable prop (style/accessibility/…) |
@@ -61,14 +68,16 @@ host never leaks nodes or handlers.
 ## What is implemented vs. future
 
 | | Status |
-|---|---|
+| --- | --- |
 | Native **command protocol** (TypeScript) | ✅ implemented + tested (`@mindees/renderer`) |
-| Command-stream **backend** | ✅ implemented + tested |
+| Command-stream **backend** | ✅ implemented + tested (Phase 8A) |
+| **Reference host** + conformance contract (`createReferenceHost`) | ✅ implemented + tested (Phase 8B) |
 | Reference host stubs (this folder) | 📄 illustrative only — not compiled, not runnable |
-| Real iOS host (compiled, renders) | ⏳ Phase 8B |
-| Real Android host (compiled, renders) | ⏳ Phase 8C |
-| End-to-end native example app | ⏳ Phase 8D |
+| Real iOS host (compiled, renders) | ⏳ Phase 8C _(needs macOS/Xcode)_ |
+| Real Android host (compiled, renders) | ⏳ Phase 8D _(needs the Android SDK)_ |
+| End-to-end native example app | ⏳ Phase 8E |
 
 **You cannot build a real mobile app with MindeesNative today.** The native
-rendering *path* exists (element tree → reactive updates → native command
-stream); a real host that draws those commands to the screen is the next phase.
+rendering _path_ exists (element tree → reactive updates → native command stream,
+validated by the reference host); a real host that draws those commands to the
+screen is the next phase.

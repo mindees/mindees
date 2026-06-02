@@ -32,6 +32,7 @@ What becomes easier or harder as a result?
 | [0004](./0004-router-render-integration.md) | Router II — nested render integration via explicit composition | Accepted |
 | [0005](./0005-router-data-guards-transitions.md) | Router II — loaders/data, navigation guards, view transitions | Accepted |
 | [0006](./0006-native-command-backend.md) | Native renderer foundation — a platform-neutral command backend (Phase 8A) | Accepted |
+| [0007](./0007-native-host-conformance.md) | Native host as a strict conformance contract with a verifiable reference host (Phase 8B) | Accepted |
 
 > ADR-0001 is finalized in Phase 0 once the research-verified tool versions are
 > pinned, so its rationale cites real current versions rather than guesses.

@@ -38,6 +38,16 @@ export {
   type NativeCommandBackendOptions,
   type NativeCommandNode,
 } from './native'
+/**
+ * The strict reference native host — applies a command stream to a model tree and
+ * validates it (the executable conformance contract real native hosts implement).
+ */
+export {
+  createReferenceHost,
+  NativeHostError,
+  type ReferenceHost,
+  type ReferenceHostNode,
+} from './native-host'
 /** The native command protocol: command types + serialization-safe helpers. */
 export {
   type CreateNodeCommand,
