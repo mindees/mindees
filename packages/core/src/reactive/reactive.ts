@@ -47,7 +47,11 @@ const DISPOSED: State = 3
 /** Equality comparator used to decide whether a value actually changed. */
 export type EqualsFn<T> = (a: T, b: T) => boolean
 
-const equalsDefault = (a: unknown, b: unknown): boolean => a === b
+// Default comparator: `Object.is`, matching context `select()` so the whole
+// package shares one semantics. Unlike `===`, this treats `NaN` as equal to
+// itself (so `set(NaN)` after `NaN` does not re-notify) and `-0`/`+0` as
+// different — the conventional choice for signal libraries.
+const equalsDefault = (a: unknown, b: unknown): boolean => Object.is(a, b)
 
 /**
  * The reactive graph is intentionally type-erased: a node may observe, and be
@@ -155,8 +159,15 @@ class Computation<T> implements Owner {
         if (this.state === DIRTY) break
       }
     }
-    if (this.state === DIRTY) this.update()
-    this.state = CLEAN
+    try {
+      if (this.state === DIRTY) this.update()
+    } finally {
+      // Always settle to CLEAN (unless disposed) even if update() — the body or a
+      // child cleanup — threw. Otherwise the node would stay DIRTY forever and
+      // markStale's wasClean gate would never re-queue it (a permanent zombie).
+      // Sources read before the throw are re-linked, so a later change recovers it.
+      if (this.state !== DISPOSED) this.state = CLEAN
+    }
   }
 
   /** Recompute the derivation, re-tracking dependencies and notifying observers. */
@@ -222,17 +233,25 @@ function unlinkSources(node: AnyComputation): void {
 }
 
 function disposeChildren(owner: Owner): void {
+  // Dispose every owned child AND run every cleanup even if some throw, so a
+  // single faulty child/cleanup can't strand the rest or leak observers. `owned`
+  // is nulled up front so a throw can't leave a half-disposed array behind.
+  // Failures are collected and surfaced together afterward.
+  const errors: unknown[] = []
   if (owner.owned) {
-    for (const child of owner.owned) disposeComputation(child)
+    const owned = owner.owned
     owner.owned = null
+    for (const child of owned) {
+      try {
+        disposeComputation(child)
+      } catch (err) {
+        errors.push(err)
+      }
+    }
   }
   if (owner.cleanups) {
-    // Run every cleanup even if one throws, so a single faulty cleanup can't
-    // strand the rest (or leak the owner). Collect failures and surface them
-    // together afterward.
     const cleanups = owner.cleanups
     owner.cleanups = null
-    const errors: unknown[] = []
     for (const c of cleanups) {
       try {
         c()
@@ -240,17 +259,23 @@ function disposeChildren(owner: Owner): void {
         errors.push(err)
       }
     }
-    if (errors.length === 1) throw errors[0]
-    if (errors.length > 1) throw new AggregateError(errors, 'cleanup(s) threw')
   }
+  if (errors.length === 1) throw errors[0]
+  if (errors.length > 1) throw new AggregateError(errors, 'disposal threw')
 }
 
 function disposeComputation(node: AnyComputation): void {
   if (node.state === DISPOSED) return
-  disposeChildren(node)
-  unlinkSources(node)
-  node.observers = null
-  node.state = DISPOSED
+  try {
+    disposeChildren(node)
+  } finally {
+    // Always fully unlink + mark disposed, even if a descendant cleanup threw,
+    // so this node never leaks as a subscribed zombie. The error (if any) still
+    // propagates to the caller, which aggregates it across siblings.
+    unlinkSources(node)
+    node.observers = null
+    node.state = DISPOSED
+  }
 }
 
 function adopt(node: AnyComputation): void {
@@ -266,6 +291,10 @@ function adopt(node: AnyComputation): void {
 function flushEffects(): void {
   if (flushing) return
   flushing = true
+  // Isolate each effect: one throwing effect must not abort the flush or strand
+  // the effects queued after it (each effect also self-recovers to CLEAN via
+  // updateIfNecessary's finally). Errors are collected and surfaced after drain.
+  const errors: unknown[] = []
   try {
     let i = 0
     let iterations = 0
@@ -278,12 +307,20 @@ function flushEffects(): void {
       }
       const e = effectQueue[i]
       i++
-      if (e && e.state !== CLEAN && e.state !== DISPOSED) e.updateIfNecessary()
+      if (e && e.state !== CLEAN && e.state !== DISPOSED) {
+        try {
+          e.updateIfNecessary()
+        } catch (err) {
+          errors.push(err)
+        }
+      }
     }
   } finally {
     effectQueue.length = 0
     flushing = false
   }
+  if (errors.length === 1) throw errors[0]
+  if (errors.length > 1) throw new AggregateError(errors, 'effect(s) threw during flush')
 }
 
 function attachNode<T, A extends object>(accessor: A, node: Computation<T>): A {
