@@ -14,6 +14,23 @@
 import ts from 'typescript'
 import type { Diagnostic } from './types'
 
+/** Synthetic ambient module that gives the single-module gate a JSX environment. */
+const JSX_LIB_FILE = '__mindees_jsx__.d.ts'
+const JSX_LIB_SOURCE = `declare namespace JSX {
+  interface IntrinsicElements { [name: string]: Record<string, unknown> }
+  type Element = unknown
+}
+`
+
+/**
+ * Module-resolution diagnostic codes the single-module gate cannot meaningfully
+ * judge (it type-checks ONE module with `noResolve`, so every import is
+ * "unresolved"). Cross-module resolution is the project-graph type-check's job.
+ * - TS2307: Cannot find module '…'.
+ * - TS2792: Cannot find module … (did you mean to set 'moduleResolution'?).
+ */
+const UNRESOLVED_IMPORT_CODES = new Set([2307, 2792])
+
 /** Default compiler options for the gate: strict, modern, JSX-aware. */
 function defaultOptions(): ts.CompilerOptions {
   return {
@@ -28,8 +45,8 @@ function defaultOptions(): ts.CompilerOptions {
     jsxFragmentFactory: 'Fragment',
     noEmit: true,
     skipLibCheck: true,
-    // Don't require imports to resolve to real files — we type-check a single
-    // module in isolation; unresolved imports are not the gate's concern.
+    // Type-check a single module in isolation; imports are not resolved here
+    // (unresolved-import diagnostics are filtered — see UNRESOLVED_IMPORT_CODES).
     noResolve: true,
     types: [],
   }
@@ -60,6 +77,8 @@ function scriptKindForFile(fileName: string): ts.ScriptKind {
 
 /** Convert a TypeScript diagnostic to our structured form. */
 function convert(diag: ts.Diagnostic): Diagnostic | null {
+  // The single-module gate doesn't resolve imports; drop unresolved-import noise.
+  if (UNRESOLVED_IMPORT_CODES.has(diag.code)) return null
   const severity = toSeverity(diag.category)
   if (!severity) return null
   const message = ts.flattenDiagnosticMessageText(diag.messageText, '\n')
@@ -94,22 +113,38 @@ export function typecheck(source: string, fileName = 'module.tsx'): Diagnostic[]
     true,
     scriptKindForFile(fileName),
   )
+  // A synthetic ambient JSX lib so intrinsic elements (`<view>`, `<text>`, …)
+  // type-check without each module declaring JSX.IntrinsicElements.
+  const jsxLib = ts.createSourceFile(
+    JSX_LIB_FILE,
+    JSX_LIB_SOURCE,
+    ts.ScriptTarget.ES2023,
+    true,
+    ts.ScriptKind.TS,
+  )
 
   const defaultHost = ts.createCompilerHost(options)
   const host: ts.CompilerHost = {
     ...defaultHost,
     getSourceFile: (name, languageVersion, onError, shouldCreate) => {
       if (name === fileName) return sourceFile
+      if (name === JSX_LIB_FILE) return jsxLib
       return defaultHost.getSourceFile(name, languageVersion, onError, shouldCreate)
     },
     writeFile: () => {
       /* noEmit */
     },
-    fileExists: (name) => name === fileName || defaultHost.fileExists(name),
-    readFile: (name) => (name === fileName ? source : defaultHost.readFile(name)),
+    fileExists: (name) =>
+      name === fileName || name === JSX_LIB_FILE || defaultHost.fileExists(name),
+    readFile: (name) =>
+      name === fileName
+        ? source
+        : name === JSX_LIB_FILE
+          ? JSX_LIB_SOURCE
+          : defaultHost.readFile(name),
   }
 
-  const program = ts.createProgram([fileName], options, host)
+  const program = ts.createProgram([JSX_LIB_FILE, fileName], options, host)
   const diagnostics = [
     ...program.getSyntacticDiagnostics(sourceFile),
     ...program.getSemanticDiagnostics(sourceFile),

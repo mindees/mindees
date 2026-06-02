@@ -2,18 +2,22 @@
  * Tree-flattening optimizer pass.
  *
  * Operates on the **desugared** `createElement(type, props, ...children)` call
- * form (JSX is lowered first): the TS `before` transformers run after JSX
- * desugaring, so we match call expressions, not JSX nodes.
+ * form. TS lowers JSX during the `after` phase, so this runs as an **`after`**
+ * transformer (a `before` transformer would see raw JSX and match no
+ * `createElement` calls) — see transform.ts and ADR-0002.
  *
  * What it does (v0, conservative + correct): a `createElement` call is
  * **static** when its `type` is a string literal, its props are a static object
  * literal (or null/undefined), and all its children are themselves static. The
- * **outermost** static call is wrapped once as `_static(createElement(...))` — a
- * marker the runtime can treat as a create-once, never-diff constant. Nested
- * static children are left untouched (they're created once as part of the
- * wrapped root). The transform is purely additive (wraps a root; never drops or
- * reorders nodes), so it can't change behavior — only annotate optimizable
- * regions.
+ * **outermost** static call is wrapped once as `_static(createElement(...))`.
+ * When any wrapping happens, the pass also **injects a self-contained
+ * `const _static = (node) => node`** at the top of the module (after imports), so
+ * the emitted code is runnable standalone — `_static` is a create-once marker
+ * that is an identity passthrough today (the element is created once at the call
+ * site regardless); a future reconciler fast-path may special-case it for
+ * never-diff. Nested static children are left untouched (created once as part of
+ * the wrapped root). The transform is purely additive (wraps a root + hoists the
+ * marker; never drops or reorders nodes), so it can't change behavior.
  *
  * `stats.flattenedNodes` counts static roots wrapped; `stats.totalElements`
  * counts every `createElement` call. These feed tests and the perf budget.
@@ -87,6 +91,30 @@ export function createFlattenTransformer(tsmod: typeof ts): {
     tsmod.forEachChild(node, countElements)
   }
 
+  /** `const _static = (node) => node` — the hoisted create-once marker. */
+  const makeMarkerDecl = (f: ts.NodeFactory): ts.Statement =>
+    f.createVariableStatement(
+      undefined,
+      f.createVariableDeclarationList(
+        [
+          f.createVariableDeclaration(
+            f.createIdentifier(STATIC_MARKER),
+            undefined,
+            undefined,
+            f.createArrowFunction(
+              undefined,
+              undefined,
+              [f.createParameterDeclaration(undefined, undefined, f.createIdentifier('node'))],
+              undefined,
+              f.createToken(tsmod.SyntaxKind.EqualsGreaterThanToken),
+              f.createIdentifier('node'),
+            ),
+          ),
+        ],
+        tsmod.NodeFlags.Const,
+      ),
+    )
+
   const factory: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory: f } = context
     return (sourceFile) => {
@@ -102,7 +130,23 @@ export function createFlattenTransformer(tsmod: typeof ts): {
       // Count all elements up front (separately from the wrapping logic), so the
       // total is accurate even though we stop recursion at static roots.
       countElements(sourceFile)
-      return tsmod.visitNode(sourceFile, visit) as ts.SourceFile
+      const visited = tsmod.visitNode(sourceFile, visit) as ts.SourceFile
+      if (stats.flattenedNodes === 0) return visited
+
+      // Inject the `_static` marker once, after any leading imports, so the
+      // emitted module is self-contained and runnable (no undefined `_static`).
+      const statements = visited.statements
+      let insertAt = 0
+      while (insertAt < statements.length) {
+        const stmt = statements[insertAt]
+        if (!stmt || !tsmod.isImportDeclaration(stmt)) break
+        insertAt++
+      }
+      return f.updateSourceFile(visited, [
+        ...statements.slice(0, insertAt),
+        makeMarkerDecl(f),
+        ...statements.slice(insertAt),
+      ])
     }
   }
 

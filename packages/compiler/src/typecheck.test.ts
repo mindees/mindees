@@ -8,6 +8,20 @@ describe('typecheck (the gate)', () => {
     expect(hasErrors(diags)).toBe(false)
   })
 
+  it('accepts a realistic component module (imported factory + intrinsic JSX)', () => {
+    const diags = typecheck(
+      'import { createElement } from \'@mindees/core\'\nexport const App = () => <view id="x"><text>hi</text></view>',
+    )
+    // Imports are not resolved by the single-module gate (TS2307 filtered), and
+    // intrinsic JSX type-checks via the ambient JSX lib — so no errors.
+    expect(diags.filter((d) => d.severity === 'error')).toEqual([])
+  })
+
+  it('still reports genuine type errors (the gate is not disabled)', () => {
+    const diags = typecheck('export const n: number = "no"')
+    expect(diags.some((d) => d.code === 'TS2322')).toBe(true)
+  })
+
   it('catches a type error and reports a TS code + position', () => {
     const diags = typecheck('const n: number = "nope"')
     expect(hasErrors(diags)).toBe(true)

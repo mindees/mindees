@@ -11,6 +11,10 @@ describe('fileToRoute', () => {
     })
   })
 
+  it('rejects a catch-all that is not the last segment', () => {
+    expect(() => fileToRoute('docs/[...rest]/edit.tsx')).toThrow(/catch-all/)
+  })
+
   it('maps static segments', () => {
     expect(fileToRoute('about.tsx').routePath).toBe('/about')
     expect(fileToRoute('settings/profile.tsx').routePath).toBe('/settings/profile')
@@ -53,6 +57,11 @@ describe('chunkName', () => {
 })
 
 describe('buildRouteManifest', () => {
+  it('rejects two files that map to the same route path', () => {
+    // `index.tsx` and `(app)/index.tsx` both resolve to '/' (groups drop from the URL).
+    expect(() => buildRouteManifest(['index.tsx', '(app)/index.tsx'])).toThrow(/Duplicate/)
+  })
+
   it('builds a manifest from a file tree (deterministic order)', () => {
     const m = buildRouteManifest([
       'index.tsx',
