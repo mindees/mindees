@@ -28,9 +28,13 @@ See [STATUS.md](./STATUS.md) for current maturity.
   dep), signals-native router state with selector-based re-render isolation, typed
   + relative navigation, dynamic route-table reconfiguration without state reset,
   and injectable history (memory + browser).
-- [ ] **Phase 7 — `@mindees/router` (Quantum) II: components, data & transitions**
-  Renderer-bound `Link`/`Outlet` + nested layouts, file-based route scanning,
-  loaders + SWR + auto-prefetch, idempotent navigation, web transitions.
+- [x] **Phase 7 — `@mindees/router` (Quantum) II: render integration** ✅
+  Nested route tree + match chain, `createRouterView` (fine-grained,
+  layout-preserving nested rendering — navigating a leaf re-mounts only the leaf;
+  a same-route param change re-mounts nothing), typed `createLink`. Built on
+  `@mindees/core` (renderer is a test-only devDependency). Deferred to a later
+  phase: the global typed route registry, loaders/data + SWR + auto-prefetch,
+  file-based route scanning + a bundler/Metro plugin, and View Transitions.
 - [ ] **Phase 8 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
   Manifest, binary diff, Ed25519 signing, atomic rollback, reference server.
 - [ ] **Phase 9 — `@mindees/data` (Continuum): local-first store & sync**

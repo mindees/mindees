@@ -14,6 +14,15 @@
 import type { Maturity, PackageInfo } from '@mindees/core'
 import { NotImplementedError, notImplemented } from '@mindees/core'
 
+/** Render integration: nested view + typed links (Router II). */
+export {
+  createLink,
+  createRouterView,
+  type LinkComponent,
+  type LinkOptions,
+  type LinkProps,
+  type RouterViewOptions,
+} from './components'
 /** Errors. */
 export { RouterError, type RouterErrorCode } from './errors'
 /** History capability. */
@@ -42,6 +51,7 @@ export {
   createRouter,
   type NavigateOptions,
   type NavTarget,
+  type RouteComponentProps,
   type RouteMatch,
   type RouteRecord,
   type Router,
