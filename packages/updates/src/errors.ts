@@ -16,6 +16,8 @@ export type UpdateErrorCode =
   | 'SIGNATURE_INVALID'
   /** A downloaded asset's SHA-256 does not match the manifest. */
   | 'HASH_MISMATCH'
+  /** A differential delta is malformed or out of bounds (see `delta.ts`). */
+  | 'DELTA_INVALID'
   /** `manifest.expires` is in the past (stale / freeze-attack protection). */
   | 'MANIFEST_EXPIRED'
   /** The manifest's `runtimeVersion` does not match the app (native-incompatibility gate). */

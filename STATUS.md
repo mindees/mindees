@@ -4,13 +4,20 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 9 (Pulse — signed OTA core). `@mindees/updates` now ships the
+**Last updated:** Phase 9B (Pulse — differential bundle diffing). On top of the 9A
+signed-OTA core, `@mindees/updates` now ships a **zero-dependency, pure-TS byte-level
+delta codec** (`diff` build-side, `applyDelta` on-device): a changed asset can be
+shipped as just its delta against a base blob the client already holds, reconstructed
+on-device and verified against the manifest's SHA-256 (a bad/forged delta can never
+install — it falls back to a full download). A reference update server and SDUI are
+the remaining Pulse **delivery** sub-phases (9C, 9D); the WASM module runtime stays a
+🔬 research track.
+
+Phase 9A (Pulse — signed OTA core): `@mindees/updates` ships the
 working core an app embeds for over-the-air updates: a versioned, hash-addressed
 manifest; Ed25519 signing/verification (threshold + key rotation, pure-JS `@noble`,
 runs on Hermes/RN); a content-addressed store; and an update client with atomic
 generations + crash-loop rollback (verify → download → atomic apply → boot-recovery).
-Differential bundle diffing, a reference update server, and SDUI are the Pulse
-**delivery** follow-up; the WASM module runtime stays a 🔬 research track.
 
 Phase 8E (Helix native strand — on-device render verification): the
 JS side has both halves of the native path: the **native command backend**
@@ -74,7 +81,8 @@ without state reset, and injectable history (memory + browser).
 | Router: typed params + validated typed search + signals-native state + typed/relative navigation | ✅ done (Phase 6) — `@mindees/router` |
 | Router render integration: nested routes, `createRouterView` (layout-preserving), typed `createLink` | ✅ done (Phase 7) — `@mindees/router` |
 | Router data/guards/transitions: SWR loaders + prefetch + invalidate, guards (cancel/redirect/idempotent), view transitions | ✅ done (Phase 7) — `@mindees/router` (typed registry, file-scan 📋) |
-| Signed OTA core: hash-addressed manifest, Ed25519 signing/verify (threshold + rotation), content-addressed store, atomic generations + crash-loop rollback | ✅ done (Phase 9) — `@mindees/updates` (differential diff + reference server + SDUI = delivery follow-up; WASM module runtime 🔬) |
+| Signed OTA core: hash-addressed manifest, Ed25519 signing/verify (threshold + rotation), content-addressed store, atomic generations + crash-loop rollback | ✅ done (Phase 9A) — `@mindees/updates` |
+| Differential bundle diffing: zero-dep pure-TS byte-level delta (`diff`/`applyDelta`), delta-download with verify-after-apply + full-fetch fallback | ✅ done (Phase 9B) — `@mindees/updates` (reference server + SDUI = delivery follow-up 9C/9D; WASM module runtime 🔬) |
 
 ## Per-package
 
@@ -88,7 +96,7 @@ without state reset, and injectable history (memory + browser).
 | `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 12 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 11 (mock/server backends; on-device 🔬). |
 | `@mindees/data` | 🚧 Scaffold | Lands in Phase 10. |
-| `@mindees/updates` | 🧪 Experimental | Pulse signed-OTA core shipped in Phase 9: a versioned hash-addressed `UpdateManifest`, Ed25519 `signManifest`/`verifySignedManifest` (≥-threshold distinct trusted keys → key rotation + multi-party signing; detached canonical bytes; pure-JS `@noble`, no WebCrypto/native dep), a content-addressed `UpdateStorage` (blobs by SHA-256 ⇒ unchanged assets aren't re-downloaded) + `createMemoryStorage()`, and `createUpdateClient()` with check/download/apply/boot/notifyReady/rollback — atomic generations, monotonic-version + expiry + runtime gates, and readiness-handshake crash-loop rollback to previous → embedded. Differential bundle diffing, a reference update server, and SDUI are the delivery follow-up. WASM module runtime is 🔬. |
+| `@mindees/updates` | 🧪 Experimental | Pulse signed-OTA core (Phase 9A): a versioned hash-addressed `UpdateManifest`, Ed25519 `signManifest`/`verifySignedManifest` (≥-threshold distinct trusted keys → key rotation + multi-party signing; detached canonical bytes; pure-JS `@noble`, no WebCrypto/native dep), a content-addressed `UpdateStorage` (blobs by SHA-256 ⇒ unchanged assets aren't re-downloaded) + `createMemoryStorage()`, and `createUpdateClient()` with check/download/apply/boot/notifyReady/rollback — atomic generations, monotonic-version + expiry + runtime gates, and readiness-handshake crash-loop rollback to previous → embedded. **Phase 9B** adds a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`, rolling-hash COPY/INSERT) and a `download()` delta path (`AssetEntry.patch`): reconstruct a changed asset from a delta against a stored base, gated by the existing post-apply SHA-256 check with a full-fetch fallback. A reference update server + SDUI are the 9C/9D follow-ups. WASM module runtime is 🔬. |
 | `create-mindees` | 🧪 Experimental | `npm create mindees` scaffolder shipped in Phase 5; delegates to `@mindees/cli`'s tested core. |
 
 ## Standing research tracks (the honest frontier)

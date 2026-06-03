@@ -16,8 +16,15 @@
  */
 
 import { sha256Hex } from './crypto'
+import { applyDelta } from './delta'
 import { UpdateError } from './errors'
-import { type AssetEntry, allAssets, canonicalManifestJson, parseManifest } from './manifest'
+import {
+  type AssetEntry,
+  allAssets,
+  canonicalManifestJson,
+  type PatchDescriptor,
+  parseManifest,
+} from './manifest'
 import {
   type SignedManifest,
   type TrustedKey,
@@ -182,6 +189,30 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
     }
   }
 
+  /**
+   * Try to reconstruct `asset` from its delta against a stored base blob. Returns the
+   * verified bytes, or `null` on any failure (missing/bad delta blob, malformed delta,
+   * reconstruction hash mismatch) so the caller falls back to a full fetch. The
+   * `sha256Hex(result) === asset.sha256` check here is the trust boundary.
+   */
+  const tryReconstruct = async (
+    asset: AssetEntry,
+    patch: PatchDescriptor,
+  ): Promise<Uint8Array | null> => {
+    try {
+      const deltaBytes = await fetchAsset(patch.delta)
+      if (sha256Hex(deltaBytes) !== patch.delta.sha256) return null // delta blob corrupt
+      const baseBytes = await storage.readBlob(patch.base)
+      // Bound the allocation by the signed expected size — an honest delta always
+      // reconstructs exactly asset.size bytes, so this never rejects a valid one.
+      const result = applyDelta(baseBytes, deltaBytes, { maxBytes: asset.size })
+      if (sha256Hex(result) !== asset.sha256) return null // reconstruction mismatch
+      return result
+    } catch {
+      return null
+    }
+  }
+
   return {
     get isEmergencyLaunch() {
       return emergency
@@ -224,6 +255,16 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
       }
       for (const asset of allAssets(manifest)) {
         if (await storage.hasBlob(asset.sha256)) continue // content-addressed: already have it
+        // Differential path: reconstruct from a delta if we already hold the base blob.
+        // The post-apply SHA-256 gate below is the trust boundary, so a bad/forged
+        // delta just yields null and falls through to a full fetch.
+        if (asset.patch && (await storage.hasBlob(asset.patch.base))) {
+          const reconstructed = await tryReconstruct(asset, asset.patch)
+          if (reconstructed) {
+            await storage.writeBlob(asset.sha256, reconstructed)
+            continue
+          }
+        }
         const bytes = await fetchAsset(asset)
         const actual = sha256Hex(bytes)
         if (actual !== asset.sha256) {

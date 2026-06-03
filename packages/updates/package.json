@@ -30,5 +30,8 @@
     "@mindees/core": "workspace:*",
     "@noble/curves": "2.2.0",
     "@noble/hashes": "2.2.0"
+  },
+  "devDependencies": {
+    "fast-check": "4.8.0"
   }
 }
