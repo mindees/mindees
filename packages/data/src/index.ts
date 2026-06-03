@@ -35,6 +35,23 @@ export {
   type OptimisticChange,
 } from './collection'
 export { DataError, type DataErrorCode } from './errors'
+export {
+  type Clock,
+  type ClockOptions,
+  compareHlc,
+  createClock,
+  decodeHlc,
+  encodeHlc,
+  type Hlc,
+} from './hlc'
+export {
+  type VersionVector,
+  vvDominates,
+  vvEquals,
+  vvGet,
+  vvMerge,
+  vvObserve,
+} from './version-vector'
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }

@@ -4,8 +4,14 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 10A (Continuum — reactive local-first store). `@mindees/data`
-now ships `createCollection`: a signals-native, in-memory document store with
+**Last updated:** Phase 10B (Continuum — causality primitives). `@mindees/data` adds a
+Hybrid Logical Clock (`createClock` — monotonic total causal order, injected physical
+clock, counter-overflow + untrusted-remote drift guards, lexicographically-sortable
+encoding) and version vectors, exhaustively property-tested (fast-check). These feed
+the CRDT merge (10C) and delta sync (10D).
+
+Phase 10A (Continuum — reactive local-first store): `@mindees/data`
+ships `createCollection`: a signals-native, in-memory document store with
 fine-grained reactive reads (`get`/`has`/`all`/`where`/`size`), atomic mutations
 (`insert`/`upsert`/`update`/`delete`/`clear`/`tx`), and optimistic changes with
 `rollback()`. Built on `@mindees/core` signals only (zero new deps). HLC causality
@@ -106,7 +112,8 @@ without state reset, and injectable history (memory + browser).
 | Differential bundle diffing: zero-dep pure-TS byte-level delta (`diff`/`applyDelta`), delta-download with verify-after-apply + full-fetch fallback | ✅ done (Phase 9B) — `@mindees/updates` |
 | Reference update server: pure injected `createUpdateServer` (channel selection, deterministic staged rollout, anti-downgrade, freeze, rollback directives, `getAsset`) — never signs; `node:http` adapter example | ✅ done (Phase 9C) — `@mindees/updates/server` + `examples/pulse-server/` |
 | Server-driven UI (SDUI): `compileSdui` (allowlisted JSON tree → `MindeesNode`, named actions + reactive `$bind`, no `eval`, prototype-pollution-safe, hard limits) + RFC 7396 merge-patch + safe RFC 6902 subset (re-validated before render) | ✅ done (Phase 9D) — `@mindees/updates/sdui` (WASM module runtime 🔬) |
-| Local-first reactive store: `createCollection` (signals-native fine-grained reactive reads, atomic mutations + `tx`, optimistic + rollback) | ✅ done (Phase 10A) — `@mindees/data` (HLC/CRDT/sync = 10B–10D; native persistence + sync server 🔬) |
+| Local-first reactive store: `createCollection` (signals-native fine-grained reactive reads, atomic mutations + `tx`, optimistic + rollback) | ✅ done (Phase 10A) — `@mindees/data` (native persistence + sync server 🔬) |
+| Causality primitives: Hybrid Logical Clock (`createClock`/`compareHlc`/`encodeHlc`, monotonic total order, drift-guarded) + version vectors (`vvMerge`/`vvDominates`/…) | ✅ done (Phase 10B) — `@mindees/data` (CRDT merge = 10C, sync = 10D) |
 
 ## Per-package
 

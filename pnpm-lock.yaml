@@ -97,6 +97,10 @@ importers:
       '@mindees/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      fast-check:
+        specifier: 4.8.0
+        version: 4.8.0
 
   packages/renderer:
     dependencies:

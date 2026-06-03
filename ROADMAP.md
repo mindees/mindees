@@ -119,8 +119,13 @@ See [STATUS.md](./STATUS.md) for current maturity.
     (`get`/`has`/`all`/`where`/`size`), atomic mutations (`insert`/`upsert`/`update`/
     `delete`/`clear`/`tx`), and optimistic changes with `rollback()`. See
     [ADR-0012](./docs/adr/0012-continuum-reactive-store.md).
-  - [ ] **Phase 10B — HLC + causality** — hybrid logical clock (injected clock + nodeId),
-    version vectors, stable content-addressed op encoding.
+  - [x] **Phase 10B — HLC + causality** ✅
+    A Hybrid Logical Clock (`createClock`, injected physical clock + nodeId; monotonic
+    total order; counter-overflow rolls into wall time; untrusted-remote drift guard;
+    lexicographically-sortable encoding) and version vectors (`vvMerge`/`vvDominates`/…),
+    exhaustively property-tested (fast-check). See
+    [ADR-0013](./docs/adr/0013-continuum-hlc-causality.md). (Content-addressed op
+    encoding lands with the `Op` type in 10D.)
   - [ ] **Phase 10C — CRDT conflict resolution** — per-field LWW-Register/Map +
     add-wins OR-Set, proven commutative/associative/idempotent/convergent (fast-check).
   - [ ] **Phase 10D — Local-first sync engine + transport** — durable mutation queue, a
