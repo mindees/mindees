@@ -24,6 +24,8 @@ android {
             // The host + ModelRenderer are pure Kotlin; JSON-codec tests use the real
             // org.json (added below). Defaults keep any stray android stub call quiet.
             isReturnDefaultValues = true
+            // Robolectric renders AndroidViewRenderer against real android.view on the JVM.
+            isIncludeAndroidResources = true
         }
     }
 }
@@ -36,4 +38,7 @@ kotlin {
 dependencies {
     testImplementation("junit:junit:4.13.2") // JUnit 4 = AGP's default unit-test framework
     testImplementation("org.json:json:20231013") // real org.json for codec unit tests
+    // Robolectric runs AndroidViewRenderer against real android.view classes on the JVM
+    // (no emulator/device needed) so the render test runs in `./gradlew :mindees-host:test`.
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
