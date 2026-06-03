@@ -23,21 +23,37 @@ corepack enable                              # activates the pinned pnpm version
 git clone https://github.com/mindees/mindees.git
 cd mindees
 pnpm install
-pnpm verify                                  # lint + typecheck + test + build
+pnpm verify                                  # lint + typecheck + build + exports + test
 ```
 
 If `pnpm verify` is green, you're ready.
+
+### Windows/Corepack fallback
+
+On locked-down Windows installs, `corepack enable` can fail if Node.js is under
+`C:\Program Files` and your shell cannot write Corepack shims there. You can
+still use the repository-pinned pnpm without installing a global package:
+
+```powershell
+npm exec --yes --package=pnpm@11.5.0 -- pnpm install
+npm exec --yes --package=pnpm@11.5.0 -- pnpm verify
+```
+
+This fallback runs pnpm 11.5.0 from npm's cache for the current command. CI and
+ordinary contributor shells should keep using the shorter `pnpm ...` commands
+after Corepack has made `pnpm` available on PATH.
 
 ## Everyday commands
 
 | Command | What it does |
 | --- | --- |
-| `pnpm verify` | Runs the full gate: lint, typecheck, test, build (what CI runs). |
+| `pnpm verify` | Runs the full gate: lint, typecheck, build, export validation, and tests. |
 | `pnpm build` | Builds all packages. |
 | `pnpm test` | Runs all tests (Vitest). |
 | `pnpm lint` | Lints + checks formatting (Biome). |
 | `pnpm format` | Auto-formats the codebase. |
 | `pnpm typecheck` | Type-checks all packages under `strict`. |
+| `pnpm check:exports` | Verifies built package export/bin targets and imports each public specifier from its owning package directory. |
 | `pnpm changeset` | Records a changeset for your change (see Releasing). |
 
 > Exact task wiring lives in `turbo.json` and the root `package.json`.

@@ -159,7 +159,7 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
     ctx.write,
     `Created "${name}" from the ${result.template} template (${result.written.length} files).`,
   )
-  out(ctx.write, 'Next: cd ' + name + ' && pnpm install && mindees dev')
+  out(ctx.write, `Next: cd ${name} && pnpm install && mindees dev`)
   return { exitCode: 0 }
 }
 

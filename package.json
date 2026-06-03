@@ -25,11 +25,12 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run check:exports && pnpm run test",
     "changeset": "changeset",
     "version-packages": "changeset version && node scripts/sync-versions.mjs",
     "check:versions": "node scripts/sync-versions.mjs --check",
-    "release": "node scripts/sync-versions.mjs --check --assert-released && pnpm run build && changeset publish",
+    "check:exports": "node scripts/validate-exports.mjs",
+    "release": "node scripts/sync-versions.mjs --check --assert-released && pnpm run build && pnpm run check:exports && changeset publish",
     "prepare": "lefthook install || exit 0"
   },
   "devDependencies": {

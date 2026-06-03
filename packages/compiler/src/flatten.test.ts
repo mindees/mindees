@@ -22,7 +22,6 @@ describe('tree-flattening', () => {
     // "ReferenceError: _static is not defined" at runtime.
     expect(code).toContain('const _static =')
     const body = code.replace(/\bexport\s+/g, '')
-    // biome-ignore lint/security/noGlobalEval: evaluate compiled output to prove it runs
     const run = new Function('createElement', `${body}\nreturn a`) as (
       createElement: (type: string, props: unknown, ...kids: unknown[]) => unknown,
     ) => unknown

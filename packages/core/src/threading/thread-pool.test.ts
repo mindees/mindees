@@ -39,8 +39,9 @@ function makeFakeWorker(): WorkerLike {
       const { id, source, input } = message as { id: number; source: string; input: unknown }
       queueMicrotask(() => {
         try {
-          // biome-ignore lint/security/noGlobalEval: test-only worker simulation of job deserialization
-          const fn = (0, eval)(`(${source})`) as (input: unknown) => unknown
+          // biome-ignore lint/security/noGlobalEval: this test simulates worker-side job deserialization.
+          const indirectEval = globalThis.eval
+          const fn = indirectEval(`(${source})`) as (input: unknown) => unknown
           const result = fn(input)
           w.onmessage?.({ data: { id, ok: true, result } })
         } catch (error) {
