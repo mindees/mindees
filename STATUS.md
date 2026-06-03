@@ -4,11 +4,17 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 10B (Continuum — causality primitives). `@mindees/data` adds a
+**Last updated:** Phase 10C (Continuum — CRDT conflict resolution). `@mindees/data`
+adds state-based CRDTs: a per-field HLC-stamped LWW-Register/Map (a same-stamp tie is
+broken by content, so `merge` stays commutative even on adversarial input) and an
+add-wins OR-Set — all proven commutative/associative/idempotent/convergent with
+`fast-check` and prototype-pollution-safe. The delta-sync engine (10D) merges remote
+ops with these.
+
+Phase 10B (Continuum — causality primitives): `@mindees/data` has a
 Hybrid Logical Clock (`createClock` — monotonic total causal order, injected physical
 clock, counter-overflow + untrusted-remote drift guards, lexicographically-sortable
-encoding) and version vectors, exhaustively property-tested (fast-check). These feed
-the CRDT merge (10C) and delta sync (10D).
+encoding) and version vectors, exhaustively property-tested (fast-check).
 
 Phase 10A (Continuum — reactive local-first store): `@mindees/data`
 ships `createCollection`: a signals-native, in-memory document store with
@@ -113,7 +119,8 @@ without state reset, and injectable history (memory + browser).
 | Reference update server: pure injected `createUpdateServer` (channel selection, deterministic staged rollout, anti-downgrade, freeze, rollback directives, `getAsset`) — never signs; `node:http` adapter example | ✅ done (Phase 9C) — `@mindees/updates/server` + `examples/pulse-server/` |
 | Server-driven UI (SDUI): `compileSdui` (allowlisted JSON tree → `MindeesNode`, named actions + reactive `$bind`, no `eval`, prototype-pollution-safe, hard limits) + RFC 7396 merge-patch + safe RFC 6902 subset (re-validated before render) | ✅ done (Phase 9D) — `@mindees/updates/sdui` (WASM module runtime 🔬) |
 | Local-first reactive store: `createCollection` (signals-native fine-grained reactive reads, atomic mutations + `tx`, optimistic + rollback) | ✅ done (Phase 10A) — `@mindees/data` (native persistence + sync server 🔬) |
-| Causality primitives: Hybrid Logical Clock (`createClock`/`compareHlc`/`encodeHlc`, monotonic total order, drift-guarded) + version vectors (`vvMerge`/`vvDominates`/…) | ✅ done (Phase 10B) — `@mindees/data` (CRDT merge = 10C, sync = 10D) |
+| Causality primitives: Hybrid Logical Clock (`createClock`/`compareHlc`/`encodeHlc`, monotonic total order, drift-guarded) + version vectors (`vvMerge`/`vvDominates`/…) | ✅ done (Phase 10B) — `@mindees/data` |
+| CRDT conflict resolution: per-field LWW-Register/Map (HLC-stamped, content-tiebroken) + add-wins OR-Set — commutative/associative/idempotent/convergent (fast-check), prototype-pollution-safe | ✅ done (Phase 10C) — `@mindees/data` (sync engine = 10D) |
 
 ## Per-package
 

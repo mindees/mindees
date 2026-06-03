@@ -126,8 +126,11 @@ See [STATUS.md](./STATUS.md) for current maturity.
     exhaustively property-tested (fast-check). See
     [ADR-0013](./docs/adr/0013-continuum-hlc-causality.md). (Content-addressed op
     encoding lands with the `Op` type in 10D.)
-  - [ ] **Phase 10C — CRDT conflict resolution** — per-field LWW-Register/Map +
-    add-wins OR-Set, proven commutative/associative/idempotent/convergent (fast-check).
+  - [x] **Phase 10C — CRDT conflict resolution** ✅
+    Per-field LWW-Register/Map (HLC-stamped; same-stamp ties broken by content so merge
+    stays commutative even on adversarial input) + an add-wins OR-Set, proven
+    commutative/associative/idempotent/convergent (fast-check) and prototype-pollution
+    safe. See [ADR-0014](./docs/adr/0014-continuum-crdt.md).
   - [ ] **Phase 10D — Local-first sync engine + transport** — durable mutation queue, a
     `SyncTransport` contract, an in-memory hub, and a sync engine; two stores converge.
   - [ ] **Phase 10E/10F — Reference sync server + persistence/interop** — a
