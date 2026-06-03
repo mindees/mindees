@@ -46,9 +46,32 @@ export {
   type ToolResultPart,
   type Usage,
 } from './contract'
-export { AiError, type AiErrorCode } from './errors'
+export { AiError, type AiErrorCode, type AiErrorOptions } from './errors'
+export {
+  containsForbiddenKey,
+  DEFAULT_MAX_INPUT_CHARS,
+  type ExtractResult,
+  extractJson,
+  formatIssues,
+  lenientParseJson,
+  type SanitizeLimits,
+  sanitizeJson,
+  type ValidationOutcome,
+  validateStandard,
+} from './json'
 export { createMockBackend, type MockBackendOptions } from './mock'
+export {
+  type GenerateObjectOptions,
+  type GenerateObjectResult,
+  type GeneratingBackend,
+  generateObject,
+  type StreamingBackend,
+  type StreamObjectChunk,
+  type StreamObjectOptions,
+  streamObject,
+} from './object'
 export { createOnDeviceBackend } from './on-device'
+export type { StandardSchemaV1 } from './standard-schema'
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }
