@@ -44,6 +44,7 @@ const httpServer = createServer((req, res) => {
   })
 })
 
+/** Route one request to the update-resolution or asset-serving endpoint. */
 async function handle(req, res) {
   const url = new URL(req.url ?? '/', `http://localhost:${PORT}`)
 

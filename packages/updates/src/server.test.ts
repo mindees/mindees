@@ -15,6 +15,7 @@ beforeEach(() => {
   signer = { keyId: 'k1', secretKey }
 })
 
+/** Build a signed {@link PublishedRelease} for the given id/version/channel/rollout. */
 function release(opts: {
   id: string
   version: number
@@ -42,6 +43,7 @@ function release(opts: {
 }
 
 const NOW = () => Date.parse('2026-06-03T12:00:00.000Z')
+/** A server over `store` with a fixed clock. */
 function server(store: MemoryUpdateServerStore) {
   return createUpdateServer({ store, now: NOW })
 }
