@@ -103,10 +103,12 @@ const DEFAULT_LIMITS: SduiLimits = {
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 const NODE_KEYS = new Set(['schema', 'tag', 'props', 'children', 'key'])
 
+/** Build an {@link SduiError} with a stable code. */
 function err(code: SduiErrorCode, message: string): SduiError {
   return new SduiError(code, message)
 }
 
+/** Narrow to a plain (non-array, non-null) object. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -292,6 +294,7 @@ function cloneJson(value: SduiJson, depth = 0): SduiJson {
   return value
 }
 
+/** Recursive RFC 7396 merge (internal; depth-guarded, prototype-pollution-safe). */
 function mergePatch(target: SduiJson | undefined, patch: SduiJson, depth: number): SduiJson {
   if (depth > MAX_PATCH_DEPTH) throw err('SDUI_PATCH_INVALID', 'patch exceeds max depth')
   if (!isPlainObject(patch)) return cloneJson(patch, depth)
@@ -340,6 +343,7 @@ function parsePointer(path: string): string[] {
     })
 }
 
+/** Parse + bounds-check an array-index pointer token (`allowEnd` permits `== length` for add). */
 function toArrayIndex(token: string, length: number, allowEnd: boolean): number {
   if (!/^\d+$/.test(token)) throw err('SDUI_PATCH_INVALID', `invalid array index "${token}"`)
   const idx = Number(token)

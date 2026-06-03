@@ -9,6 +9,7 @@ import {
   type SduiRegistry,
 } from './sdui'
 
+/** A test registry with a small allowlist + a stub bindings provider. */
 function registry(over: Partial<SduiRegistry> = {}): SduiRegistry {
   return {
     components: { view: 'view', text: 'text', button: 'button' },
@@ -17,6 +18,7 @@ function registry(over: Partial<SduiRegistry> = {}): SduiRegistry {
   }
 }
 
+/** Assert a compiled node is an element and return it typed. */
 const el = (v: unknown): MindeesElement => {
   if (!isElement(v)) throw new Error('expected an element')
   return v
