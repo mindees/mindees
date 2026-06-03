@@ -1,3 +1,18 @@
+/**
+ * `@mindees/ai` (Synapse) — provider-agnostic AI + dev-time intelligence.
+ *
+ * Phase 11A ships the **contract** ({@link createAi}, {@link AiBackend}, messages,
+ * {@link GenerateRequest}/{@link AiResult}/{@link AiChunk}, {@link AiError}) with
+ * streaming as `AsyncIterable` only (Node/browser/Hermes-safe), a deterministic
+ * {@link createMockBackend mock backend} (the working, offline, no-keys fallback), and
+ * a research-track {@link createOnDeviceBackend on-device seam} that throws. An
+ * inject-`fetch` server backend (11B), Standard-Schema structured output + tool calling
+ * (11C), and a dev-time error explainer (11D) build on this. On-device LLM inference is
+ * inherently native and stays a 🔬 research track.
+ *
+ * @module
+ */
+
 import type { Maturity, PackageInfo } from '@mindees/core'
 import { NotImplementedError, notImplemented } from '@mindees/core'
 
@@ -8,10 +23,32 @@ export const name = '@mindees/ai'
 export const VERSION = '0.0.0'
 
 /** Current maturity of this package. See the repository `STATUS.md`. */
-export const maturity: Maturity = 'scaffold'
+export const maturity: Maturity = 'experimental'
 
 /** Static identity + maturity metadata for this package. */
 export const info: PackageInfo = { name, version: VERSION, maturity }
+
+export {
+  type AbortLike,
+  type Ai,
+  type AiBackend,
+  type AiChunk,
+  type AiResult,
+  createAi,
+  type FinishReason,
+  type GenerateRequest,
+  type Message,
+  messageText,
+  type Part,
+  type Role,
+  type TextPart,
+  type ToolCallPart,
+  type ToolResultPart,
+  type Usage,
+} from './contract'
+export { AiError, type AiErrorCode } from './errors'
+export { createMockBackend, type MockBackendOptions } from './mock'
+export { createOnDeviceBackend } from './on-device'
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }
