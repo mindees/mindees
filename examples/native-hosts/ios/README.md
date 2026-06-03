@@ -1,10 +1,13 @@
 # MindeesNativeHost — iOS reference host (Swift Package)
 
-> ✅ **CI-verified compile + conformance core; not yet on-device.** A GitHub Actions
-> macOS runner ([`.github/workflows/native-ios.yml`](../../../.github/workflows/native-ios.yml))
-> runs `swift build` + `swift test` and compiles the package (incl. `UIKitRenderer`)
-> for the iOS SDK on every change. What is **not** yet verified: rendering on a real
-> device/simulator and a JS↔native bridge (Phase 8E). Not a production host.
+> ✅ **CI-verified: compiles + conformance core + renders on an iOS Simulator.** A
+> GitHub Actions macOS runner
+> ([`.github/workflows/native-ios.yml`](../../../.github/workflows/native-ios.yml))
+> runs `swift build` + `swift test`, compiles the package (incl. `UIKitRenderer`) for
+> the iOS SDK, and runs `UIKitRenderTests` on an **iOS Simulator** (`xcodebuild test`)
+> asserting the real `UIView` hierarchy — every change. What is **not** yet verified:
+> a full app on a physical device over an embedded JS engine / JS↔native bridge
+> (Phase 8F). Not a production host.
 
 A reference iOS host that replays the MindeesNative **native command stream** (from
 `@mindees/renderer`'s `createNativeCommandBackend()`) into UIKit views. It
@@ -58,10 +61,11 @@ try host.apply(commands)
 
 ## Status
 
-- ✅ **Phase 8C** — implements the 8B conformance contract (decode → apply → strict
-  validate); CI compiles the package for iOS (incl. `UIKitRenderer`) and runs
-  `swift test`.
-- 🔬 **Phase 8E** — render on a real device/simulator (UI test) + a JS↔native bridge.
-  Not done; the bridge transport is out of scope here.
+- ✅ **Phase 8C** — implements the 8B conformance contract; CI compiles the package
+  for iOS (incl. `UIKitRenderer`) and runs `swift test`.
+- ✅ **Phase 8E** — `UIKitRenderTests` renders a command stream into real `UIView`s on
+  an iOS Simulator (`xcodebuild test`) and asserts the hierarchy + updates + disposal.
+- 🔬 **Phase 8F** — a full app on a physical device over an embedded JS engine /
+  JS↔native bridge. Not done; the bridge transport is out of scope here.
 - The tag→view mapping and prop application are an intentional MVP — extend
   `UIKitRenderer.makeElement` / `setProp` for a real design system.

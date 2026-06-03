@@ -58,17 +58,24 @@ See [STATUS.md](./STATUS.md) for current maturity.
     A real Swift package (`examples/native-hosts/ios/`): UIKit renderer + a
     device-free apply/validation core implementing the 8B contract. A macOS CI job
     (`.github/workflows/native-ios.yml`) runs `swift test` and compiles the full
-    package (incl. `UIKitRenderer`) for the iOS SDK. Remaining (8E): render on a
-    real device + wire the JS↔native bridge.
+    package (incl. `UIKitRenderer`) for the iOS SDK. Render-verified in 8E; full
+    end-to-end app in 8F.
   - [x] **Phase 8D — Android host (compiles + conformance core verified in CI)** ✅
     A real Gradle/Android library (`examples/native-hosts/android/`): `android.view`
     renderer + a JVM-testable core. A Linux CI job (`.github/workflows/native-android.yml`,
     Android SDK) runs `:mindees-host:test` and `:mindees-host:assembleDebug` (compiles
-    `AndroidViewRenderer`). Remaining (8E): render on a real device + wire the bridge.
-  - [ ] **Phase 8E — Native example app (on-device rendering, end to end)**
-    A runnable native example that renders the command stream on a real iOS/Android
-    device/emulator (proving on-device pixels) over a JS↔native bridge — the step
-    that makes a native MindeesNative app real end to end.
+    `AndroidViewRenderer`). Render-verified in 8E; full end-to-end app in 8F.
+  - [x] **Phase 8E — On-device render verification** ✅
+    The renderers are proven to build correct **native view trees on the platform
+    runtime**, in CI: an iOS Simulator XCTest (`UIKitRenderTests`, run via
+    `xcodebuild test`) and an Android Robolectric test (`AndroidRenderTest`, real
+    `android.view` on the JVM — incl. click dispatch via `performClick()`). Both
+    decode the JSON wire format and assert the resulting hierarchy + updates +
+    disposal. (Proves correct native rendering; not yet pixels on a physical device.)
+  - [ ] **Phase 8F — End-to-end native example app**
+    A runnable native example that renders on a real device/emulator over a real
+    JS↔native bridge (embedding a JS engine to run the reactive app on-device) —
+    the step that makes a native MindeesNative app real end to end.
 - [ ] **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
   Manifest, binary diff, Ed25519 signing, atomic rollback, reference server.
 - [ ] **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**

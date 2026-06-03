@@ -4,17 +4,18 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 8C + 8D (Helix native strand — iOS & Android hosts compile +
-their conformance cores pass in CI). The JS side has both halves of the native path:
-the **native command backend** (`createNativeCommandBackend()`, Phase 8A) and a strict
-**reference host** (`createReferenceHost()`, Phase 8B) that validates the stream. The
-real host projects in `examples/native-hosts/` are now **CI-verified**: a macOS runner
-runs the iOS `swift test` + compiles the package (incl. `UIKitRenderer`) for the iOS SDK
-(Phase 8C), and a Linux runner runs the Android `gradle test` + `assembleDebug` (incl.
-`AndroidViewRenderer`) (Phase 8D). **What is NOT yet done: rendering on a real
-device.** No simulator/emulator UI test or JS↔native bridge exists yet, so **you
-cannot build a native mobile app end-to-end with MindeesNative today** — on-device
-rendering is Phase 8E.
+**Last updated:** Phase 8E (Helix native strand — on-device render verification). The
+JS side has both halves of the native path: the **native command backend**
+(`createNativeCommandBackend()`, Phase 8A) and a strict **reference host**
+(`createReferenceHost()`, Phase 8B). The real host projects in `examples/native-hosts/`
+are **CI-verified** to compile + pass their conformance cores (iOS `swift test` + iOS-SDK
+compile, Phase 8C; Android `gradle test` + `assembleDebug`, Phase 8D) **and to render
+the command stream into correct native view trees on the platform runtime** (Phase 8E):
+an iOS Simulator XCTest asserts the real `UIView` hierarchy, and an Android Robolectric
+test asserts the real `android.view` hierarchy (incl. click dispatch via `performClick()`).
+**What is NOT yet done: a full app on a physical device** — there is no embedded JS
+engine / JS↔native bridge running the reactive app on-device, so **you cannot build a
+native mobile app end-to-end with MindeesNative today** — that is Phase 8F.
 
 Phase 7 (Quantum Router II) — complete (render integration +
 data/guards/transitions). `@mindees/router` renders (`createRouterView` —
@@ -58,7 +59,8 @@ without state reset, and injectable history (memory + browser).
 | Reactive renderer + web/DOM backend + SSR/hydration | ✅ done (Phase 3) — `@mindees/renderer` (native + GPU canvas 🔬) |
 | Native command backend (element tree + reactive updates → serializable `NativeCommand` stream) | ✅ done (Phase 8A) — `@mindees/renderer` |
 | Native host conformance contract (strict reference host: replay + validate the command stream) | ✅ done (Phase 8B) — `@mindees/renderer` |
-| Native host projects compile + conformance core verified in CI (iOS `swift test`/iOS compile; Android `gradle test`/`assemble`) | ✅ done (Phase 8C iOS, 8D Android) — `examples/native-hosts/` (on-device UI rendering 🔬, Phase 8E) |
+| Native host projects compile + conformance core verified in CI (iOS `swift test`/iOS compile; Android `gradle test`/`assemble`) | ✅ done (Phase 8C iOS, 8D Android) — `examples/native-hosts/` |
+| Native hosts render the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric incl. click dispatch) | ✅ done (Phase 8E) — `examples/native-hosts/` (full app on a physical device over a JS↔native bridge 🔬, Phase 8F) |
 | Compiler: type-check gate + TSX transform + tree-flatten + route manifest | ✅ done (Phase 4) — `@mindees/compiler` (TS→native AOT 🔬) |
 | CLI: create + build + doctor + info + dev orchestrator; `npm create mindees` | ✅ done (Phase 5) — `@mindees/cli` + `create-mindees` (dev HTTP/HMR transport = preview) |
 | Router: typed params + validated typed search + signals-native state + typed/relative navigation | ✅ done (Phase 6) — `@mindees/router` |
@@ -73,7 +75,7 @@ without state reset, and injectable history (memory + browser).
 | `@mindees/compiler` | 🧪 Experimental | MDC build-time optimizer (type-check gate, TSX→createElement, tree-flattening, per-route manifest, plugin API) on the TS Compiler API shipped in Phase 4. TS→native AOT is 🔬. |
 | `@mindees/cli` | 🧪 Experimental | Forge CLI shipped in Phase 5: create (+ templates), build (via the compiler), doctor, info, dev rebuild-orchestrator. Live dev-server HTTP/HMR transport is a preview. |
 | `@mindees/router` | 🧪 Experimental | Quantum Router I (Phase 6) + II (Phase 7). I: codegen-free typed path params, Standard-Schema validated typed search params, signals-native router state with selector isolation, typed + relative navigation, dynamic reconfiguration, memory + browser history. II: nested route tree + match chain, `createRouterView` (fine-grained, layout-preserving nested rendering), typed `createLink`, SWR data loaders (+ AbortSignal, `invalidate`, `preload`), navigation guards (cancel/redirect/idempotent), web view transitions. Deferred 📋: global typed route registry, file-based scanning + bundler plugin, per-key fine-grained loader signals, native shared-element transitions. |
-| `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. **Phase 8A** added the native command backend (`createNativeCommandBackend()`): a serializable `NativeCommand` protocol + a `HostBackend` that emits it (events as stable handler ids; subtree-safe disposal). **Phase 8B** added `createReferenceHost()`: a strict reference host that replays + validates the stream — the conformance contract real native hosts implement. The `examples/native-hosts/` iOS + Android host projects now compile + pass their conformance cores in CI (Phase 8C/8D). On-device UI rendering (Phase 8E) + GPU canvas are 🔬. |
+| `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. **Phase 8A** added the native command backend (`createNativeCommandBackend()`): a serializable `NativeCommand` protocol + a `HostBackend` that emits it (events as stable handler ids; subtree-safe disposal). **Phase 8B** added `createReferenceHost()`: a strict reference host that replays + validates the stream — the conformance contract real native hosts implement. The `examples/native-hosts/` iOS + Android host projects compile + pass their conformance cores in CI (Phase 8C/8D) and render the command stream into correct native view trees on the platform runtime (iOS Simulator XCTest; Android Robolectric — Phase 8E). A full app on a physical device over a JS↔native bridge (Phase 8F) + GPU canvas are 🔬. |
 | `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 12 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 11 (mock/server backends; on-device 🔬). |
 | `@mindees/data` | 🚧 Scaffold | Lands in Phase 10. |
@@ -92,9 +94,12 @@ These are real seams in the architecture, deliberately **not** faked. Each has
   command stream (Phase 8B) are implemented and tested. The real **iOS (SwiftPM) and
   Android (Gradle) host projects** in `examples/native-hosts/` now **compile + pass
   their conformance cores in CI** (macOS runner: iOS `swift test` + iOS-SDK compile,
-  Phase 8C; Linux runner: Android `gradle test` + `assemble`, Phase 8D). What remains
-  🔬 is **rendering on a real device** (simulator/emulator UI tests) + a JS↔native
-  bridge — Phase 8E. Fallback today: web/DOM. _(Phase 3, 8A, 8B, 8C, 8D)_
+  Phase 8C; Linux runner: Android `gradle test` + `assemble`, Phase 8D), **and render
+  the command stream into correct native view trees on the platform runtime** (iOS
+  Simulator XCTest; Android Robolectric incl. click dispatch — Phase 8E). What remains
+  🔬 is a **full app on a physical device** (embedded JS engine + JS↔native bridge
+  running the reactive app on-device) — Phase 8F. Fallback today: web/DOM.
+  _(Phase 3, 8A, 8B, 8C, 8D, 8E)_
 - **GPU canvas strand (wgpu/WebGPU).** _(Phase 3+)_
 - **On-device LLM runtime (ExecuTorch / Apple Foundation Models / Gemini Nano).**
   Fallback: deterministic mock + server backend. _(Phase 10)_

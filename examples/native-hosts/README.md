@@ -1,12 +1,14 @@
 # MindeesNative — Reference Native Hosts
 
-> **Status: CI-compiled + conformance-core-tested — not yet on-device.** These are
-> real Swift / Gradle projects that show how a native platform consumes the
+> **Status: CI-verified to compile + render correctly — not yet a real-device app.**
+> These are real Swift / Gradle projects that show how a native platform consumes the
 > MindeesNative **native command protocol** (`@mindees/renderer`'s
-> `native-protocol.ts`). They now **compile and pass their conformance cores in CI**
-> (a macOS runner for iOS, a Linux+SDK runner for Android — Phase 8C/8D), but they do
-> **not render on a real device yet** (no simulator/emulator UI test or JS↔native
-> bridge — that's Phase 8E). Not production hosts.
+> `native-protocol.ts`). In CI they **compile + pass their conformance cores** (macOS
+> for iOS, Linux+SDK for Android — Phase 8C/8D) **and render the command stream into
+> correct native view trees on the platform runtime** (iOS Simulator XCTest; Android
+> Robolectric, incl. click dispatch — Phase 8E). What's **not** done: a full app on a
+> physical device over an embedded JS engine / JS↔native bridge (Phase 8F). Not
+> production hosts.
 
 ## What this is
 
@@ -82,10 +84,10 @@ renderer, and each is **compiled + its core tested in CI**:
 | **Reference host** + conformance contract (`createReferenceHost`) | ✅ implemented + tested (Phase 8B) |
 | iOS host project (`ios/`) — compiles + conformance core | ✅ verified in CI (macOS; Phase 8C) |
 | Android host project (`android/`) — compiles + conformance core | ✅ verified in CI (Linux; Phase 8D) |
-| Hosts **render on a real device** (simulator/emulator UI tests + JS↔native bridge) | ⏳ Phase 8E |
-| End-to-end native example app | ⏳ Phase 8E |
+| Hosts **render the command stream into correct native view trees** | ✅ verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch; Phase 8E) |
+| Full app **on a physical device** (embedded JS engine + JS↔native bridge) | ⏳ Phase 8F |
 
-**You cannot build a real mobile app with MindeesNative today.** The native
-rendering _path_ exists and the host projects compile + pass their conformance cores
-in CI, but **nothing renders on a device yet** — on-device rendering over a JS↔native
-bridge is the next phase.
+**You cannot build a real mobile app with MindeesNative today.** The host projects
+compile, pass their conformance cores, and are verified to render the command stream
+into correct native view trees in CI — but **there is no embedded JS engine / bridge
+running a reactive app on a physical device yet** (Phase 8F).
