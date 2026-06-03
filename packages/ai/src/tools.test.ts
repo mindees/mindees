@@ -156,6 +156,30 @@ describe('runTools', () => {
     expect(maxConcurrent).toBe(1)
   })
 
+  it('dedups a FAILING duplicate call too (no re-execution of a throwing tool)', async () => {
+    const execute = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const tool: Tool = { name: 'flaky', execute }
+    const backend = createMockBackend({
+      script: [
+        { toolCalls: [call('flaky', { x: 1 }, 'a')] },
+        { toolCalls: [call('flaky', { x: 1 }, 'b')] }, // identical → reuse the cached failure
+        'done',
+      ],
+    })
+    const result = await runTools(backend, { messages: [] }, [tool])
+    expect(result.text).toBe('done')
+    expect(execute).toHaveBeenCalledTimes(1) // failure cached, not re-executed
+  })
+
+  it('records the terminal assistant answer in the returned transcript', async () => {
+    const backend = createMockBackend({ reply: 'final answer' })
+    const result = await runTools(backend, { messages: [{ role: 'user', content: 'q' }] }, [])
+    const last = result.messages[result.messages.length - 1]
+    expect(last).toEqual({ role: 'assistant', content: 'final answer' })
+  })
+
   it('rejects a non-integer / < 1 maxSteps', async () => {
     const backend = createMockBackend({ reply: 'x' })
     await expect(runTools(backend, { messages: [] }, [], { maxSteps: 0 })).rejects.toBeInstanceOf(

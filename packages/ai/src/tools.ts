@@ -191,17 +191,17 @@ export async function runTools(
   )
 
   const messages: Message[] = [...request.messages]
-  const resultCache = new Map<string, unknown>() // resolved successes (cross-turn dedup)
-  const inFlight = new Map<string, Promise<unknown>>() // shared execution per key (in-batch dedup)
+  // One promise per (name,args) for the whole run: concurrent identical calls share it (no
+  // double-fire in a parallel turn) AND a later identical call reuses the settled outcome —
+  // success OR failure — so a throwing tool isn't re-executed either (no duplicate side
+  // effects). The per-call error POLICY (throw vs feed-back) is applied at await, not cached.
+  const callCache = new Map<string, Promise<unknown>>()
   let usage: Usage | undefined
   let steps = 0
 
   const aborted = (): boolean => signal?.aborted === true
 
-  // Execute one validated call (or produce a fed-back error result). Honors abort + dedup —
-  // identical (name,args) calls share ONE execution even when emitted in the same parallel
-  // turn (the cache check is synchronous, so it must key on the in-flight promise, not the
-  // resolved value, or both would miss the empty cache and double-fire side effects).
+  // Execute one validated call (or produce a fed-back error result). Honors abort + dedup.
   const runCall = async (call: ToolCallPart): Promise<unknown> => {
     const tool = byName.get(call.name)
     if (!tool) {
@@ -221,31 +221,25 @@ export async function runTools(
       return { error: 'invalid_arguments', message: validated.message } satisfies ToolErrorResult
     }
     const key = `${tool.name}:${stableStringify(validated.value)}`
-    if (resultCache.has(key)) return resultCache.get(key) // idempotent across turns
-    if (aborted()) throw new AiError('ABORTED', 'tool loop aborted')
-
-    let promise = inFlight.get(key)
-    if (!promise) {
-      promise = (async () => {
+    let exec = callCache.get(key)
+    if (!exec) {
+      if (aborted()) throw new AiError('ABORTED', 'tool loop aborted')
+      exec = (async () => {
         const ctx: ToolContext = signal ? { signal } : {}
         const raw = await tool.execute(validated.value, ctx)
         if (aborted()) throw new AiError('ABORTED', 'tool loop aborted')
         return truncateResult(raw, options.maxToolResultChars)
       })()
-      inFlight.set(key, promise)
+      callCache.set(key, exec)
     }
     try {
-      const result = await promise
-      resultCache.set(key, result)
-      return result
+      return await exec
     } catch (err) {
       if (err instanceof AiError && err.code === 'ABORTED') throw err
       if (options.throwOnToolError) {
         throw new AiError('TOOL_FAILED', `tool "${tool.name}" failed: ${errorMessage(err)}`)
       }
       return { error: 'tool_failed', message: errorMessage(err) } satisfies ToolErrorResult
-    } finally {
-      inFlight.delete(key) // settled → a later turn may re-run (only successes are cached)
     }
   }
 
@@ -274,6 +268,9 @@ export async function runTools(
     // Drive on tool-call presence, not finishReason: 'tool-calls' with no calls is terminal,
     // and a provider that under-reports finishReason but includes calls still executes them.
     if (calls.length === 0) {
+      // Record the final assistant answer so the returned transcript is complete (callers may
+      // resume from `messages`).
+      if (result.text) messages.push({ role: 'assistant', content: result.text })
       // Normalize a stale 'tool-calls' (no calls actually emitted) to 'stop' so a caller
       // branching on the result's finishReason isn't told work is still pending.
       const finishReason: FinishReason =
