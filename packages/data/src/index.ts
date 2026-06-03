@@ -45,6 +45,26 @@ export {
   type Hlc,
 } from './hlc'
 export {
+  type LwwMap,
+  type LwwRegister,
+  lwwDelete,
+  lwwGet,
+  lwwHas,
+  lwwKeys,
+  lwwSet,
+  mergeLwwMap,
+  mergeRegister,
+} from './lww'
+export {
+  emptyOrSet,
+  mergeOrSet,
+  type OrSet,
+  orAdd,
+  orHas,
+  orRemove,
+  orValues,
+} from './or-set'
+export {
   type VersionVector,
   vvDominates,
   vvEquals,
