@@ -178,8 +178,17 @@ See [STATUS.md](./STATUS.md) for current maturity.
     `generateObject`, plus a `mindees ai explain <error>` CLI command (server backend wired
     from `MINDEES_AI_*` env). Dev/build path only — never bundled on device. See
     [ADR-0021](./docs/adr/0021-synapse-devtools.md). **Phase 11 (Synapse) complete.**
-- [ ] **Phase 12 — `@mindees/atlas` (Atlas) + first-party capability modules**
-  Accessible primitives + recycling list (web impls; native research-track).
+- [~] **Phase 12 — `@mindees/atlas` (Atlas): accessible UI primitives + recycling list**
+  Web implementations now; native is a labeled research track. Sub-phased:
+  - [x] **Phase 12A — Primitives, style & theme** ✅ accessible signals-native primitives
+    (`View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button`/`Stack`/`Row`/`Column`/`Spacer`/
+    `ScrollView`) over `createElement`, a curated cross-platform `StyleObject` (numbers → `px`
+    on web), `Reactive<T>` props, `role`/`aria-*` accessibility, real-DOM-event interaction,
+    and a structural theme (`@mindees/atlas/theme`). See
+    [ADR-0022](./docs/adr/0022-atlas-primitives.md).
+  - [ ] **Phase 12B — Virtualized recycling `List`** — fixed-pool row recycling over the
+    Helix reactive-region model (`@mindees/atlas/list`); fixed-height first, variable-height
+    a research track.
 - [ ] **Phase 13 — Examples, docs, benchmarks, release & governance**
   Runnable web example (offline + live OTA), docs site, enforced perf budgets,
   codemods, release pipeline, `v0.x.0`.

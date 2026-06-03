@@ -58,6 +58,39 @@ function isEventProp(key: string): boolean {
   )
 }
 
+/**
+ * CSS properties whose numeric value is unitless (no `px`). Mirrors React DOM's
+ * `isUnitlessNumber` set — everything else gets `px` appended to a bare number, so a
+ * platform-agnostic `{ width: 12 }` renders as `12px` on web (and stays `12` on native).
+ */
+const UNITLESS_STYLE_PROPS = new Set([
+  'opacity',
+  'flex',
+  'flexGrow',
+  'flexShrink',
+  'order',
+  'zIndex',
+  'fontWeight',
+  'lineHeight',
+  'aspectRatio',
+])
+
+/** Stringify a style value, appending `px` to a finite number on a non-unitless property. */
+function styleValue(prop: string, value: unknown): string {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return '' // NaN/Infinity → unset, never the literal "NaN"
+    return UNITLESS_STYLE_PROPS.has(prop) ? String(value) : `${value}px`
+  }
+  return String(value)
+}
+
+/**
+ * Form-control props that must be written as the live DOM **property** (not an attribute). The
+ * `value`/`checked` *attribute* only seeds the DEFAULT; once the user edits, the property and
+ * attribute diverge, so a controlled update must set the property to change what's shown.
+ */
+const FORM_PROPERTIES = new Set(['value', 'checked', 'selected', 'indeterminate'])
+
 /** `onClick` → `click`, `onPointerDown` → `pointerdown`. */
 function eventNameFor(key: string): string {
   return key.slice(2).toLowerCase()
@@ -118,9 +151,16 @@ export function createDomBackend(doc?: DomDocument): HostBackend<DomNode> {
         }
         if (next) {
           for (const [prop, v] of Object.entries(next)) {
-            style[prop] = String(v)
+            // Nullish → unset (don't write the literal "undefined"/"null").
+            style[prop] = v === null || v === undefined ? '' : styleValue(prop, v)
           }
         }
+        return
+      }
+      if (FORM_PROPERTIES.has(key)) {
+        // Live property, so a controlled `value`/`checked` updates what the user sees.
+        ;(el as unknown as Record<string, unknown>)[key] =
+          value === null || value === undefined ? '' : value
         return
       }
       if (value === false || value === null || value === undefined) {

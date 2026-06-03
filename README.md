@@ -217,7 +217,7 @@ upgrades).
 | [`@mindees/cli`](./packages/cli) | Forge | `mindees` CLI: create / build / doctor / info / dev | 🧪 Experimental |
 | [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state + nested rendering | 🧪 Experimental |
 | [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend (real iOS/Android hosts + GPU canvas 🔬) | 🧪 Experimental |
-| `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
+| [`@mindees/atlas`](./packages/atlas) | Atlas | Accessible, signals-native UI primitives (View/Text/Image/TextInput/Pressable/Button/Stack/Row/Column/Spacer/ScrollView) + cross-platform `StyleObject`, `role`/`aria-*` a11y, real-DOM-event interaction, and a structural theme; virtualized list next; native 🔬 | 🧪 Experimental |
 | [`@mindees/ai`](./packages/ai) | Synapse | Provider-agnostic AI: pure-TS contract + mock & inject-`fetch` server backends, `AsyncIterable` streaming, Standard-Schema structured output (`generateObject`/`streamObject`), bounded tool calling (`runTools`), and a dev-time error explainer; on-device runtime 🔬 | 🧪 Experimental |
 | [`@mindees/data`](./packages/data) | Continuum | Local-first: signals-native `createCollection` + HLC causality + CRDT merge (LWW + OR-Set) + a delta-sync engine where two peers converge offline | 🧪 Experimental |
 | [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** + **server-driven UI (SDUI)** | 🧪 Experimental |
@@ -249,7 +249,8 @@ upgrades).
 - ✅ **Phase 9D** — Pulse **server-driven UI (SDUI)**: `compileSdui` turns an allowlisted JSON tree into a reactive `MindeesNode` (named actions + `$bind` bindings, no `eval`, prototype-pollution-safe) + RFC 7396 / safe RFC 6902 patches — **Phase 9 (Pulse) complete**
 - ✅ **Phase 10 (core)** — Continuum **local-first data**: signals-native `createCollection` (10A) + Hybrid Logical Clock causality (10B) + CRDT conflict resolution — per-field LWW + add-wins OR-Set (10C) + a **delta-sync engine where two peers converge offline** (10D)
 - ✅ **Phase 11 (Synapse) — provider-agnostic AI**: a pure-TS `AiBackend` (`createAi`) with a deterministic mock + an inject-`fetch` server backend (openai/anthropic), `AsyncIterable` streaming (11A/11B); Standard-Schema **structured output** (`generateObject`/`streamObject`, no `eval`, sanitize-before-validate) + a bounded **tool-calling loop** (`runTools`) (11C); and a dev-time **error explainer** (`mindees ai explain`) (11D) — on-device LLM inference is a labeled 🔬 research track
-- ⏭️ **Phases 8F / 12–13** — end-to-end native app (embedded JS engine + JS↔native bridge); then Atlas UI, examples, benchmarks & release
+- ✅ **Phase 12A (Atlas) — accessible UI primitives**: signals-native `View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button` + layout (`Stack`/`Row`/`Column`/`Spacer`/`ScrollView`), a curated cross-platform `StyleObject` (numbers → `px` on web), `role`/`aria-*` accessibility, real-DOM-event interaction, and a structural theme — renderer-agnostic trees, web real, native 🔬
+- ⏭️ **Phases 8F / 12B–13** — end-to-end native app (embedded JS engine + JS↔native bridge); Atlas virtualized list; then examples, benchmarks & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 

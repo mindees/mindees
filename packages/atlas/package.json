@@ -1,7 +1,7 @@
 {
   "name": "@mindees/atlas",
   "version": "0.0.0",
-  "description": "MindeesNative Atlas - batteries-included component library. Scaffold.",
+  "description": "MindeesNative Atlas - accessible, signals-native UI primitives (virtualized list coming in 12B). Renderer-agnostic (web real, native research track).",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -12,6 +12,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./theme": {
+      "types": "./dist/theme.d.ts",
+      "import": "./dist/theme.js"
     }
   },
   "publishConfig": {
@@ -28,5 +32,17 @@
   },
   "dependencies": {
     "@mindees/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@mindees/renderer": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@mindees/renderer": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mindees/renderer": "workspace:*",
+    "happy-dom": "20.9.0"
   }
 }

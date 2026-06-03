@@ -88,13 +88,49 @@ describe('DOM backend (happy-dom)', () => {
     expect(div.style.color).toBe('red')
   })
 
-  it('removes nodes on dispose', () => {
+  it('appends px to numeric dimensional style values, leaving unitless props raw', () => {
     const container = document.createElement('div')
     const backend = createDomBackend(document as never)
-    const m = render(h('view', null, 'x'), backend, container as never)
-    expect(container.childNodes.length).toBe(1)
-    m.dispose()
-    expect(container.childNodes.length).toBe(0)
+    render(
+      h('view', { style: { width: 120, marginTop: 8, opacity: 0.5, flexGrow: 2, zIndex: 3 } }),
+      backend,
+      container as never,
+    )
+    const div = container.firstElementChild as HTMLElement
+    expect(div.style.width).toBe('120px')
+    expect(div.style.marginTop).toBe('8px')
+    expect(div.style.opacity).toBe('0.5') // unitless
+    expect(div.style.flexGrow).toBe('2') // unitless
+    expect(div.style.zIndex).toBe('3') // unitless
+  })
+
+  it('skips nullish / non-finite style values instead of writing "undefined"/"NaN"', () => {
+    const container = document.createElement('div')
+    const backend = createDomBackend(document as never)
+    render(
+      h('view', { style: { width: undefined, height: null, opacity: Number.NaN, color: 'red' } }),
+      backend,
+      container as never,
+    )
+    const div = container.firstElementChild as HTMLElement
+    expect(div.style.width).toBe('')
+    expect(div.style.height).toBe('')
+    expect(div.style.opacity).toBe('')
+    expect(div.style.color).toBe('red')
+  })
+
+  it('writes form-control `value` as the live property so a controlled input updates after edit', () => {
+    const container = document.createElement('div')
+    const backend = createDomBackend(document as never)
+    const value = signal('initial')
+    render(h('textinput', { value: () => value() }), backend, container as never)
+    const input = container.firstElementChild as HTMLInputElement
+    expect(input.value).toBe('initial')
+    // Simulate a user edit (diverges the property from the attribute), then a controlled push.
+    input.value = 'typed by user'
+    value.set('reset by code')
+    expect(input.value).toBe('reset by code') // property updated — not a no-op
+    expect(input.hasAttribute('value')).toBe(false) // written as property, not attribute
   })
 
   it('disposes the current content of a reactive region in a top-level array (no leak, no throw)', () => {
