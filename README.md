@@ -239,7 +239,8 @@ upgrades).
 - ✅ **Phase 8A** — Helix native strand: a platform-neutral native **command backend** (element tree + reactive updates → serializable command stream; events as stable handler ids)
 - ✅ **Phase 8B** — native **host conformance contract**: a strict reference host (`createReferenceHost`) that replays + validates the command stream — the executable spec a real native host implements
 - ✅ **Phase 8C / 8D** — **iOS & Android host projects** ([examples/native-hosts/](./examples/native-hosts/)) compile + pass their conformance cores in CI (macOS runner for iOS; Linux + Android SDK for Android)
-- ⏭️ **Phases 8E–13** — on-device native rendering + example, then OTA, local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 8E** — both hosts **render** the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch)
+- ⏭️ **Phases 8F–13** — end-to-end native app (embedded JS engine + JS↔native bridge), then OTA, local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
