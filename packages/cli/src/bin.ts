@@ -63,8 +63,16 @@ function aiBackendFromEnv(): AiBackend | undefined {
   const baseUrl = process.env.MINDEES_AI_BASE_URL
   const model = process.env.MINDEES_AI_MODEL
   if (!baseUrl || !model) return undefined
-  const adapter: AdapterName =
-    process.env.MINDEES_AI_ADAPTER === 'anthropic' ? 'anthropic' : 'openai'
+  // Fail loud on a mistyped adapter rather than silently defaulting to openai (which would
+  // build the wrong auth headers and yield confusing HTTP errors). Empty/unset → openai.
+  const adapterEnv = process.env.MINDEES_AI_ADAPTER
+  if (adapterEnv && adapterEnv !== 'openai' && adapterEnv !== 'anthropic') {
+    process.stderr.write(
+      `mindees: unknown MINDEES_AI_ADAPTER "${adapterEnv}" (expected "openai" or "anthropic"); AI backend not configured.\n`,
+    )
+    return undefined
+  }
+  const adapter: AdapterName = adapterEnv === 'anthropic' ? 'anthropic' : 'openai'
   return createServerBackend({
     // The global `fetch` is structurally compatible at runtime; the minimal FetchLike
     // intentionally avoids the DOM lib, so cast rather than pull in those types.
