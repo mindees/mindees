@@ -76,8 +76,22 @@ See [STATUS.md](./STATUS.md) for current maturity.
     A runnable native example that renders on a real device/emulator over a real
     JS↔native bridge (embedding a JS engine to run the reactive app on-device) —
     the step that makes a native MindeesNative app real end to end.
-- [ ] **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
-  Manifest, binary diff, Ed25519 signing, atomic rollback, reference server.
+- **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
+  Ship new JS + assets to installed apps with no app-store release, safely.
+  Sub-phased so each step is real and tested:
+  - [x] **Phase 9A — Signed OTA core** ✅
+    A versioned, hash-addressed `UpdateManifest`; Ed25519 `signManifest` /
+    `verifySignedManifest` (≥-threshold distinct trusted keys → key rotation +
+    multi-party signing; signature checked over detached canonical bytes; pure-JS
+    `@noble`, so it runs on Hermes/RN without WebCrypto); a content-addressed
+    `UpdateStorage` (blobs keyed by SHA-256 ⇒ unchanged assets aren't re-downloaded);
+    and `createUpdateClient()` — check/download/apply/boot/notifyReady/rollback with
+    atomic generations, monotonic-version + expiry + runtime-compatibility gates, and
+    readiness-handshake crash-loop rollback (previous → embedded). See
+    [ADR-0008](./docs/adr/0008-pulse-ota.md).
+  - [ ] **Phase 9B — Pulse delivery: differential diff + reference server + SDUI**
+    Pure-JS differential bundle diffing (on top of content-addressing), a reference
+    update server that builds/signs/serves manifests, and a server-driven-UI subset.
 - [ ] **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
   Reactive offline store, delta sync, conflict resolution.
 - [ ] **Phase 11 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**

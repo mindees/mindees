@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { info, maturity, NotImplementedError, name, notImplemented, VERSION } from './index'
+import {
+  createWasmModuleRuntime,
+  info,
+  maturity,
+  NotImplementedError,
+  name,
+  VERSION,
+} from './index'
 
-describe('@mindees/updates (scaffold)', () => {
+describe('@mindees/updates metadata', () => {
   it('exposes honest package metadata', () => {
     expect(name).toBe('@mindees/updates')
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+/)
-    expect(maturity).toBe('scaffold')
-    expect(info).toEqual({ name: '@mindees/updates', version: VERSION, maturity: 'scaffold' })
+    expect(maturity).toBe('experimental')
+    expect(info).toEqual({ name: '@mindees/updates', version: VERSION, maturity: 'experimental' })
   })
 
-  it('re-exports a throwable NotImplementedError', () => {
-    expect(() => notImplemented('updates.future', { rfc: 'RFC-0001' })).toThrow(NotImplementedError)
+  it('the WASM module runtime is a research track that throws (not a silent stub)', () => {
+    expect(() => createWasmModuleRuntime()).toThrow(NotImplementedError)
   })
 })

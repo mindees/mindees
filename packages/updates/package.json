@@ -1,7 +1,7 @@
 {
   "name": "@mindees/updates",
   "version": "0.0.0",
-  "description": "MindeesNative Pulse - signed differential OTA and SDUI. Scaffold.",
+  "description": "MindeesNative Pulse - signed over-the-air (OTA) updates: hash-addressed manifests, Ed25519 signing, content-addressed storage, atomic generations with crash-loop rollback.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -27,6 +27,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mindees/core": "workspace:*"
+    "@mindees/core": "workspace:*",
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.2.0"
   }
 }

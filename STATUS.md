@@ -4,7 +4,15 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 8E (Helix native strand — on-device render verification). The
+**Last updated:** Phase 9 (Pulse — signed OTA core). `@mindees/updates` now ships the
+working core an app embeds for over-the-air updates: a versioned, hash-addressed
+manifest; Ed25519 signing/verification (threshold + key rotation, pure-JS `@noble`,
+runs on Hermes/RN); a content-addressed store; and an update client with atomic
+generations + crash-loop rollback (verify → download → atomic apply → boot-recovery).
+Differential bundle diffing, a reference update server, and SDUI are the Pulse
+**delivery** follow-up; the WASM module runtime stays a 🔬 research track.
+
+Phase 8E (Helix native strand — on-device render verification): the
 JS side has both halves of the native path: the **native command backend**
 (`createNativeCommandBackend()`, Phase 8A) and a strict **reference host**
 (`createReferenceHost()`, Phase 8B). The real host projects in `examples/native-hosts/`
@@ -66,6 +74,7 @@ without state reset, and injectable history (memory + browser).
 | Router: typed params + validated typed search + signals-native state + typed/relative navigation | ✅ done (Phase 6) — `@mindees/router` |
 | Router render integration: nested routes, `createRouterView` (layout-preserving), typed `createLink` | ✅ done (Phase 7) — `@mindees/router` |
 | Router data/guards/transitions: SWR loaders + prefetch + invalidate, guards (cancel/redirect/idempotent), view transitions | ✅ done (Phase 7) — `@mindees/router` (typed registry, file-scan 📋) |
+| Signed OTA core: hash-addressed manifest, Ed25519 signing/verify (threshold + rotation), content-addressed store, atomic generations + crash-loop rollback | ✅ done (Phase 9) — `@mindees/updates` (differential diff + reference server + SDUI = delivery follow-up; WASM module runtime 🔬) |
 
 ## Per-package
 
@@ -79,7 +88,7 @@ without state reset, and injectable history (memory + browser).
 | `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 12 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 11 (mock/server backends; on-device 🔬). |
 | `@mindees/data` | 🚧 Scaffold | Lands in Phase 10. |
-| `@mindees/updates` | 🚧 Scaffold | Lands in Phase 9. WASM module runtime is 🔬. |
+| `@mindees/updates` | 🧪 Experimental | Pulse signed-OTA core shipped in Phase 9: a versioned hash-addressed `UpdateManifest`, Ed25519 `signManifest`/`verifySignedManifest` (≥-threshold distinct trusted keys → key rotation + multi-party signing; detached canonical bytes; pure-JS `@noble`, no WebCrypto/native dep), a content-addressed `UpdateStorage` (blobs by SHA-256 ⇒ unchanged assets aren't re-downloaded) + `createMemoryStorage()`, and `createUpdateClient()` with check/download/apply/boot/notifyReady/rollback — atomic generations, monotonic-version + expiry + runtime gates, and readiness-handshake crash-loop rollback to previous → embedded. Differential bundle diffing, a reference update server, and SDUI are the delivery follow-up. WASM module runtime is 🔬. |
 | `create-mindees` | 🧪 Experimental | `npm create mindees` scaffolder shipped in Phase 5; delegates to `@mindees/cli`'s tested core. |
 
 ## Standing research tracks (the honest frontier)

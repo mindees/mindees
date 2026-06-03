@@ -30,10 +30,13 @@ OTA updates. Built in the open.
 > actually works.** [`STATUS.md`](./STATUS.md) is the honest, per-package source
 > of truth for what's real today versus what's still planned. **The reactive
 > core, renderer (with SSR), compiler, CLI, and typed router are done and
-> tested** — see the live examples below. The **native rendering foundation** — a
-> platform-neutral command backend — just landed (Phase 8A), but native
-> iOS/Android apps **do not run end-to-end yet**: a real host that draws the
-> commands is the next phase.
+> tested** — see the live examples below. The **native rendering strand** is real:
+> the command backend, a strict conformance contract, and **iOS + Android host
+> projects that render the command stream into correct native view trees** are all
+> verified in CI (Phases 8A–8E). The **signed OTA core** (Pulse — manifest, Ed25519
+> signing, content-addressed store, atomic rollback) landed in Phase 9A. Still
+> missing: native iOS/Android apps **do not run end-to-end yet** — an embedded JS
+> engine + JS↔native bridge (Phase 8F) is what makes a full on-device app real.
 >
 > ⭐ **Star the repo** to follow along, and check the
 > [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
@@ -217,7 +220,7 @@ upgrades).
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
 | `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
-| `@mindees/updates` | Pulse | Signed differential OTA + SDUI | 🚧 Scaffold |
+| [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA core: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback (differential diff + server + SDUI 🔬 next) | 🧪 Experimental |
 | [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
 
 > 🧪 **Experimental** = implemented & tested, API may still change before `1.0`.
@@ -240,7 +243,8 @@ upgrades).
 - ✅ **Phase 8B** — native **host conformance contract**: a strict reference host (`createReferenceHost`) that replays + validates the command stream — the executable spec a real native host implements
 - ✅ **Phase 8C / 8D** — **iOS & Android host projects** ([examples/native-hosts/](./examples/native-hosts/)) compile + pass their conformance cores in CI (macOS runner for iOS; Linux + Android SDK for Android)
 - ✅ **Phase 8E** — both hosts **render** the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch)
-- ⏭️ **Phases 8F–13** — end-to-end native app (embedded JS engine + JS↔native bridge), then OTA, local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 9A** — Pulse **signed OTA core**: hash-addressed manifest + Ed25519 signing/verify (threshold + key rotation, pure-JS `@noble`) + content-addressed store + an update client with atomic generations & crash-loop rollback
+- ⏭️ **Phases 8F / 9B–13** — end-to-end native app (embedded JS engine + JS↔native bridge); Pulse delivery (differential diff + reference server + SDUI); then local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
