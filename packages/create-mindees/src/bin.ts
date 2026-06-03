@@ -11,9 +11,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { parseArgs } from 'node:util'
 import type { FileSystem } from '@mindees/cli'
-import { type CreateArgs, runCreate } from './index'
+import { parseCreateCommand } from './args'
+import { runCreate } from './index'
 
 function nodeFileSystem(): FileSystem {
   return {
@@ -42,42 +42,29 @@ function nodeFileSystem(): FileSystem {
 }
 
 function main(): void {
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    allowPositionals: true,
-    strict: false,
-    options: {
-      template: { type: 'string', short: 't' },
-      prompt: { type: 'string', short: 'p' },
-      force: { type: 'boolean' },
-    },
-  })
-
-  const appName = positionals[0]
-  if (!appName) {
-    process.stderr.write('Usage: create-mindees <app-name> [--template <name>] [--prompt "..."]\n')
-    process.exitCode = 1
+  const command = parseCreateCommand(process.argv.slice(2), process.cwd())
+  if (command.kind === 'help') {
+    process.stdout.write(`${command.usage}\n`)
+    process.exitCode = command.exitCode
     return
   }
 
-  const args: CreateArgs = {
-    appName,
-    targetDir: join(process.cwd(), appName),
-    force: values.force === true,
+  if (command.kind === 'error') {
+    process.stderr.write(`${command.error}\n${command.usage}\n`)
+    process.exitCode = command.exitCode
+    return
   }
-  if (typeof values.template === 'string') args.template = values.template
-  if (typeof values.prompt === 'string') args.prompt = values.prompt
 
-  const result = runCreate(nodeFileSystem(), args)
+  const result = runCreate(nodeFileSystem(), command.args)
   if (!result.ok) {
     process.stderr.write(`${result.error ?? 'create failed'}\n`)
     process.exitCode = 1
     return
   }
   process.stdout.write(
-    `Created "${appName}" from the ${result.template} template (${result.written.length} files).\n`,
+    `Created "${command.args.appName}" from the ${result.template} template (${result.written.length} files).\n`,
   )
-  process.stdout.write(`Next: cd ${appName} && pnpm install && mindees dev\n`)
+  process.stdout.write(`Next: cd ${command.displayDir} && pnpm install && mindees dev\n`)
 }
 
 main()

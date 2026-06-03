@@ -29,11 +29,14 @@ describe('runDoctor', () => {
     const pm = checks.find((c) => c.name === 'Package manager')
     expect(pm?.status).toBe('warn')
     expect(pm?.fix).toMatch(/corepack/i)
+    expect(pm?.fix).toContain('npm exec --yes --package=pnpm@11.5.0 -- pnpm')
   })
 
   it('warns when no package manager is detected', () => {
     const checks = runDoctor({ ...healthy, packageManager: null })
-    expect(checks.find((c) => c.name === 'Package manager')?.status).toBe('warn')
+    const pm = checks.find((c) => c.name === 'Package manager')
+    expect(pm?.status).toBe('warn')
+    expect(pm?.fix).toContain('npm exec --yes --package=pnpm@11.5.0 -- pnpm')
   })
 
   it('warns when not inside a project', () => {
@@ -48,6 +51,7 @@ describe('runDoctor', () => {
     const deps = checks.find((c) => c.name === 'Dependencies')
     expect(deps?.status).toBe('warn')
     expect(deps?.fix).toMatch(/pnpm install/)
+    expect(deps?.fix).toContain('npm exec --yes --package=pnpm@11.5.0 -- pnpm install')
   })
 
   it('handles an unrecognized Node version string', () => {

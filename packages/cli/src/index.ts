@@ -8,6 +8,8 @@ export { type AiCommandContext, runAiCommand } from './ai'
 export { type BuildOptions, type BuildResult, buildProject } from './build'
 /** CLI dispatch. `runCli` is synchronous; `runCliAsync` adds the async `ai` command. */
 export { type CliContext, runCli, runCliAsync } from './cli'
+/** Create target path + package-name resolution. */
+export { type CreateTarget, type CreateTargetResult, resolveCreateTarget } from './create-target'
 /** Dev orchestrator (rebuild-on-change). */
 export { type DevOptions, type DevSession, startDev, type Watcher } from './dev'
 /** Environment diagnostics. */
@@ -17,7 +19,11 @@ export { createMemoryFileSystem, type FileSystem } from './fs'
 /** Natural-language → template mapping (offline; AI is Phase 10). */
 export { naturalLanguageToTemplate, type TemplatePick } from './nl'
 /** Scaffolding. */
-export { type ScaffoldOptions, type ScaffoldResult, scaffold } from './scaffold'
+export {
+  type ScaffoldOptions,
+  type ScaffoldResult,
+  scaffold,
+} from './scaffold'
 /** Templates. */
 export {
   DEFAULT_TEMPLATE,

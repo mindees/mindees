@@ -13,6 +13,7 @@ import type { DoctorCheck, EnvProbe } from './types'
 
 /** Minimum supported Node.js major (matches the repo's engines floor). */
 const MIN_NODE_MAJOR = 22
+const PNPM_EXEC_FALLBACK = 'npm exec --yes --package=pnpm@11.5.0 -- pnpm'
 
 function parseMajor(version: string): number | null {
   const m = version.match(/^v?(\d+)\./)
@@ -52,14 +53,14 @@ export function runDoctor(env: EnvProbe): DoctorCheck[] {
       name: 'Package manager',
       status: 'warn',
       detail: 'none detected',
-      fix: 'Enable pnpm via Corepack: `corepack enable`.',
+      fix: `Enable pnpm via Corepack: \`corepack enable\`. If Windows blocks Corepack shims, use \`${PNPM_EXEC_FALLBACK}\`.`,
     })
   } else if (env.packageManager.name !== 'pnpm') {
     checks.push({
       name: 'Package manager',
       status: 'warn',
       detail: `${env.packageManager.name} ${env.packageManager.version}`,
-      fix: 'MindeesNative uses pnpm. Enable it via Corepack: `corepack enable`.',
+      fix: `MindeesNative uses pnpm. Enable it via Corepack: \`corepack enable\`. If Windows blocks Corepack shims, use \`${PNPM_EXEC_FALLBACK}\`.`,
     })
   } else {
     checks.push({
@@ -82,7 +83,7 @@ export function runDoctor(env: EnvProbe): DoctorCheck[] {
       name: 'Dependencies',
       status: 'warn',
       detail: 'node_modules missing',
-      fix: 'Install dependencies: `pnpm install`.',
+      fix: `Install dependencies: \`pnpm install\` (or \`${PNPM_EXEC_FALLBACK} install\` if the pnpm shim is unavailable).`,
     })
   } else {
     checks.push({ name: 'Project', status: 'ok', detail: 'package.json + node_modules present' })

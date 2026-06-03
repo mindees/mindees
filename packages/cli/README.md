@@ -12,7 +12,7 @@ third-party dependencies (built on `node:util` `parseArgs`).
 ## Commands
 
 ```bash
-mindees create <name> [--template blank|counter] [--prompt "..."] [--force]
+mindees create <name-or-path> [--template blank|counter] [--prompt "..."] [--force]
 mindees build [--out-dir <dir>] [--no-source-map]
 mindees doctor          # diagnose Node / package manager / project / deps
 mindees info            # CLI + environment info
@@ -32,7 +32,7 @@ $ mindees doctor
 ✓ Node.js: v24.7.0
 ✓ Package manager: pnpm 11.5.0
 ! Dependencies: node_modules missing
-    → Install dependencies: `pnpm install`.
+    → Install dependencies: `pnpm install` (or `npm exec --yes --package=pnpm@11.5.0 -- pnpm install` if the pnpm shim is unavailable).
 ```
 
 ## Design: a testable core, a thin shell
@@ -44,6 +44,9 @@ an `EnvProbe`, and a `Writer` — so the entire CLI is deterministic in tests. T
 
 - **`scaffold`** — writes a template through the injected FS (templates are
   in-memory; no on-disk fixtures). Refuses a non-empty target without `--force`.
+- **`resolveCreateTarget`** — normalizes simple names, relative paths, and
+  absolute Windows/POSIX paths into a target directory plus npm-safe package
+  name, so path separators never leak into generated `package.json` files.
 - **`buildProject`** — compiles `src/**` via `@mindees/compiler` (the type-check
   gate + emit), writing `dist/` and a `routes.manifest.json` when `src/routes/`
   exists. Genuine type errors fail the build; isolation-only diagnostics
@@ -59,7 +62,8 @@ an `EnvProbe`, and a `Writer` — so the entire CLI is deterministic in tests. T
 
 Forge's internals are exported so other tooling (and `create-mindees`) can reuse
 them: `runCli`, `scaffold`, `buildProject`, `startDev`, `runDoctor`,
-`createMemoryFileSystem`, `TEMPLATES`, `naturalLanguageToTemplate`, and their types.
+`resolveCreateTarget`, `createMemoryFileSystem`, `TEMPLATES`,
+`naturalLanguageToTemplate`, and their types.
 
 ## License
 

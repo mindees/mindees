@@ -50,12 +50,57 @@ describe('runCli — dispatch', () => {
 })
 
 describe('runCli — create', () => {
+  it('prints create help without requiring an app name', () => {
+    const { ctx, text, errText } = makeCtx()
+    const result = runCli(['create', '--help'], ctx)
+    expect(result.exitCode).toBe(0)
+    expect(text()).toMatch(/Usage: mindees create/)
+    expect(errText()).toBe('')
+  })
+
   it('scaffolds an app into cwd', () => {
     const { ctx, text } = makeCtx({ cwd: 'work' })
     const r = runCli(['create', 'my-app'], ctx)
     expect(r.exitCode).toBe(0)
     expect(text()).toMatch(/Created "my-app"/)
     expect(ctx.fs.exists('work/my-app/package.json')).toBe(true)
+  })
+
+  it('resolves a Windows absolute target and uses its basename as the package name', () => {
+    const { ctx, text } = makeCtx({ cwd: 'E:/MiND/mindees' })
+    const result = runCli(['create', 'E:\\MiND\\mindees-create-smoke'], ctx)
+
+    expect(result.exitCode).toBe(0)
+    expect(ctx.fs.exists('E:/MiND/mindees-create-smoke/package.json')).toBe(true)
+    expect(ctx.fs.exists('E:/MiND/mindees/E:/MiND/mindees-create-smoke/package.json')).toBe(false)
+
+    const snap = (ctx.fs as ReturnType<typeof createMemoryFileSystem>).snapshot()
+    const pkg = JSON.parse(snap['E:/MiND/mindees-create-smoke/package.json'] as string)
+    expect(pkg.name).toBe('mindees-create-smoke')
+    expect(text()).toMatch(/Created "mindees-create-smoke"/)
+    expect(text()).toMatch(/Next: cd E:\/MiND\/mindees-create-smoke/)
+  })
+
+  it('resolves a relative parent target before scaffolding', () => {
+    const { ctx } = makeCtx({ cwd: 'E:/MiND/mindees' })
+    const result = runCli(['create', '..\\mindees-create-smoke'], ctx)
+
+    expect(result.exitCode).toBe(0)
+    expect(ctx.fs.exists('E:/MiND/mindees-create-smoke/package.json')).toBe(true)
+
+    const snap = (ctx.fs as ReturnType<typeof createMemoryFileSystem>).snapshot()
+    const pkg = JSON.parse(snap['E:/MiND/mindees-create-smoke/package.json'] as string)
+    expect(pkg.name).toBe('mindees-create-smoke')
+  })
+
+  it('sanitizes a path basename into a valid npm package name', () => {
+    const { ctx } = makeCtx()
+    const result = runCli(['create', 'My App!'], ctx)
+
+    expect(result.exitCode).toBe(0)
+    const snap = (ctx.fs as ReturnType<typeof createMemoryFileSystem>).snapshot()
+    const pkg = JSON.parse(snap['My App!/package.json'] as string)
+    expect(pkg.name).toBe('my-app')
   })
 
   it('requires an app name', () => {

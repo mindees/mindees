@@ -13,6 +13,7 @@ import { parseArgs } from 'node:util'
 import type { AiBackend } from '@mindees/ai'
 import { runAiCommand } from './ai'
 import { buildProject } from './build'
+import { resolveCreateTarget } from './create-target'
 import { doctorSummary, renderDoctor, runDoctor } from './doctor'
 import type { FileSystem } from './fs'
 import { naturalLanguageToTemplate } from './nl'
@@ -48,6 +49,14 @@ Commands:
   help              Show this help
 
 Run \`mindees create --help\` style flags inline. Templates: ${templateNames().join(', ')}.`
+
+const CREATE_HELP = `Usage: mindees create <name-or-path> [options]
+
+Options:
+  -t, --template <name>  Template to scaffold (${templateNames().join(', ')})
+  -p, --prompt <text>    Pick a template from a short prompt
+      --force            Overwrite a non-empty target directory
+  -h, --help             Show this help`
 
 function out(write: Writer, text: string): void {
   write({ stream: 'out', text })
@@ -112,15 +121,21 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
     allowPositionals: true,
     strict: false,
     options: {
+      help: { type: 'boolean', short: 'h' },
       template: { type: 'string', short: 't' },
       force: { type: 'boolean' },
       prompt: { type: 'string', short: 'p' },
     },
   })
 
+  if (values.help === true || positionals[0] === 'help') {
+    out(ctx.write, CREATE_HELP)
+    return { exitCode: 0 }
+  }
+
   const name = positionals[0]
   if (!name) {
-    err(ctx.write, 'create: missing app name. Usage: mindees create <name> [--template <t>]')
+    err(ctx.write, 'create: missing app name or target path. Usage: mindees create <name-or-path>')
     return { exitCode: 1 }
   }
 
@@ -142,10 +157,15 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
     out(ctx.write, `Interpreted prompt → "${picked.template}" template (${picked.reason}).`)
   }
 
-  const targetDir = ctx.cwd === '.' ? name : `${ctx.cwd}/${name}`
+  const target = resolveCreateTarget(name, ctx.cwd)
+  if (!target.ok) {
+    err(ctx.write, target.error)
+    return { exitCode: 1 }
+  }
+
   const result = scaffold(ctx.fs, {
-    appName: name,
-    targetDir,
+    appName: target.packageName,
+    targetDir: target.targetDir,
     template,
     force: values.force === true,
   })
@@ -157,9 +177,9 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
 
   out(
     ctx.write,
-    `Created "${name}" from the ${result.template} template (${result.written.length} files).`,
+    `Created "${target.packageName}" from the ${result.template} template (${result.written.length} files).`,
   )
-  out(ctx.write, 'Next: cd ' + name + ' && pnpm install && mindees dev')
+  out(ctx.write, `Next: cd ${target.displayDir} && pnpm install && mindees dev`)
   return { exitCode: 0 }
 }
 
