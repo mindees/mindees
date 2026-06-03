@@ -1,7 +1,7 @@
 {
   "name": "@mindees/data",
   "version": "0.0.0",
-  "description": "MindeesNative Continuum - local-first store and sync. Scaffold.",
+  "description": "MindeesNative Continuum - local-first reactive store and sync: a signals-native document store with fine-grained reactive queries, optimistic updates, CRDT conflict resolution, and delta sync.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "sideEffects": false,

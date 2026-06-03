@@ -4,9 +4,16 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 9D (Pulse — server-driven UI). **Phase 9 (Pulse) is now
-complete**: `@mindees/updates` ships the signed-OTA core (9A), differential downloads
-(9B), the reference update server (9C), and now **SDUI** (9D) at the
+**Last updated:** Phase 10A (Continuum — reactive local-first store). `@mindees/data`
+now ships `createCollection`: a signals-native, in-memory document store with
+fine-grained reactive reads (`get`/`has`/`all`/`where`/`size`), atomic mutations
+(`insert`/`upsert`/`update`/`delete`/`clear`/`tx`), and optimistic changes with
+`rollback()`. Built on `@mindees/core` signals only (zero new deps). HLC causality
+(10B), CRDT conflict resolution (10C), and the delta-sync engine (10D) build on it;
+on-device native persistence + a production sync server are research tracks.
+
+Phase 9 (Pulse) complete: `@mindees/updates` ships the signed-OTA core (9A),
+differential downloads (9B), the reference update server (9C), and **SDUI** (9D) at the
 `@mindees/updates/sdui` subpath — `compileSdui` turns an allowlisted, schema-versioned
 JSON tree into a `@mindees/core` `MindeesNode` (named actions + reactive bindings, no
 `eval`, prototype-pollution-safe, hard limits), plus pure-TS RFC 7396 merge-patch and a
@@ -99,6 +106,7 @@ without state reset, and injectable history (memory + browser).
 | Differential bundle diffing: zero-dep pure-TS byte-level delta (`diff`/`applyDelta`), delta-download with verify-after-apply + full-fetch fallback | ✅ done (Phase 9B) — `@mindees/updates` |
 | Reference update server: pure injected `createUpdateServer` (channel selection, deterministic staged rollout, anti-downgrade, freeze, rollback directives, `getAsset`) — never signs; `node:http` adapter example | ✅ done (Phase 9C) — `@mindees/updates/server` + `examples/pulse-server/` |
 | Server-driven UI (SDUI): `compileSdui` (allowlisted JSON tree → `MindeesNode`, named actions + reactive `$bind`, no `eval`, prototype-pollution-safe, hard limits) + RFC 7396 merge-patch + safe RFC 6902 subset (re-validated before render) | ✅ done (Phase 9D) — `@mindees/updates/sdui` (WASM module runtime 🔬) |
+| Local-first reactive store: `createCollection` (signals-native fine-grained reactive reads, atomic mutations + `tx`, optimistic + rollback) | ✅ done (Phase 10A) — `@mindees/data` (HLC/CRDT/sync = 10B–10D; native persistence + sync server 🔬) |
 
 ## Per-package
 
@@ -111,7 +119,7 @@ without state reset, and injectable history (memory + browser).
 | `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. **Phase 8A** added the native command backend (`createNativeCommandBackend()`): a serializable `NativeCommand` protocol + a `HostBackend` that emits it (events as stable handler ids; subtree-safe disposal). **Phase 8B** added `createReferenceHost()`: a strict reference host that replays + validates the stream — the conformance contract real native hosts implement. The `examples/native-hosts/` iOS + Android host projects compile + pass their conformance cores in CI (Phase 8C/8D) and render the command stream into correct native view trees on the platform runtime (iOS Simulator XCTest; Android Robolectric — Phase 8E). A full app on a physical device over a JS↔native bridge (Phase 8F) + GPU canvas are 🔬. |
 | `@mindees/atlas` | 🚧 Scaffold | Lands in Phase 12 (web impls; native 🔬). |
 | `@mindees/ai` | 🚧 Scaffold | Lands in Phase 11 (mock/server backends; on-device 🔬). |
-| `@mindees/data` | 🚧 Scaffold | Lands in Phase 10. |
+| `@mindees/data` | 🧪 Experimental | Continuum reactive local-first store shipped in Phase 10A: `createCollection` — a signals-native, in-memory document store with fine-grained reactive reads (`get`/`has`/`all`/`where`/`size` via per-record + per-collection version signals), atomic mutations (`insert`/`upsert`/`update`/`delete`/`clear`/`tx`), and `optimistic()` changes with `rollback()`. `@mindees/core` only; zero third-party deps. HLC causality (10B), CRDT merge (10C), and delta sync (10D) build on it. Native persistence + production sync server + rich-text CRDTs are 🔬 research tracks. |
 | `@mindees/updates` | 🧪 Experimental | Pulse signed-OTA core (Phase 9A): a versioned hash-addressed `UpdateManifest`, Ed25519 `signManifest`/`verifySignedManifest` (≥-threshold distinct trusted keys → key rotation + multi-party signing; detached canonical bytes; pure-JS `@noble`, no WebCrypto/native dep), a content-addressed `UpdateStorage` (blobs by SHA-256 ⇒ unchanged assets aren't re-downloaded) + `createMemoryStorage()`, and `createUpdateClient()` with check/download/apply/boot/notifyReady/rollback — atomic generations, monotonic-version + expiry + runtime gates, and readiness-handshake crash-loop rollback to previous → embedded. **Phase 9B** adds a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`, rolling-hash COPY/INSERT) and a `download()` delta path (`AssetEntry.patch`): reconstruct a changed asset from a delta against a stored base, gated by the existing post-apply SHA-256 check with a full-fetch fallback. **Phase 9C** adds the `@mindees/updates/server` subpath — a pure, capability-injected `createUpdateServer` (channel selection, deterministic staged rollout, anti-downgrade mirror, freeze, rollback directives, `getAsset`) that never signs (serves pre-signed manifests), with a runnable `node:http` adapter in `examples/pulse-server/`. **Phase 9D** adds the `@mindees/updates/sdui` subpath — `compileSdui` (allowlisted, schema-versioned JSON tree → `@mindees/core` `MindeesNode`; named actions + reactive `$bind`; no `eval`; prototype-pollution-safe; hard depth/node/string/prop limits) + pure-TS RFC 7396 merge-patch and a safe RFC 6902 subset (`add`/`remove`/`replace`), re-validated before render. **Phase 9 (Pulse) complete.** WASM module runtime is 🔬. |
 | `create-mindees` | 🧪 Experimental | `npm create mindees` scaffolder shipped in Phase 5; delegates to `@mindees/cli`'s tested core. |
 

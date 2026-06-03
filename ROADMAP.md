@@ -110,8 +110,24 @@ See [STATUS.md](./STATUS.md) for current maturity.
     defense, and hard depth/node/string/prop limits. Incremental updates via pure-TS
     RFC 7396 merge-patch + a safe RFC 6902 subset (`add`/`remove`/`replace`), re-validated
     before render. See [ADR-0011](./docs/adr/0011-pulse-sdui.md). **Phase 9 (Pulse) complete.**
-- [ ] **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
-  Reactive offline store, delta sync, conflict resolution.
+- **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
+  A reactive offline store, delta sync, and conflict resolution — hand-rolled pure-TS
+  on `@mindees/core` signals (Automerge/Loro are WASM and can't run on Hermes; Yjs is
+  a documented optional rich-text adapter). Sub-phased:
+  - [x] **Phase 10A — Reactive document store** ✅
+    `createCollection`: signals-native fine-grained reactive reads
+    (`get`/`has`/`all`/`where`/`size`), atomic mutations (`insert`/`upsert`/`update`/
+    `delete`/`clear`/`tx`), and optimistic changes with `rollback()`. See
+    [ADR-0012](./docs/adr/0012-continuum-reactive-store.md).
+  - [ ] **Phase 10B — HLC + causality** — hybrid logical clock (injected clock + nodeId),
+    version vectors, stable content-addressed op encoding.
+  - [ ] **Phase 10C — CRDT conflict resolution** — per-field LWW-Register/Map +
+    add-wins OR-Set, proven commutative/associative/idempotent/convergent (fast-check).
+  - [ ] **Phase 10D — Local-first sync engine + transport** — durable mutation queue, a
+    `SyncTransport` contract, an in-memory hub, and a sync engine; two stores converge.
+  - [ ] **Phase 10E/10F — Reference sync server + persistence/interop** — a
+    capability-injected server core (`@mindees/data/server`) + a `node:http`/WS example;
+    in-memory + IndexedDB persistence (native SQLite = research track).
 - [ ] **Phase 11 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**
   Mock + server backends, guided generation, tool calling, error explainer.
 - [ ] **Phase 12 — `@mindees/atlas` (Atlas) + first-party capability modules**

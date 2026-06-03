@@ -219,7 +219,7 @@ upgrades).
 | [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend (real iOS/Android hosts + GPU canvas 🔬) | 🧪 Experimental |
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
-| `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
+| [`@mindees/data`](./packages/data) | Continuum | Local-first reactive store + sync: signals-native `createCollection` (fine-grained reactive queries, atomic tx, optimistic + rollback); HLC/CRDT/delta-sync next | 🧪 Experimental |
 | [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** + **server-driven UI (SDUI)** | 🧪 Experimental |
 | [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
 
@@ -247,7 +247,8 @@ upgrades).
 - ✅ **Phase 9B** — Pulse **differential downloads**: a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`) so a changed asset ships as just its delta against a stored base, verified by the existing SHA-256 gate with a full-fetch fallback
 - ✅ **Phase 9C** — Pulse **reference update server**: a pure, capability-injected `createUpdateServer` (channel selection, staged rollout, anti-downgrade, freeze, rollback directives, content-addressed asset serving; never signs) + a runnable `node:http` adapter example
 - ✅ **Phase 9D** — Pulse **server-driven UI (SDUI)**: `compileSdui` turns an allowlisted JSON tree into a reactive `MindeesNode` (named actions + `$bind` bindings, no `eval`, prototype-pollution-safe) + RFC 7396 / safe RFC 6902 patches — **Phase 9 (Pulse) complete**
-- ⏭️ **Phases 8F / 10–13** — end-to-end native app (embedded JS engine + JS↔native bridge); then local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 10A** — Continuum **reactive local-first store**: signals-native `createCollection` (fine-grained reactive queries, atomic transactions, optimistic updates with rollback) — HLC/CRDT/delta-sync next
+- ⏭️ **Phases 8F / 10B–13** — end-to-end native app (embedded JS engine + JS↔native bridge); Continuum sync (HLC, CRDT, delta sync); then on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
