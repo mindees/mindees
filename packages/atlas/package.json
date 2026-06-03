@@ -38,7 +38,7 @@
     "@mindees/core": "workspace:*"
   },
   "peerDependencies": {
-    "@mindees/renderer": "workspace:*"
+    "@mindees/renderer": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@mindees/renderer": {
