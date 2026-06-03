@@ -220,7 +220,7 @@ upgrades).
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
 | `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
-| [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA core: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback (differential diff + server + SDUI 🔬 next) | 🧪 Experimental |
+| [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** (reference server + SDUI next) | 🧪 Experimental |
 | [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
 
 > 🧪 **Experimental** = implemented & tested, API may still change before `1.0`.
@@ -244,7 +244,8 @@ upgrades).
 - ✅ **Phase 8C / 8D** — **iOS & Android host projects** ([examples/native-hosts/](./examples/native-hosts/)) compile + pass their conformance cores in CI (macOS runner for iOS; Linux + Android SDK for Android)
 - ✅ **Phase 8E** — both hosts **render** the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch)
 - ✅ **Phase 9A** — Pulse **signed OTA core**: hash-addressed manifest + Ed25519 signing/verify (threshold + key rotation, pure-JS `@noble`) + content-addressed store + an update client with atomic generations & crash-loop rollback
-- ⏭️ **Phases 8F / 9B–13** — end-to-end native app (embedded JS engine + JS↔native bridge); Pulse delivery (differential diff + reference server + SDUI); then local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 9B** — Pulse **differential downloads**: a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`) so a changed asset ships as just its delta against a stored base, verified by the existing SHA-256 gate with a full-fetch fallback
+- ⏭️ **Phases 8F / 9C–13** — end-to-end native app (embedded JS engine + JS↔native bridge); Pulse delivery (reference update server + SDUI); then local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 

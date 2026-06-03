@@ -20,6 +20,22 @@ export interface AssetEntry {
   readonly size: number
   /** Lowercase hex SHA-256 of the file's bytes. */
   readonly sha256: string
+  /**
+   * Optional differential-download hint: reconstruct this asset by applying a delta
+   * to a base blob the client likely already has, instead of fetching it whole. Purely
+   * an optimization — the reconstructed bytes are still verified against
+   * {@link AssetEntry.sha256}, so a bad or forged delta can never install unverified
+   * bytes (the client falls back to a full download). See `delta.ts`.
+   */
+  readonly patch?: PatchDescriptor
+}
+
+/** A differential-download descriptor (see {@link AssetEntry.patch}). */
+export interface PatchDescriptor {
+  /** Lowercase hex SHA-256 of the base blob the delta applies to. */
+  readonly base: string
+  /** The delta blob, itself a content-addressed {@link AssetEntry} (never nested again). */
+  readonly delta: AssetEntry
 }
 
 /**
@@ -123,8 +139,16 @@ export function parseManifest(input: string): UpdateManifest {
   return raw as unknown as UpdateManifest
 }
 
-/** Assert `value` is a well-formed {@link AssetEntry}; throw `MANIFEST_MALFORMED` otherwise. */
-function validateAsset(value: unknown, where: string): asserts value is AssetEntry {
+/**
+ * Assert `value` is a well-formed {@link AssetEntry}; throw `MANIFEST_MALFORMED`
+ * otherwise. `allowPatch` is false when validating a nested delta asset — a delta
+ * blob is fetched whole and must not itself carry a `patch` (no delta-of-a-delta).
+ */
+function validateAsset(
+  value: unknown,
+  where: string,
+  allowPatch = true,
+): asserts value is AssetEntry {
   if (!isObject(value)) throw malformed(`${where} must be an object`)
   if (!isNonEmptyString(value.path)) throw malformed(`${where}.path must be a non-empty string`)
   if (!isNonNegativeInteger(value.size))
@@ -132,6 +156,19 @@ function validateAsset(value: unknown, where: string): asserts value is AssetEnt
   if (typeof value.sha256 !== 'string' || !SHA256_HEX.test(value.sha256)) {
     throw malformed(`${where}.sha256 must be lowercase hex SHA-256`)
   }
+  if (value.patch !== undefined) {
+    if (!allowPatch) throw malformed(`${where}.patch is not allowed on a delta asset`)
+    validatePatch(value.patch, `${where}.patch`)
+  }
+}
+
+/** Assert `value` is a well-formed {@link PatchDescriptor}; throw `MANIFEST_MALFORMED` otherwise. */
+function validatePatch(value: unknown, where: string): asserts value is PatchDescriptor {
+  if (!isObject(value)) throw malformed(`${where} must be an object`)
+  if (typeof value.base !== 'string' || !SHA256_HEX.test(value.base)) {
+    throw malformed(`${where}.base must be lowercase hex SHA-256`)
+  }
+  validateAsset(value.delta, `${where}.delta`, false)
 }
 
 /** Assert `value` is a string→string map; throw `MANIFEST_MALFORMED` otherwise. */

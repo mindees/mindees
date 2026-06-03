@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createUpdateClient, type UpdateClientOptions } from './client'
 import { generateKeypair, sha256Hex, toHex, utf8 } from './crypto'
+import { diff } from './delta'
 import { UpdateError } from './errors'
 import type { AssetEntry, UpdateManifest } from './manifest'
 import {
@@ -412,5 +413,113 @@ describe('createUpdateClient — option validation', () => {
   })
   it('rejects an empty runtimeVersion', () => {
     expect(() => client(fx, { runtimeVersion: '' })).toThrow(TypeError)
+  })
+})
+
+describe('update client — differential download (delta patch)', () => {
+  // A large base bundle the client already has, and a target that edits a few bytes.
+  const baseBytes = utf8('mindees-native-bundle-'.repeat(300))
+  const targetBytes = new Uint8Array([
+    ...baseBytes.subarray(0, 500),
+    ...utf8('PATCHED'),
+    ...baseBytes.subarray(500),
+  ])
+  const baseSha = sha256Hex(baseBytes)
+  const targetSha = sha256Hex(targetBytes)
+
+  /** Build a signed manifest whose launch asset carries a delta patch descriptor. */
+  function patchedManifest(deltaBytes: Uint8Array): SignedManifest {
+    const manifest: UpdateManifest = {
+      schema: 1,
+      id: 'u1',
+      version: 2,
+      runtimeVersion: '1.0.0',
+      createdAt: '2026-06-03T00:00:00.000Z',
+      launchAsset: {
+        path: 'bundle.js',
+        size: targetBytes.length,
+        sha256: targetSha,
+        patch: {
+          base: baseSha,
+          delta: { path: 'bundle.delta', size: deltaBytes.length, sha256: sha256Hex(deltaBytes) },
+        },
+      },
+      assets: [],
+    }
+    return signManifest(manifest, [signer])
+  }
+
+  /** A client whose fetchAsset counts full-asset vs delta fetches. */
+  function patchClient(signed: SignedManifest, deltaBytes: Uint8Array, storage: UpdateStorage) {
+    const counts = { full: 0, delta: 0 }
+    const c = createUpdateClient({
+      storage,
+      trustedKeys: [trusted],
+      runtimeVersion: '1.0.0',
+      fetchManifest: () => Promise.resolve(signed),
+      fetchAsset: (asset) => {
+        if (asset.path === 'bundle.delta') {
+          counts.delta++
+          return Promise.resolve(deltaBytes)
+        }
+        counts.full++
+        return Promise.resolve(targetBytes)
+      },
+      now: () => Date.parse('2026-06-03T12:00:00.000Z'),
+    })
+    return { c, counts }
+  }
+
+  it('reconstructs the asset from the delta when the base blob is already stored', async () => {
+    const deltaBytes = diff(baseBytes, targetBytes)
+    const storage = createMemoryStorage()
+    await storage.writeBlob(baseSha, baseBytes) // client already holds the previous bundle
+    const { c, counts } = patchClient(patchedManifest(deltaBytes), deltaBytes, storage)
+
+    const res = await c.check()
+    expect(res.available).toBe(true)
+    if (res.available) await c.download(res.manifest)
+
+    expect(await storage.hasBlob(targetSha)).toBe(true)
+    expect([...(await storage.readBlob(targetSha))]).toEqual([...targetBytes])
+    expect(counts.delta).toBe(1)
+    expect(counts.full).toBe(0) // the whole asset was never downloaded
+    // the delta is genuinely smaller than the full asset
+    expect(deltaBytes.length).toBeLessThan(targetBytes.length / 5)
+  })
+
+  it('falls back to a full fetch when the base blob is missing', async () => {
+    const deltaBytes = diff(baseBytes, targetBytes)
+    const storage = createMemoryStorage() // no base blob
+    const { c, counts } = patchClient(patchedManifest(deltaBytes), deltaBytes, storage)
+
+    const res = await c.check()
+    if (res.available) await c.download(res.manifest)
+
+    expect(await storage.hasBlob(targetSha)).toBe(true)
+    expect(counts.delta).toBe(0)
+    expect(counts.full).toBe(1)
+  })
+
+  it('falls back to a full fetch when the delta reconstructs the wrong bytes', async () => {
+    // A valid delta, but for a DIFFERENT target → passes its own SHA-256 yet fails the
+    // post-apply gate against the asset's sha256, so the client must fall back.
+    const wrongTarget = new Uint8Array([
+      ...baseBytes.subarray(0, 500),
+      ...utf8('WRONG'),
+      ...baseBytes.subarray(500),
+    ])
+    const deltaBytes = diff(baseBytes, wrongTarget)
+    const storage = createMemoryStorage()
+    await storage.writeBlob(baseSha, baseBytes)
+    const { c, counts } = patchClient(patchedManifest(deltaBytes), deltaBytes, storage)
+
+    const res = await c.check()
+    if (res.available) await c.download(res.manifest)
+
+    expect(await storage.hasBlob(targetSha)).toBe(true)
+    expect([...(await storage.readBlob(targetSha))]).toEqual([...targetBytes]) // correct bytes installed
+    expect(counts.delta).toBe(1) // delta was attempted
+    expect(counts.full).toBe(1) // then fell back to a full fetch
   })
 })

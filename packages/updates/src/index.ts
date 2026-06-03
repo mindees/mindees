@@ -42,11 +42,13 @@ export {
   toHex,
   verify,
 } from './crypto'
+export { type ApplyDeltaOptions, applyDelta, diff } from './delta'
 export { UpdateError, type UpdateErrorCode } from './errors'
 export {
   type AssetEntry,
   allAssets,
   canonicalManifestJson,
+  type PatchDescriptor,
   parseManifest,
   type UpdateManifest,
 } from './manifest'

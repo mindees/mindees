@@ -89,9 +89,21 @@ See [STATUS.md](./STATUS.md) for current maturity.
     atomic generations, monotonic-version + expiry + runtime-compatibility gates, and
     readiness-handshake crash-loop rollback (previous → embedded). See
     [ADR-0008](./docs/adr/0008-pulse-ota.md).
-  - [ ] **Phase 9B — Pulse delivery: differential diff + reference server + SDUI**
-    Pure-JS differential bundle diffing (on top of content-addressing), a reference
-    update server that builds/signs/serves manifests, and a server-driven-UI subset.
+  - [x] **Phase 9B — Differential bundle diffing** ✅
+    A zero-dependency, pure-TS byte-level delta codec (`diff` build-side / `applyDelta`
+    on-device, a rolling-hash COPY/INSERT scheme) and a `download()` delta path: an
+    `AssetEntry.patch` descriptor (inside the signed manifest) lets a changed asset be
+    reconstructed from a small delta against a base blob the client already holds,
+    gated by the existing post-apply SHA-256 check with a full-fetch fallback. See
+    [ADR-0009](./docs/adr/0009-pulse-differential-diff.md).
+  - [ ] **Phase 9C — Pulse reference update server**
+    A pure, capability-injected server core (selection / staged rollout / anti-downgrade;
+    serves pre-signed manifests — never signs) plus a thin `node:http` adapter in
+    `examples/`, using the diff layer to serve deltas.
+  - [ ] **Phase 9D — Server-driven UI (SDUI)**
+    An allowlisted, schema-versioned JSON component tree → `createElement`, with named
+    (never `eval`'d) action handlers, reactive data bindings, and incremental
+    (RFC 7396 / safe RFC 6902) patches — re-validated before render.
 - [ ] **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
   Reactive offline store, delta sync, conflict resolution.
 - [ ] **Phase 11 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**

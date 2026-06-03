@@ -24,6 +24,12 @@ installed apps without an app-store release, safely.
 - **Content-addressed storage** — `UpdateStorage` stores blobs by SHA-256, so files
   shared across updates are stored once and **unchanged assets are never re-downloaded**.
   `createMemoryStorage()` is the reference implementation; bring your own for FS/S3/R2/RN.
+- **Differential (delta) downloads** — a zero-dependency, pure-TS byte-level delta codec
+  (`diff` build-side, `applyDelta` on-device, a rolling-hash COPY/INSERT scheme). A
+  changed asset can carry an `AssetEntry.patch` descriptor `{ base, delta }` in the
+  signed manifest; the client fetches only the small delta, reconstructs the asset
+  against a base blob it already holds, and verifies the result against the asset's
+  SHA-256. A bad or forged delta can never install — it falls back to a full download.
 - **Safe update client** — `createUpdateClient()`:
   - `check()` — fetch + verify the signed manifest; apply the signature, expiry,
     runtime-compatibility, and monotonic-version (anti-rollback) gates.
