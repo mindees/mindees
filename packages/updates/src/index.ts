@@ -56,6 +56,7 @@ export {
   type Signer,
   signManifest,
   type TrustedKey,
+  type VerifiedManifest,
   verifySignedManifest,
 } from './signing'
 export {

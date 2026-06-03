@@ -74,6 +74,10 @@ export function canonicalManifestJson(manifest: UpdateManifest): string {
   return stableStringify(manifest)
 }
 
+/**
+ * Recursively serialize a JSON value with object keys sorted and `undefined`
+ * properties omitted, so the same logical value always yields identical bytes.
+ */
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
@@ -119,6 +123,7 @@ export function parseManifest(input: string): UpdateManifest {
   return raw as unknown as UpdateManifest
 }
 
+/** Assert `value` is a well-formed {@link AssetEntry}; throw `MANIFEST_MALFORMED` otherwise. */
 function validateAsset(value: unknown, where: string): asserts value is AssetEntry {
   if (!isObject(value)) throw malformed(`${where} must be an object`)
   if (!isNonEmptyString(value.path)) throw malformed(`${where}.path must be a non-empty string`)
@@ -129,6 +134,7 @@ function validateAsset(value: unknown, where: string): asserts value is AssetEnt
   }
 }
 
+/** Assert `value` is a string→string map; throw `MANIFEST_MALFORMED` otherwise. */
 function validateMetadata(value: unknown): void {
   if (!isObject(value)) throw malformed('metadata must be an object')
   for (const [k, v] of Object.entries(value)) {
@@ -136,22 +142,37 @@ function validateMetadata(value: unknown): void {
   }
 }
 
+/** Build a `MANIFEST_MALFORMED` {@link UpdateError} with a uniform message prefix. */
 function malformed(detail: string): UpdateError {
   return new UpdateError('MANIFEST_MALFORMED', `malformed update manifest: ${detail}`)
 }
 
+/** Narrow to a plain (non-array, non-null) object. */
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** Narrow to a non-empty string. */
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
+/** Narrow to an integer ≥ 0. */
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
 }
 
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+
+/**
+ * Strict canonical-ISO check: exactly `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC, millisecond
+ * precision) **and** a real calendar date. `Date.parse` alone is deliberately
+ * avoided — ECMAScript lets it accept implementation-defined formats, so a manifest
+ * deemed "valid" (or an `expires` boundary) could differ across Node/browser/Hermes.
+ * Round-tripping through `toISOString()` pins one representation on every runtime.
+ */
 function isIsoDate(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value))
+  if (typeof value !== 'string' || !ISO_UTC.test(value)) return false
+  const ms = Date.parse(value)
+  return !Number.isNaN(ms) && new Date(ms).toISOString() === value
 }

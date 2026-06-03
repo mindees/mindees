@@ -3,7 +3,13 @@ import { createUpdateClient, type UpdateClientOptions } from './client'
 import { generateKeypair, sha256Hex, toHex, utf8 } from './crypto'
 import { UpdateError } from './errors'
 import type { AssetEntry, UpdateManifest } from './manifest'
-import { type SignedManifest, type Signer, signManifest, type TrustedKey } from './signing'
+import {
+  type SignedManifest,
+  type Signer,
+  signManifest,
+  type TrustedKey,
+  type VerifiedManifest,
+} from './signing'
 import { createMemoryStorage, type UpdateStorage } from './store'
 
 // One keypair the fixtures sign with and the client trusts.
@@ -17,7 +23,9 @@ beforeEach(() => {
 
 interface Fixture {
   signed: SignedManifest
-  manifest: UpdateManifest
+  // Branded as verified: these fixtures are signed with the trusted key, so they
+  // model exactly what `check()` would hand to `download()`.
+  manifest: VerifiedManifest
   blobs: Map<string, Uint8Array>
 }
 
@@ -49,7 +57,7 @@ function fixture(opts: {
     assets: rest,
     ...(opts.metadata ? { metadata: opts.metadata } : {}),
   }
-  return { signed: signManifest(manifest, [signer]), manifest, blobs }
+  return { signed: signManifest(manifest, [signer]), manifest: manifest as VerifiedManifest, blobs }
 }
 
 /** Download → apply → boot → notifyReady a fixture onto `storage`, leaving it confirmed-current. */
@@ -302,6 +310,50 @@ describe('update client — apply / boot / rollback', () => {
   it('treats expires === now as expired (freeze protection is inclusive)', async () => {
     const fx = fixture({ id: 'u1', version: 2, expires: '2026-06-03T12:00:00.000Z' }) // === now
     await expect(client(fx).check()).rejects.toBeInstanceOf(UpdateError) // MANIFEST_EXPIRED
+  })
+})
+
+describe('update client — trust boundary (download/apply re-enforce the gates)', () => {
+  it('check() → download(): the verified manifest from check() is accepted', async () => {
+    const fx = fixture({ id: 'u1', version: 2 })
+    const c = client(fx, {}, createMemoryStorage())
+    const res = await c.check()
+    expect(res.available).toBe(true)
+    if (res.available) {
+      const gen = await c.download(res.manifest) // res.manifest is a VerifiedManifest
+      expect(gen).toMatchObject({ id: 'u1', version: 2, status: 'pending' })
+    }
+  })
+
+  it('download() rejects an expired manifest even when called without check()', async () => {
+    const fx = fixture({ id: 'u1', version: 2, expires: '2026-06-03T06:00:00.000Z' }) // past `now`
+    await expect(client(fx).download(fx.manifest)).rejects.toBeInstanceOf(UpdateError) // MANIFEST_EXPIRED
+  })
+
+  it('download() rejects a runtime-incompatible manifest', async () => {
+    const fx = fixture({ id: 'u1', version: 2, runtimeVersion: '2.0.0' })
+    await expect(client(fx).download(fx.manifest)).rejects.toBeInstanceOf(UpdateError) // RUNTIME_MISMATCH
+  })
+
+  it('download() rejects a downgrade (not newer than what is applied)', async () => {
+    const storage = createMemoryStorage()
+    await confirm(fixture({ id: 'hi', version: 5 }), storage) // high-water mark = 5
+    const old = fixture({ id: 'lo', version: 2 })
+    await expect(client(old, {}, storage).download(old.manifest)).rejects.toBeInstanceOf(
+      UpdateError,
+    ) // VERSION_NOT_NEWER
+  })
+
+  it('apply() refuses to re-activate a generation that previously failed', async () => {
+    const storage = createMemoryStorage()
+    const fx = fixture({ id: 'u1', version: 2 })
+    const c = client(fx, { maxBootAttempts: 1 }, storage)
+    await c.download(fx.manifest)
+    await c.apply('u1')
+    await c.boot()
+    await c.boot() // crash-loop → u1 marked failed, rolled back to embedded
+    expect((await c.state()).generations.u1?.status).toBe('failed')
+    await expect(c.apply('u1')).rejects.toBeInstanceOf(UpdateError) // GENERATION_FAILED
   })
 })
 

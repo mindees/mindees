@@ -44,6 +44,17 @@ export interface TrustedKey {
   readonly publicKey: string
 }
 
+declare const verifiedBrand: unique symbol
+
+/**
+ * An {@link UpdateManifest} whose signature has been verified against trusted keys.
+ * The brand is unforgeable in TypeScript: only {@link verifySignedManifest} (and
+ * therefore {@link "./client".UpdateClient.check}) can produce one. APIs that
+ * activate code — `download()` / `apply()` — accept only a `VerifiedManifest`, so a
+ * caller cannot smuggle an unsigned, locally-constructed manifest past the trust gate.
+ */
+export type VerifiedManifest = UpdateManifest & { readonly [verifiedBrand]: true }
+
 /**
  * Sign a manifest with one or more {@link Signer}s. Produces the canonical bytes
  * and a signature per signer.
@@ -69,7 +80,7 @@ export function verifySignedManifest(
   signed: SignedManifest,
   trustedKeys: readonly TrustedKey[],
   threshold = 1,
-): UpdateManifest {
+): VerifiedManifest {
   // A non-positive (or non-integer) threshold would otherwise accept a manifest
   // with *zero* valid signatures — a signature-check bypass. Fail closed.
   if (!Number.isInteger(threshold) || threshold < 1) {
@@ -105,5 +116,6 @@ export function verifySignedManifest(
       `manifest has ${validPublicKeys.size} valid trusted signature(s), need ${threshold}`,
     )
   }
-  return parseManifest(signed.manifest)
+  // Signature verified ⇒ mint the brand. parseManifest still strictly validates shape.
+  return parseManifest(signed.manifest) as VerifiedManifest
 }

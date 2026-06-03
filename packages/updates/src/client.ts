@@ -18,7 +18,12 @@
 import { sha256Hex } from './crypto'
 import { UpdateError } from './errors'
 import { type AssetEntry, allAssets, canonicalManifestJson, parseManifest } from './manifest'
-import { type SignedManifest, type TrustedKey, verifySignedManifest } from './signing'
+import {
+  type SignedManifest,
+  type TrustedKey,
+  type VerifiedManifest,
+  verifySignedManifest,
+} from './signing'
 import { type GenerationMeta, initialState, type UpdateState, type UpdateStorage } from './store'
 
 /** Options for {@link createUpdateClient}. */
@@ -45,7 +50,7 @@ export interface UpdateClientOptions {
 
 /** Result of {@link UpdateClient.check}. */
 export type UpdateCheck =
-  | { readonly available: true; readonly manifest: ReturnType<typeof parseManifest> }
+  | { readonly available: true; readonly manifest: VerifiedManifest }
   | { readonly available: false; readonly reason: 'up-to-date' | 'runtime-mismatch' }
 
 /** Result of {@link UpdateClient.boot}. */
@@ -62,8 +67,13 @@ export interface UpdateClient {
   boot(): Promise<BootResult>
   /** Check the server for a newer, valid, compatible update. */
   check(): Promise<UpdateCheck>
-  /** Download a checked manifest's missing assets; record a pending generation. */
-  download(manifest: ReturnType<typeof parseManifest>): Promise<GenerationMeta>
+  /**
+   * Download a verified manifest's missing assets and record a pending generation.
+   * Accepts only a {@link VerifiedManifest} (from {@link UpdateClient.check}), and
+   * re-asserts the freeze / runtime / anti-downgrade gates, so it is safe even if
+   * called without `check()` first.
+   */
+  download(manifest: VerifiedManifest): Promise<GenerationMeta>
   /** Atomically make a downloaded generation the current one (applies next launch). */
   apply(generationId: string): Promise<void>
   /** Confirm the current generation launched successfully. */
@@ -134,9 +144,13 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
   if (trustedKeys.length < 1) {
     throw new TypeError('createUpdateClient: trustedKeys must contain at least one key')
   }
-  if (!Number.isInteger(threshold) || threshold < 1 || threshold > trustedKeys.length) {
+  // Bound the threshold by distinct *public keys*: verifySignedManifest counts unique
+  // keys, so a threshold above the distinct-key count is unattainable (every check()
+  // would fail). Duplicate keyId aliases for one key must not inflate the ceiling.
+  const distinctKeyCount = new Set(trustedKeys.map((k) => k.publicKey)).size
+  if (!Number.isInteger(threshold) || threshold < 1 || threshold > distinctKeyCount) {
     throw new TypeError(
-      `createUpdateClient: threshold must be an integer in [1, ${trustedKeys.length}], got ${threshold}`,
+      `createUpdateClient: threshold must be an integer in [1, ${distinctKeyCount}], got ${threshold}`,
     )
   }
   if (typeof runtimeVersion !== 'string' || runtimeVersion.length === 0) {
@@ -158,6 +172,16 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
   const readStateOrInit = async (): Promise<UpdateState> =>
     (await storage.readState()) ?? initialState(embeddedVersion)
 
+  /** Throw if the manifest has expired (freeze protection). */
+  const assertNotExpired = (manifest: VerifiedManifest): void => {
+    if (manifest.expires !== undefined && Date.parse(manifest.expires) <= now()) {
+      throw new UpdateError(
+        'MANIFEST_EXPIRED',
+        `manifest ${manifest.id} expired at ${manifest.expires}`,
+      )
+    }
+  }
+
   return {
     get isEmergencyLaunch() {
       return emergency
@@ -169,12 +193,7 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
       const signed = await fetchManifest()
       // Throws SIGNATURE_INVALID if < threshold valid trusted signatures.
       const manifest = verifySignedManifest(signed, trustedKeys, threshold)
-      if (manifest.expires !== undefined && Date.parse(manifest.expires) <= now()) {
-        throw new UpdateError(
-          'MANIFEST_EXPIRED',
-          `manifest ${manifest.id} expired at ${manifest.expires}`,
-        )
-      }
+      assertNotExpired(manifest)
       if (manifest.runtimeVersion !== runtimeVersion) {
         return { available: false, reason: 'runtime-mismatch' }
       }
@@ -186,6 +205,23 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
     },
 
     async download(manifest): Promise<GenerationMeta> {
+      // `manifest` is signature-verified (the VerifiedManifest brand), but freshness,
+      // runtime compatibility, and the anti-downgrade floor depend on *now* + current
+      // state — re-assert them here so download() is safe even without a prior check().
+      assertNotExpired(manifest)
+      if (manifest.runtimeVersion !== runtimeVersion) {
+        throw new UpdateError(
+          'RUNTIME_MISMATCH',
+          `manifest ${manifest.id} targets runtime ${manifest.runtimeVersion}, app is ${runtimeVersion}`,
+        )
+      }
+      const st = await readStateOrInit()
+      if (manifest.version <= st.highestVersion) {
+        throw new UpdateError(
+          'VERSION_NOT_NEWER',
+          `manifest ${manifest.id} version ${manifest.version} is not newer than ${st.highestVersion}`,
+        )
+      }
       for (const asset of allAssets(manifest)) {
         if (await storage.hasBlob(asset.sha256)) continue // content-addressed: already have it
         const bytes = await fetchAsset(asset)
@@ -198,7 +234,6 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
         }
         await storage.writeBlob(asset.sha256, bytes)
       }
-      const st = await readStateOrInit()
       const generation: GenerationMeta = {
         id: manifest.id,
         version: manifest.version,
@@ -216,6 +251,18 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
       const st = await readStateOrInit()
       const generation = st.generations[generationId]
       if (!generation) throw new UpdateError('GENERATION_UNKNOWN', `no generation ${generationId}`)
+      // Never re-activate a generation that previously failed (e.g. crash-looped).
+      if (generation.status === 'failed') {
+        throw new UpdateError('GENERATION_FAILED', `generation ${generationId} previously failed`)
+      }
+      // Never activate something older than the high-water mark (anti-downgrade), even
+      // if it was downloaded while it was still the newest.
+      if (generation.version < st.highestVersion) {
+        throw new UpdateError(
+          'VERSION_NOT_NEWER',
+          `generation ${generationId} version ${generation.version} is older than ${st.highestVersion}`,
+        )
+      }
       // All assets must be present before we make it current.
       for (const asset of allAssets(parseManifest(generation.manifest))) {
         if (!(await storage.hasBlob(asset.sha256))) {

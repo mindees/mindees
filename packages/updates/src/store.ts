@@ -74,20 +74,34 @@ export function initialState(embeddedVersion = 0): UpdateState {
 export function createMemoryStorage(): UpdateStorage {
   const blobs = new Map<string, Uint8Array>()
   let state: UpdateState | null = null
+
+  // Clone at the boundary: callers must never hold a reference into the store's
+  // internals, or they could mutate a blob after writeBlob() (breaking the
+  // content-addressed integrity guarantee) or mutate state without a writeState().
+  const cloneState = (value: UpdateState | null): UpdateState | null =>
+    value === null
+      ? null
+      : {
+          ...value,
+          generations: Object.fromEntries(
+            Object.entries(value.generations).map(([id, meta]) => [id, { ...meta }]),
+          ),
+        }
+
   return {
     hasBlob: (sha256) => Promise.resolve(blobs.has(sha256)),
     readBlob: (sha256) => {
       const blob = blobs.get(sha256)
       if (!blob) return Promise.reject(new UpdateError('ASSET_MISSING', `blob ${sha256} not found`))
-      return Promise.resolve(blob)
+      return Promise.resolve(new Uint8Array(blob))
     },
     writeBlob: (sha256, data) => {
-      blobs.set(sha256, data)
+      blobs.set(sha256, new Uint8Array(data))
       return Promise.resolve()
     },
-    readState: () => Promise.resolve(state),
+    readState: () => Promise.resolve(cloneState(state)),
     writeState: (next) => {
-      state = next
+      state = cloneState(next)
       return Promise.resolve()
     },
   }

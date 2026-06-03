@@ -18,10 +18,16 @@ export type UpdateErrorCode =
   | 'HASH_MISMATCH'
   /** `manifest.expires` is in the past (stale / freeze-attack protection). */
   | 'MANIFEST_EXPIRED'
+  /** The manifest's `runtimeVersion` does not match the app (native-incompatibility gate). */
+  | 'RUNTIME_MISMATCH'
+  /** The manifest/generation is not strictly newer than what is applied (anti-downgrade). */
+  | 'VERSION_NOT_NEWER'
   /** An asset a generation needs is not present in the store. */
   | 'ASSET_MISSING'
   /** `apply()`/`rollback()` referenced a generation id that does not exist. */
   | 'GENERATION_UNKNOWN'
+  /** `apply()` referenced a generation previously marked failed (cannot be re-activated). */
+  | 'GENERATION_FAILED'
 
 /** An OTA update error carrying a stable {@link UpdateErrorCode}. */
 export class UpdateError extends Error {

@@ -60,6 +60,10 @@ describe('parseManifest', () => {
       ['empty id', { ...manifest, id: '' }],
       ['negative version', { ...manifest, version: -1 }],
       ['bad date', { ...manifest, createdAt: 'never' }],
+      ['non-canonical date (missing ms)', { ...manifest, createdAt: '2026-06-03T00:00:00Z' }],
+      ['date-only', { ...manifest, createdAt: '2026-06-03' }],
+      ['impossible calendar date', { ...manifest, createdAt: '2026-13-40T00:00:00.000Z' }],
+      ['non-UTC offset', { ...manifest, createdAt: '2026-06-03T00:00:00.000+05:00' }],
       ['short sha256', { ...manifest, launchAsset: { path: 'x', size: 1, sha256: 'abc' } }],
       ['non-string metadata value', { ...manifest, metadata: { n: 1 } }],
     ]

@@ -25,6 +25,22 @@ describe('memory storage', () => {
     expect(await s.readState()).toEqual(st)
   })
 
+  it('clones at the boundary: mutating inputs or outputs cannot corrupt the store', async () => {
+    const s = createMemoryStorage()
+    const bytes = new Uint8Array([1, 2, 3])
+    await s.writeBlob('h', bytes)
+    bytes[0] = 99 // mutate the source after writing
+    expect([...(await s.readBlob('h'))]).toEqual([1, 2, 3]) // store kept its own copy
+    const read = await s.readBlob('h')
+    read[0] = 88 // mutate the returned copy
+    expect([...(await s.readBlob('h'))]).toEqual([1, 2, 3]) // store unaffected
+
+    await s.writeState(initialState(1))
+    const got = await s.readState()
+    if (got) (got as { current: string | null }).current = 'tampered'
+    expect((await s.readState())?.current).toBeNull() // store unaffected
+  })
+
   it('initialState reflects the embedded version and a clean slate', () => {
     expect(initialState(7)).toEqual({
       current: null,
