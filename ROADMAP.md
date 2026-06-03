@@ -147,8 +147,23 @@ See [STATUS.md](./STATUS.md) for current maturity.
     replica resumes after restart with stable identity (closing the op-id hazard). Native
     SQLite + Yjs/Automerge/Loro interop are 🔬 research tracks. See
     [ADR-0016](./docs/adr/0016-continuum-server-persistence.md). **Phase 10 (Continuum) complete.**
-- [ ] **Phase 11 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**
-  Mock + server backends, guided generation, tool calling, error explainer.
+- **Phase 11 — `@mindees/ai` (Synapse): provider-agnostic AI + dev-time AI**
+  A pure-TS, hand-rolled AI contract (no vendor SDK) with backends that work everywhere;
+  on-device LLM inference is inherently native (Apple Foundation Models, AICore, ExecuTorch)
+  so it's a labeled research track with a working mock/server fallback. Sub-phased:
+  - [x] **Phase 11A — AI contract + mock backend** ✅
+    `createAi` + the `AiBackend` seam (messages, `GenerateRequest`/`AiResult`/`AiChunk`,
+    `AiError`), streaming as `AsyncIterable` only; a deterministic `createMockBackend`
+    (offline, no keys); a `createOnDeviceBackend` research-track seam that throws. See
+    [ADR-0017](./docs/adr/0017-synapse-ai-contract.md).
+  - [ ] **Phase 11B — Server/HTTP backend** — `createServerBackend({ fetch, … })` over an
+    injected `fetch`, a pure-TS SSE→`AsyncIterable` parser, and openai/anthropic mappers
+    (golden-fixture tested, zero real network).
+  - [ ] **Phase 11C — Structured output + tool calling** — `generateObject`/`streamObject`
+    (Standard-Schema validated, no `eval`, bounded repairs) + a bounded tool-calling loop
+    (validate args before invoking; hard step ceiling).
+  - [ ] **Phase 11D — Dev-time error explainer** — a `mindees ai explain` CLI tool over
+    the same contract (dev/build path only, never on device).
 - [ ] **Phase 12 — `@mindees/atlas` (Atlas) + first-party capability modules**
   Accessible primitives + recycling list (web impls; native research-track).
 - [ ] **Phase 13 — Examples, docs, benchmarks, release & governance**
