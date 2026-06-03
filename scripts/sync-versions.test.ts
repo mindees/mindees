@@ -54,6 +54,7 @@ function run(root: string, ...args: string[]): { code: number; out: string; err:
     const out = execFileSync('node', [scriptPath, ...args], {
       env: { ...process.env, SYNC_VERSIONS_ROOT: root },
       encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
     })
     return { code: 0, out, err: '' }
   } catch (e) {
