@@ -23,7 +23,7 @@ corepack enable                              # activates the pinned pnpm version
 git clone https://github.com/mindees/mindees.git
 cd mindees
 pnpm install
-pnpm verify                                  # lint + typecheck + build + exports + test
+pnpm verify                                  # lint + typecheck + build + exports + CLI smoke + test
 ```
 
 If `pnpm verify` is green, you're ready.
@@ -47,7 +47,7 @@ after Corepack has made `pnpm` available on PATH.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm verify` | Runs the full gate: lint, typecheck, build, export validation, and tests. |
+| `pnpm verify` | Runs the full gate: lint, typecheck, build, export validation, CLI smoke, and tests. |
 | `pnpm build` | Builds all packages. |
 | `pnpm test` | Runs all tests (Vitest). |
 | `pnpm lint` | Lints + checks formatting (Biome). |
