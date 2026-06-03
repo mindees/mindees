@@ -19,6 +19,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const node = process.execPath
 const cliBin = join(root, 'packages', 'cli', 'dist', 'bin.js')
 const createBin = join(root, 'packages', 'create-mindees', 'dist', 'bin.js')
+const commandTimeoutMs = 30_000
 const tempRoots = []
 
 function assert(condition, message) {
@@ -50,9 +51,13 @@ function run(label, args, options = {}) {
     cwd: options.cwd ?? root,
     env,
     encoding: 'utf8',
+    timeout: commandTimeoutMs,
     windowsHide: true,
   })
   if (result.error) {
+    if (result.error.code === 'ETIMEDOUT') {
+      throw new Error(`${label}: timed out after ${commandTimeoutMs}ms\n${commandOutput(result)}`)
+    }
     throw new Error(`${label}: failed to launch: ${result.error.message}`)
   }
   return result
