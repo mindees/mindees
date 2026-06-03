@@ -10,8 +10,14 @@ export default defineConfig({
     // a prior build step. Folder name maps 1:1 to the scope suffix
     // (e.g. @mindees/core -> packages/core/src/index.ts).
     alias: [
+      // Subpath exports (e.g. @mindees/ai/devtools) → packages/ai/src/devtools.ts. Must come
+      // before the bare-package rule so the package name isn't treated as a folder.
       {
-        find: /^@mindees\/(.*)$/,
+        find: /^@mindees\/([^/]+)\/(.+)$/,
+        replacement: resolve(root, 'packages/$1/src/$2.ts'),
+      },
+      {
+        find: /^@mindees\/([^/]+)$/,
         replacement: resolve(root, 'packages/$1/src/index.ts'),
       },
     ],

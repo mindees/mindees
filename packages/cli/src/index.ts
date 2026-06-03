@@ -2,10 +2,12 @@ import type { Maturity, PackageInfo } from '@mindees/core'
 import { NotImplementedError, notImplemented } from '@mindees/core'
 import { VERSION } from './version'
 
+/** AI command handler (used by `runCliAsync`; exposed for embedders). */
+export { type AiCommandContext, runAiCommand } from './ai'
 /** Project build (via @mindees/compiler). */
 export { type BuildOptions, type BuildResult, buildProject } from './build'
-/** CLI dispatch. */
-export { type CliContext, runCli } from './cli'
+/** CLI dispatch. `runCli` is synchronous; `runCliAsync` adds the async `ai` command. */
+export { type CliContext, runCli, runCliAsync } from './cli'
 /** Dev orchestrator (rebuild-on-change). */
 export { type DevOptions, type DevSession, startDev, type Watcher } from './dev'
 /** Environment diagnostics. */

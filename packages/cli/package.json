@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@mindees/core": "workspace:*",
-    "@mindees/compiler": "workspace:*"
+    "@mindees/compiler": "workspace:*",
+    "@mindees/ai": "workspace:*"
   }
 }

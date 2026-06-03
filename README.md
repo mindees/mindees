@@ -218,7 +218,7 @@ upgrades).
 | [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state + nested rendering | 🧪 Experimental |
 | [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend (real iOS/Android hosts + GPU canvas 🔬) | 🧪 Experimental |
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
-| [`@mindees/ai`](./packages/ai) | Synapse | Provider-agnostic AI: pure-TS contract + deterministic mock + streaming (server backend, structured output & tools next); on-device runtime 🔬 | 🧪 Experimental |
+| [`@mindees/ai`](./packages/ai) | Synapse | Provider-agnostic AI: pure-TS contract + mock & inject-`fetch` server backends, `AsyncIterable` streaming, Standard-Schema structured output (`generateObject`/`streamObject`), bounded tool calling (`runTools`), and a dev-time error explainer; on-device runtime 🔬 | 🧪 Experimental |
 | [`@mindees/data`](./packages/data) | Continuum | Local-first: signals-native `createCollection` + HLC causality + CRDT merge (LWW + OR-Set) + a delta-sync engine where two peers converge offline | 🧪 Experimental |
 | [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** + **server-driven UI (SDUI)** | 🧪 Experimental |
 | [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
@@ -248,8 +248,8 @@ upgrades).
 - ✅ **Phase 9C** — Pulse **reference update server**: a pure, capability-injected `createUpdateServer` (channel selection, staged rollout, anti-downgrade, freeze, rollback directives, content-addressed asset serving; never signs) + a runnable `node:http` adapter example
 - ✅ **Phase 9D** — Pulse **server-driven UI (SDUI)**: `compileSdui` turns an allowlisted JSON tree into a reactive `MindeesNode` (named actions + `$bind` bindings, no `eval`, prototype-pollution-safe) + RFC 7396 / safe RFC 6902 patches — **Phase 9 (Pulse) complete**
 - ✅ **Phase 10 (core)** — Continuum **local-first data**: signals-native `createCollection` (10A) + Hybrid Logical Clock causality (10B) + CRDT conflict resolution — per-field LWW + add-wins OR-Set (10C) + a **delta-sync engine where two peers converge offline** (10D)
-- ✅ **Phase 11A** — Synapse **AI contract**: a pure-TS provider-agnostic `AiBackend` (`createAi`) + a deterministic mock backend + `AsyncIterable` streaming — server backend, structured output & tool calling next; on-device runtime is a research track
-- ⏭️ **Phases 8F / 11B–13** — end-to-end native app (embedded JS engine + JS↔native bridge); Synapse server backend + structured output/tools + dev-time AI; then Atlas UI, examples & release
+- ✅ **Phase 11 (Synapse) — provider-agnostic AI**: a pure-TS `AiBackend` (`createAi`) with a deterministic mock + an inject-`fetch` server backend (openai/anthropic), `AsyncIterable` streaming (11A/11B); Standard-Schema **structured output** (`generateObject`/`streamObject`, no `eval`, sanitize-before-validate) + a bounded **tool-calling loop** (`runTools`) (11C); and a dev-time **error explainer** (`mindees ai explain`) (11D) — on-device LLM inference is a labeled 🔬 research track
+- ⏭️ **Phases 8F / 12–13** — end-to-end native app (embedded JS engine + JS↔native bridge); then Atlas UI, examples, benchmarks & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
