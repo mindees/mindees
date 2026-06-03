@@ -65,6 +65,17 @@ export {
   orValues,
 } from './or-set'
 export {
+  type Cursor,
+  createMemoryHub,
+  createMutationLog,
+  createSyncEngine,
+  type MutationLog,
+  type Op,
+  type SyncEngine,
+  type SyncEngineOptions,
+  type SyncTransport,
+} from './sync'
+export {
   type VersionVector,
   vvDominates,
   vvEquals,

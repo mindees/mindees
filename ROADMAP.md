@@ -131,8 +131,15 @@ See [STATUS.md](./STATUS.md) for current maturity.
     stays commutative even on adversarial input) + an add-wins OR-Set, proven
     commutative/associative/idempotent/convergent (fast-check) and prototype-pollution
     safe. See [ADR-0014](./docs/adr/0014-continuum-crdt.md).
-  - [ ] **Phase 10D — Local-first sync engine + transport** — durable mutation queue, a
-    `SyncTransport` contract, an in-memory hub, and a sync engine; two stores converge.
+  - [x] **Phase 10D — Local-first sync engine + transport** ✅
+    HLC-stamped, idempotent `Op`s; a convergent `MutationLog` (record-level LWW via 10C
+    `mergeRegister`); a `SyncTransport` contract + an in-memory `createMemoryHub`; and
+    `createSyncEngine` (optimistic local `set`/`delete`, `sync()` = push + pull + merge).
+    Two peers converge after concurrent offline edits, duplicate delivery, and
+    out-of-order pulls — proven in a pure unit test. See
+    [ADR-0015](./docs/adr/0015-continuum-sync-engine.md). The reactive offline store +
+    delta sync + conflict resolution that defines Continuum now work end to end (a
+    reference server + native persistence are the 10E/10F follow-ups).
   - [ ] **Phase 10E/10F — Reference sync server + persistence/interop** — a
     capability-injected server core (`@mindees/data/server`) + a `node:http`/WS example;
     in-memory + IndexedDB persistence (native SQLite = research track).
