@@ -162,7 +162,7 @@ See [STATUS.md](./STATUS.md) for current maturity.
     openai/anthropic mappers — defensive untrusted-JSON parsing, golden-fixture tested with
     zero real network, exported from the `@mindees/ai/server` subpath. See
     [ADR-0018](./docs/adr/0018-synapse-server-backend.md).
-  - [~] **Phase 11C — Structured output + tool calling** — split in two:
+  - [ ] **Phase 11C — Structured output + tool calling** — split in two (structured output done):
     - [x] **Structured output** ✅ `generateObject`/`streamObject`: prompt-and-validate
       against any Standard Schema (no JSON-Schema generation — validator-agnostic), no
       `eval`, deep sanitize-before-validate (prototype-pollution + DoS defense), bounded

@@ -88,6 +88,12 @@ describe('containsForbiddenKey', () => {
     expect(containsForbiddenKey(JSON.parse('[{"ok":1},{"prototype":2}]'))).toBe(true)
     expect(containsForbiddenKey([1, 2, { ok: true }])).toBe(false)
   })
+
+  it('is depth-capped and fail-closed on very deep input', () => {
+    let deep: unknown = 1
+    for (let i = 0; i < 100; i++) deep = { nested: deep }
+    expect(containsForbiddenKey(deep, 16)).toBe(true) // too deep to vet → treated as forbidden
+  })
 })
 
 describe('sanitizeJson', () => {
@@ -146,6 +152,11 @@ describe('formatIssues', () => {
     expect(formatIssues([{ message: 'bad', path: [sym] }])).toContain('bad')
     expect(formatIssues([{ message: 'bad', path: [{ key: sym }] }])).toContain('bad')
   })
+
+  it('tolerates a malformed (non-array) issue path', () => {
+    const issue = { message: 'bad', path: 'oops' } as unknown as StandardSchemaV1.Issue
+    expect(formatIssues([issue])).toBe('bad')
+  })
 })
 
 // A tiny inline Standard Schema validator (real validators — Zod/Valibot/ArkType — work
@@ -193,6 +204,17 @@ describe('validateStandard', () => {
     }
     const r = await validateStandard(bad, 1)
     expect(r).toEqual({ ok: false, issues: [] })
+  })
+
+  it('treats a non-object validator result as a failure (no crash)', async () => {
+    const bogus: StandardSchemaV1 = {
+      '~standard': {
+        version: 1,
+        vendor: 'test',
+        validate: () => null as unknown as StandardSchemaV1.Result<unknown>,
+      },
+    }
+    expect(await validateStandard(bogus, 1)).toEqual({ ok: false, issues: [] })
   })
 
   it('discriminates on issues, not value (undefined is a valid success)', async () => {

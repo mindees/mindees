@@ -255,14 +255,21 @@ export function sanitizeJson(
 /**
  * Cheap recursive check for any prototype-pollution own key, WITHOUT cloning. Used to skip
  * emitting an unsanitized streaming preview that carries a poison key (so a consumer who
- * naively deep-merges the preview can't be tricked into polluting the prototype).
+ * naively deep-merges the preview can't be tricked into polluting the prototype). Depth-capped
+ * and fail-closed: a value nested past `maxDepth` is treated as forbidden (skip the preview)
+ * rather than risking a stack overflow on a deeply-nested untrusted payload.
  */
-export function containsForbiddenKey(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some(containsForbiddenKey)
+export function containsForbiddenKey(
+  value: unknown,
+  maxDepth: number = DEFAULT_SANITIZE_LIMITS.maxDepth,
+  depth = 0,
+): boolean {
+  if (depth > maxDepth) return true // fail-closed: too deep to vet → don't emit
+  if (Array.isArray(value)) return value.some((v) => containsForbiddenKey(v, maxDepth, depth + 1))
   if (isPlainObject(value)) {
     for (const k of Object.keys(value)) {
       if (FORBIDDEN_KEYS.has(k)) return true
-      if (containsForbiddenKey(value[k])) return true
+      if (containsForbiddenKey(value[k], maxDepth, depth + 1)) return true
     }
   }
   return false
@@ -274,9 +281,12 @@ export function formatIssues(issues: ReadonlyArray<StandardSchemaV1.Issue>): str
   const lines = list.map((issue) => {
     // String()-coerce each segment: a path key may be a symbol (PropertyKey), and
     // `Array.join`'s implicit coercion throws on symbols — that must not escape the pipeline.
-    const path = issue.path
-      ?.map((seg) => String(typeof seg === 'object' && seg !== null ? seg.key : seg))
-      .join('.')
+    // Guard the array shape too — a malformed validator may hand back a non-array `path`.
+    const path = Array.isArray(issue.path)
+      ? issue.path
+          .map((seg) => String(typeof seg === 'object' && seg !== null ? seg.key : seg))
+          .join('.')
+      : undefined
     return path ? `${path}: ${issue.message}` : issue.message
   })
   return lines.join('; ')
@@ -299,6 +309,11 @@ export async function validateStandard<S extends StandardSchemaV1>(
 ): Promise<ValidationOutcome<StandardSchemaV1.InferOutput<S>>> {
   const raw = schema['~standard'].validate(value)
   const result = raw instanceof Promise ? await raw : raw
+  // A buggy/hostile validator may return a non-object — treat that as a (repairable) failure
+  // rather than crashing on a property access.
+  if (typeof result !== 'object' || result === null) {
+    return { ok: false, issues: [] }
+  }
   if (result.issues) {
     return { ok: false, issues: Array.isArray(result.issues) ? result.issues : [] }
   }
