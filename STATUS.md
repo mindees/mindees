@@ -4,8 +4,15 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Phase 10D (Continuum — local-first sync engine). **The Continuum core
-(10A–10D) is complete**: `@mindees/data` now does the reactive offline store + delta
+**Last updated:** Phase 10E/10F (Continuum — reference server + persistence).
+**Phase 10 (Continuum) is complete**: on top of the core (10A–10D), `@mindees/data` now
+also has a capability-injected reference sync server (`@mindees/data/server` +
+`createSyncServer` over an injected op log, with a runnable `node:http` example) and a
+`Persistence` contract + engine `export()`/restore so a replica resumes after restart
+with stable identity. Native SQLite persistence + Yjs/Automerge/Loro interop are 🔬
+research tracks.
+
+The Continuum core (10A–10D): `@mindees/data` does the reactive offline store + delta
 sync + conflict resolution that defines it. 10D adds idempotent HLC-stamped `Op`s, a
 convergent `MutationLog` (record-level LWW via 10C `mergeRegister`), a `SyncTransport`
 contract + an in-memory `createMemoryHub`, and `createSyncEngine` (optimistic local
@@ -127,7 +134,8 @@ without state reset, and injectable history (memory + browser).
 | Local-first reactive store: `createCollection` (signals-native fine-grained reactive reads, atomic mutations + `tx`, optimistic + rollback) | ✅ done (Phase 10A) — `@mindees/data` (native persistence + sync server 🔬) |
 | Causality primitives: Hybrid Logical Clock (`createClock`/`compareHlc`/`encodeHlc`, monotonic total order, drift-guarded) + version vectors (`vvMerge`/`vvDominates`/…) | ✅ done (Phase 10B) — `@mindees/data` |
 | CRDT conflict resolution: per-field LWW-Register/Map (HLC-stamped, content-tiebroken) + add-wins OR-Set — commutative/associative/idempotent/convergent (fast-check), prototype-pollution-safe | ✅ done (Phase 10C) — `@mindees/data` |
-| Local-first delta sync: idempotent HLC `Op`s, a convergent `MutationLog`, a `SyncTransport` contract + in-memory hub, and `createSyncEngine` (optimistic local writes + push/pull/merge) — two peers converge offline | ✅ done (Phase 10D) — `@mindees/data` (reference server + native persistence 🔬 = 10E/10F) |
+| Local-first delta sync: idempotent HLC `Op`s, a convergent `MutationLog`, a `SyncTransport` contract + in-memory hub, and `createSyncEngine` (optimistic local writes + push/pull/merge) — two peers converge offline | ✅ done (Phase 10D) — `@mindees/data` |
+| Reference sync server + persistence: `createSyncServer` over an injected `OpLogStore` (`@mindees/data/server`) + `node:http` example; `Persistence` + engine `export()`/restore (durable replicas resume with stable identity) | ✅ done (Phase 10E/10F) — `@mindees/data` + `examples/data-sync-server/` (native persistence + CRDT-lib interop 🔬) |
 
 ## Per-package
 

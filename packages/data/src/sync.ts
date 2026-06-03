@@ -39,11 +39,15 @@ export interface MutationLog<T> {
   get(recordId: Id): T | undefined
   /** All live records as `[recordId, value]` pairs. */
   records(): Array<readonly [Id, T]>
+  /** The full per-record register state (incl. tombstones) — for persistence. */
+  dump(): Array<readonly [Id, LwwRegister<T>]>
 }
 
-/** Create an empty {@link MutationLog}. */
-export function createMutationLog<T>(): MutationLog<T> {
-  const state = new Map<Id, LwwRegister<T>>()
+/** Create a {@link MutationLog}, optionally seeded from a {@link MutationLog.dump}. */
+export function createMutationLog<T>(
+  initial?: Iterable<readonly [Id, LwwRegister<T>]>,
+): MutationLog<T> {
+  const state = new Map<Id, LwwRegister<T>>(initial)
 
   return {
     apply(op): boolean {
@@ -67,6 +71,9 @@ export function createMutationLog<T>(): MutationLog<T> {
         if (reg.op === 'set') out.push([recordId, reg.value])
       }
       return out
+    },
+    dump(): Array<readonly [Id, LwwRegister<T>]> {
+      return [...state]
     },
   }
 }
@@ -115,6 +122,18 @@ export function createMemoryHub<T>(): SyncTransport<T> {
   }
 }
 
+/** A serializable snapshot of a {@link SyncEngine}'s durable state (10F). */
+export interface SyncSnapshot<T> {
+  /** The next local op sequence number (persisted so ids don't collide across restarts). */
+  readonly seq: number
+  /** The last pull cursor. */
+  readonly cursor: Cursor | null
+  /** The materialized per-record register state. */
+  readonly registers: ReadonlyArray<readonly [Id, LwwRegister<T>]>
+  /** Local ops applied but not yet acked (retried on next sync). */
+  readonly outbox: readonly Op<T>[]
+}
+
 /** Options for {@link createSyncEngine}. */
 export interface SyncEngineOptions<T> {
   /**
@@ -129,6 +148,8 @@ export interface SyncEngineOptions<T> {
   readonly transport: SyncTransport<T>
   /** Injected physical clock. Default `() => Date.now()`. */
   readonly now?: () => number
+  /** Restore from a previously {@link SyncEngine.export}ed snapshot (durable replica). */
+  readonly snapshot?: SyncSnapshot<T>
 }
 
 /** A local-first sync engine over a {@link SyncTransport}. */
@@ -145,16 +166,18 @@ export interface SyncEngine<T> {
   pending(): readonly Op<T>[]
   /** Push pending ops, then pull + apply remote ops. */
   sync(signal?: AbortLike): Promise<void>
+  /** A serializable snapshot to persist (restore via the `snapshot` option). */
+  export(): SyncSnapshot<T>
 }
 
 /** Create a {@link SyncEngine}. */
 export function createSyncEngine<T>(options: SyncEngineOptions<T>): SyncEngine<T> {
-  const { nodeId, transport } = options
+  const { nodeId, transport, snapshot } = options
   const clock: Clock = createClock(options.now ? { nodeId, now: options.now } : { nodeId })
-  const log = createMutationLog<T>()
-  const outbox: Op<T>[] = []
-  let seq = 0
-  let cursor: Cursor | null = null
+  const log = createMutationLog<T>(snapshot?.registers)
+  const outbox: Op<T>[] = snapshot ? [...snapshot.outbox] : []
+  let seq = snapshot?.seq ?? 0
+  let cursor: Cursor | null = snapshot?.cursor ?? null
   let syncing = false
 
   const emit = (op: Op<T>): Op<T> => {
@@ -211,6 +234,10 @@ export function createSyncEngine<T>(options: SyncEngineOptions<T>): SyncEngine<T
       } finally {
         syncing = false
       }
+    },
+
+    export(): SyncSnapshot<T> {
+      return { seq, cursor, registers: log.dump(), outbox: [...outbox] }
     },
   }
 
