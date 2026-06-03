@@ -55,6 +55,18 @@ export interface AbortLike {
   readonly aborted: boolean
 }
 
+/**
+ * A tool the model may call, as sent to the backend (the **wire** shape — no `execute`).
+ * `parameters` is a provider-native JSON Schema sent verbatim; the runtime-validating
+ * {@link import('./tools').Tool} adds `execute` (+ an optional Standard Schema) on top.
+ */
+export interface ToolDefinition {
+  readonly name: string
+  readonly description?: string
+  /** JSON Schema describing the arguments (sent to the provider as-is). */
+  readonly parameters?: Record<string, unknown>
+}
+
 /** A one-shot or streaming generation request. */
 export interface GenerateRequest {
   readonly messages: readonly Message[]
@@ -62,9 +74,10 @@ export interface GenerateRequest {
   readonly temperature?: number
   /** Cap on output tokens (backend-defined default). */
   readonly maxOutputTokens?: number
+  /** Tools the model may call. A backend that can't express tools must throw, not drop them. */
+  readonly tools?: readonly ToolDefinition[]
   /** Cancellation. */
   readonly signal?: AbortLike
-  // `tools` + `output` (structured generation) are added additively in Phase 11C.
 }
 
 /** The result of {@link AiBackend.generate}. */

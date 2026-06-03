@@ -43,6 +43,7 @@ export {
   type Role,
   type TextPart,
   type ToolCallPart,
+  type ToolDefinition,
   type ToolResultPart,
   type Usage,
 } from './contract'
@@ -59,7 +60,12 @@ export {
   type ValidationOutcome,
   validateStandard,
 } from './json'
-export { createMockBackend, type MockBackendOptions } from './mock'
+export {
+  createMockBackend,
+  type MockBackendOptions,
+  type MockReply,
+  type MockResponse,
+} from './mock'
 export {
   type GenerateObjectOptions,
   type GenerateObjectResult,
@@ -72,6 +78,13 @@ export {
 } from './object'
 export { createOnDeviceBackend } from './on-device'
 export type { StandardSchemaV1 } from './standard-schema'
+export {
+  type RunToolsOptions,
+  type RunToolsResult,
+  runTools,
+  type Tool,
+  type ToolContext,
+} from './tools'
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }

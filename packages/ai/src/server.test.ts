@@ -7,6 +7,7 @@ import {
   type RequestInitLike,
   type ResponseLike,
 } from './server'
+import { runTools, type Tool } from './tools'
 
 const enc = new TextEncoder()
 async function* bodyOf(text: string): AsyncIterable<Uint8Array> {
@@ -211,6 +212,198 @@ describe('server backend — anthropic adapter', () => {
       { type: 'text-delta', delta: 'Hi' },
       { type: 'finish', finishReason: 'stop', usage: { outputTokens: 1 } },
     ])
+  })
+})
+
+describe('server backend — tool calling', () => {
+  it('openai: serializes tools and parses tool_calls into AiResult.toolCalls', async () => {
+    let seenInit: RequestInitLike | undefined
+    const fetch = fakeFetch(
+      {
+        json: () =>
+          Promise.resolve({
+            choices: [
+              {
+                message: {
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: 't1',
+                      type: 'function',
+                      function: { name: 'add', arguments: '{"a":2,"b":3}' },
+                    },
+                  ],
+                },
+                finish_reason: 'tool_calls',
+              },
+            ],
+          }),
+      },
+      (_url, init) => {
+        seenInit = init
+      },
+    )
+    const ai = createServerBackend({ fetch, baseUrl: 'x', model: 'm' })
+    const result = await ai.generate({
+      messages: [{ role: 'user', content: '2+3?' }],
+      tools: [{ name: 'add', description: 'add two', parameters: { type: 'object' } }],
+    })
+    expect(result.finishReason).toBe('tool-calls')
+    expect(result.toolCalls).toEqual([
+      { type: 'tool-call', id: 't1', name: 'add', args: { a: 2, b: 3 } },
+    ])
+    const body = JSON.parse(seenInit?.body ?? '{}')
+    expect(body.tools[0]).toEqual({
+      type: 'function',
+      function: { name: 'add', description: 'add two', parameters: { type: 'object' } },
+    })
+  })
+
+  it('openai: a malformed tool-call arguments string becomes empty args', async () => {
+    const fetch = fakeFetch({
+      json: () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: { tool_calls: [{ id: 't', function: { name: 'x', arguments: '{bad' } }] },
+              finish_reason: 'tool_calls',
+            },
+          ],
+        }),
+    })
+    const ai = createServerBackend({ fetch, baseUrl: 'x', model: 'm' })
+    const result = await ai.generate({ messages: [] })
+    expect(result.toolCalls).toEqual([{ type: 'tool-call', id: 't', name: 'x', args: {} }])
+  })
+
+  it('anthropic: serializes tools and parses tool_use blocks', async () => {
+    let seenInit: RequestInitLike | undefined
+    const fetch = fakeFetch(
+      {
+        json: () =>
+          Promise.resolve({
+            content: [
+              { type: 'text', text: 'let me add' },
+              { type: 'tool_use', id: 'u1', name: 'add', input: { a: 1, b: 2 } },
+            ],
+            stop_reason: 'tool_use',
+          }),
+      },
+      (_url, init) => {
+        seenInit = init
+      },
+    )
+    const ai = createServerBackend({ fetch, baseUrl: 'x', model: 'm', adapter: 'anthropic' })
+    const result = await ai.generate({
+      messages: [],
+      tools: [{ name: 'add', parameters: { type: 'object' } }],
+    })
+    expect(result.text).toBe('let me add')
+    expect(result.finishReason).toBe('tool-calls')
+    expect(result.toolCalls).toEqual([
+      { type: 'tool-call', id: 'u1', name: 'add', args: { a: 1, b: 2 } },
+    ])
+    const body = JSON.parse(seenInit?.body ?? '{}')
+    expect(body.tools[0]).toEqual({ name: 'add', input_schema: { type: 'object' } })
+  })
+})
+
+describe('server backend — runTools round-trips a tool turn (mapper serialization)', () => {
+  interface Body {
+    messages: Array<Record<string, unknown>>
+  }
+  const addTool: Tool = {
+    name: 'add',
+    parameters: { type: 'object' },
+    execute: (args) => {
+      const { a, b } = args as { a: number; b: number }
+      return a + b
+    },
+  }
+
+  it('openai: 2nd request carries assistant tool_calls + a tool message with tool_call_id', async () => {
+    const bodies: Body[] = []
+    let turn = 0
+    const fetch: FetchLike = (_url, init) => {
+      bodies.push(JSON.parse(init.body) as Body)
+      turn++
+      const json =
+        turn === 1
+          ? {
+              choices: [
+                {
+                  message: {
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: 'tc1',
+                        type: 'function',
+                        function: { name: 'add', arguments: '{"a":2,"b":3}' },
+                      },
+                    ],
+                  },
+                  finish_reason: 'tool_calls',
+                },
+              ],
+            }
+          : { choices: [{ message: { content: 'The answer is 5.' }, finish_reason: 'stop' }] }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(json),
+        text: () => Promise.resolve(''),
+        body: null,
+      })
+    }
+    const ai = createServerBackend({ fetch, baseUrl: 'x', model: 'm' })
+    const result = await runTools(ai, { messages: [{ role: 'user', content: '2+3?' }] }, [addTool])
+    expect(result.text).toBe('The answer is 5.')
+    expect(result.steps).toBe(2)
+    const t2 = bodies[1]
+    const assistant = t2?.messages.find((m) => m.role === 'assistant' && 'tool_calls' in m)
+    expect((assistant?.tool_calls as Array<{ function: { name: string } }>)[0]?.function.name).toBe(
+      'add',
+    )
+    const toolMsg = t2?.messages.find((m) => m.role === 'tool')
+    expect(toolMsg?.tool_call_id).toBe('tc1')
+    expect(String(toolMsg?.content)).toContain('5')
+  })
+
+  it('anthropic: 2nd request carries a tool_use block + a user tool_result block', async () => {
+    const bodies: Body[] = []
+    let turn = 0
+    const fetch: FetchLike = (_url, init) => {
+      bodies.push(JSON.parse(init.body) as Body)
+      turn++
+      const json =
+        turn === 1
+          ? {
+              content: [{ type: 'tool_use', id: 'u1', name: 'add', input: { a: 1, b: 2 } }],
+              stop_reason: 'tool_use',
+            }
+          : { content: [{ type: 'text', text: 'It is 3.' }], stop_reason: 'end_turn' }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(json),
+        text: () => Promise.resolve(''),
+        body: null,
+      })
+    }
+    const ai = createServerBackend({ fetch, baseUrl: 'x', model: 'm', adapter: 'anthropic' })
+    const result = await runTools(ai, { messages: [{ role: 'user', content: '1+2?' }] }, [addTool])
+    expect(result.text).toBe('It is 3.')
+    const t2 = bodies[1]
+    const assistant = t2?.messages.find((m) => m.role === 'assistant')
+    const blocks = assistant?.content as Array<{ type: string; name?: string }>
+    expect(blocks.some((b) => b.type === 'tool_use' && b.name === 'add')).toBe(true)
+    const userResult = t2?.messages.find(
+      (m) =>
+        m.role === 'user' &&
+        Array.isArray(m.content) &&
+        (m.content as Array<{ type: string }>).some((b) => b.type === 'tool_result'),
+    )
+    expect(userResult).toBeDefined()
   })
 })
 
