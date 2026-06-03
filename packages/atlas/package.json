@@ -1,7 +1,7 @@
 {
   "name": "@mindees/atlas",
   "version": "0.0.0",
-  "description": "MindeesNative Atlas - accessible, signals-native UI primitives (virtualized list coming in 12B). Renderer-agnostic (web real, native research track).",
+  "description": "MindeesNative Atlas - accessible, signals-native UI primitives + a virtualized recycling list. Renderer-agnostic (web real, native research track).",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -16,6 +16,10 @@
     "./theme": {
       "types": "./dist/theme.d.ts",
       "import": "./dist/theme.js"
+    },
+    "./list": {
+      "types": "./dist/list.d.ts",
+      "import": "./dist/list.js"
     }
   },
   "publishConfig": {

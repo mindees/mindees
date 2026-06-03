@@ -4,7 +4,7 @@
  * web rendering is real via the Helix DOM backend; native is a labeled 🔬 research track (the
  * same serializable tree, interpreted by a native host later). A curated cross-platform
  * `StyleObject`, typed accessibility, and a structural theme (on the `@mindees/atlas/theme`
- * subpath). A virtualized recycling `List` (`@mindees/atlas/list`) follows in Phase 12B.
+ * subpath). The virtualized recycling `List` is on the `@mindees/atlas/list` subpath.
  *
  * @module
  */

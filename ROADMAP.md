@@ -178,7 +178,7 @@ See [STATUS.md](./STATUS.md) for current maturity.
     `generateObject`, plus a `mindees ai explain <error>` CLI command (server backend wired
     from `MINDEES_AI_*` env). Dev/build path only — never bundled on device. See
     [ADR-0021](./docs/adr/0021-synapse-devtools.md). **Phase 11 (Synapse) complete.**
-- [~] **Phase 12 — `@mindees/atlas` (Atlas): accessible UI primitives + recycling list**
+- [x] **Phase 12 — `@mindees/atlas` (Atlas): accessible UI primitives + recycling list** ✅
   Web implementations now; native is a labeled research track. Sub-phased:
   - [x] **Phase 12A — Primitives, style & theme** ✅ accessible signals-native primitives
     (`View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button`/`Stack`/`Row`/`Column`/`Spacer`/
@@ -186,9 +186,12 @@ See [STATUS.md](./STATUS.md) for current maturity.
     on web), `Reactive<T>` props, `role`/`aria-*` accessibility, real-DOM-event interaction,
     and a structural theme (`@mindees/atlas/theme`). See
     [ADR-0022](./docs/adr/0022-atlas-primitives.md).
-  - [ ] **Phase 12B — Virtualized recycling `List`** — fixed-pool row recycling over the
-    Helix reactive-region model (`@mindees/atlas/list`); fixed-height first, variable-height
-    a research track.
+  - [x] **Phase 12B — Virtualized recycling `List`** ✅ a fixed pool of per-slot reactive
+    regions (not `items.map()`, which the reconciler would fully remount) so in-view rows keep
+    identity and `renderItem` runs once per row as it scrolls in; pure `computeWindow` math,
+    spacer-based scrollbar, `transform`-positioned rows, `onEndReached`, headless-testable
+    (`@mindees/atlas/list`). Fixed-height; variable-height is a research track. See
+    [ADR-0023](./docs/adr/0023-atlas-list.md).
 - [ ] **Phase 13 — Examples, docs, benchmarks, release & governance**
   Runnable web example (offline + live OTA), docs site, enforced perf budgets,
   codemods, release pipeline, `v0.x.0`.
