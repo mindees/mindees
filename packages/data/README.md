@@ -2,11 +2,11 @@
 
 **Continuum** — a local-first reactive store + sync for MindeesNative.
 
-> Status: 🧪 **Experimental** (Phase 10A — the reactive document store). A
-> signals-native, in-memory collection with fine-grained reactive reads is implemented
-> and tested. HLC causality (10B), CRDT conflict resolution (10C), and the delta-sync
-> engine (10D) build on it. On-device native persistence and a production sync server
-> are 🔬 research tracks. See the repository [STATUS.md](../../STATUS.md).
+> Status: 🧪 **Experimental** — the Continuum core (Phases 10A–10D) is implemented and
+> tested: the reactive document store, Hybrid Logical Clock causality, CRDT conflict
+> resolution (per-field LWW + add-wins OR-Set), and a local-first delta-sync engine
+> where two peers converge offline. On-device native persistence and a production sync
+> server are 🔬 research tracks (10E/10F). See the repository [STATUS.md](../../STATUS.md).
 
 ## What works today
 
