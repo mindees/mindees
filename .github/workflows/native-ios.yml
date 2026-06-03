@@ -53,3 +53,8 @@ jobs:
       # UIKit is available. This is the "the iOS host compiles" check.
       - name: Compile for iOS
         run: xcodebuild build -scheme MindeesNativeHost -destination 'generic/platform=iOS' -skipPackagePluginValidation
+
+      # Run the UIKit render tests on an iOS Simulator — proves the command stream
+      # renders into a correct, real UIView hierarchy (Phase 8E).
+      - name: Render test on iOS Simulator
+        run: xcodebuild test -scheme MindeesNativeHost -destination 'platform=iOS Simulator,name=iPhone 16' -skipPackagePluginValidation
