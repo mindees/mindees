@@ -192,9 +192,16 @@ See [STATUS.md](./STATUS.md) for current maturity.
     spacer-based scrollbar, `transform`-positioned rows, `onEndReached`, headless-testable
     (`@mindees/atlas/list`). Fixed-height; variable-height is a research track. See
     [ADR-0023](./docs/adr/0023-atlas-list.md).
-- [ ] **Phase 13 — Examples, docs, benchmarks, release & governance**
-  Runnable web example (offline + live OTA), docs site, enforced perf budgets,
-  codemods, release pipeline, `v0.x.0`.
+- [~] **Phase 13 — Release pipeline & governance**
+  - [x] **Release infrastructure** ✅ version-source sync (`scripts/sync-versions.mjs` keeps each
+    package's source `VERSION` equal to its `package.json` — wired into `version-packages`, so the
+    automated version PR also updates the versions `create-mindees` pins), a CI drift guard
+    (`pnpm check:versions`), and a guarded `release` that refuses to publish `0.0.0` or with
+    drifted sources. The Release workflow opens a version PR only; publishing is maintainer-gated.
+    See [ADR-0024](./docs/adr/0024-release-pipeline.md) + [RELEASING.md](./RELEASING.md).
+  - [ ] **First publish (`v0.x.0`)** — a deliberate maintainer action (confirm npm names + auth),
+    not automated.
+  - [ ] Deferred: runnable web example, docs site, enforced perf budgets, codemods.
 
 > Phases are gated: each is completed and reviewed before the next begins.
 > Native rendering (Phase 8) is prioritized ahead of OTA/data/AI because it is the

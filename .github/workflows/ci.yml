@@ -47,6 +47,9 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      - name: Check version sync
+        run: pnpm run check:versions
+
       - name: Typecheck
         run: pnpm run typecheck
 

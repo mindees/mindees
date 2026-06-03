@@ -23,7 +23,7 @@ export default defineConfig({
     ],
   },
   test: {
-    include: ['packages/*/src/**/*.test.ts'],
+    include: ['packages/*/src/**/*.test.ts', 'scripts/**/*.test.ts'],
     environment: 'node',
     // Several tests construct a real TypeScript program (the compiler gate, the
     // CLI build/dev orchestrator) which loads lib `.d.ts` files — ~1.5-2.5s each

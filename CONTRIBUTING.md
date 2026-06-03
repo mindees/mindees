@@ -144,9 +144,13 @@ pnpm changeset            # describe the change + bump type (in your PR)
 ```
 
 On merge to `main`, the Release workflow opens/updates a **"version packages"
-PR** (applying the bumps + changelogs). **Publishing to npm is deferred to
-Phase 12** — CI does **not** run `changeset publish` today (packages are still
-`0.0.0`), so there is nothing to publish yet.
+PR** — `pnpm version-packages` applies the bumps + changelogs **and** syncs each
+package's source `VERSION` (and the versions `create-mindees` pins) via
+`scripts/sync-versions.mjs`. Publishing is **intentionally maintainer-gated and
+not automated in CI**: once the version PR is merged (versions are real, not
+`0.0.0`), a maintainer runs `pnpm release` with npm auth — it refuses to publish
+`0.0.0` or with drifted sources. See [RELEASING.md](./RELEASING.md) for the full
+process.
 
 ## Good first issues
 

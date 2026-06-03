@@ -35,15 +35,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Phase 0 scope: this step ONLY opens/updates a "version packages" PR when
-      # changesets are pending. It deliberately does NOT publish to npm.
+      # This step ONLY opens/updates a "version packages" PR when changesets are
+      # pending — `version-packages` bumps package.json AND syncs the source VERSION
+      # constants (scripts/sync-versions.mjs). It deliberately does NOT publish to npm.
       #
-      # Why no `publish:` input here: changesets/action, when given a publish
-      # command and finding no changesets, falls back to publishing unpublished
-      # packages (via NPM_TOKEN or OIDC trusted publishing) — which fails before
-      # npm release is actually set up. Publishing (NPM_TOKEN/OIDC provenance +
-      # the `id-token: write` permission + the `publish:` input) is wired up in
-      # Phase 12, when the packages are real and ready to ship. See ROADMAP.md.
+      # Publishing is intentionally MAINTAINER-GATED, not wired into CI: the first
+      # real publish is an irreversible, deliberate decision. Once a "version
+      # packages" PR is merged (versions are real, not 0.0.0), a maintainer runs
+      # `pnpm release` with npm auth — it refuses to publish 0.0.0
+      # (`sync-versions.mjs --assert-released`). To later automate, add a
+      # `publish: pnpm release` input here plus `id-token: write` (OIDC provenance)
+      # or an `NPM_TOKEN`. See RELEASING.md.
       - name: Create or update the version packages PR
         uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
         with:
