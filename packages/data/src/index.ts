@@ -64,6 +64,7 @@ export {
   orRemove,
   orValues,
 } from './or-set'
+export { createMemoryPersistence, type Persistence } from './persist'
 export {
   type Cursor,
   createMemoryHub,
@@ -73,6 +74,7 @@ export {
   type Op,
   type SyncEngine,
   type SyncEngineOptions,
+  type SyncSnapshot,
   type SyncTransport,
 } from './sync'
 export {

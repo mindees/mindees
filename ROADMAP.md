@@ -140,9 +140,13 @@ See [STATUS.md](./STATUS.md) for current maturity.
     [ADR-0015](./docs/adr/0015-continuum-sync-engine.md). The reactive offline store +
     delta sync + conflict resolution that defines Continuum now work end to end (a
     reference server + native persistence are the 10E/10F follow-ups).
-  - [ ] **Phase 10E/10F — Reference sync server + persistence/interop** — a
-    capability-injected server core (`@mindees/data/server`) + a `node:http`/WS example;
-    in-memory + IndexedDB persistence (native SQLite = research track).
+  - [x] **Phase 10E/10F — Reference sync server + persistence** ✅
+    A capability-injected `createSyncServer` over an injected `OpLogStore`
+    (`@mindees/data/server`) + a runnable `node:http` adapter in `examples/`; and a
+    `Persistence` contract + `createMemoryPersistence` + engine `export()`/restore so a
+    replica resumes after restart with stable identity (closing the op-id hazard). Native
+    SQLite + Yjs/Automerge/Loro interop are 🔬 research tracks. See
+    [ADR-0016](./docs/adr/0016-continuum-server-persistence.md). **Phase 10 (Continuum) complete.**
 - [ ] **Phase 11 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**
   Mock + server backends, guided generation, tool calling, error explainer.
 - [ ] **Phase 12 — `@mindees/atlas` (Atlas) + first-party capability modules**
