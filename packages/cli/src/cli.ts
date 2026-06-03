@@ -10,6 +10,8 @@
  */
 
 import { parseArgs } from 'node:util'
+import type { AiBackend } from '@mindees/ai'
+import { runAiCommand } from './ai'
 import { buildProject } from './build'
 import { doctorSummary, renderDoctor, runDoctor } from './doctor'
 import type { FileSystem } from './fs'
@@ -28,6 +30,8 @@ export interface CliContext {
   version: string
   /** Output sink. */
   write: Writer
+  /** AI backend for `ai` commands (wired from `MINDEES_AI_*` env in `bin`). */
+  aiBackend?: AiBackend
 }
 
 const HELP = `mindees — the MindeesNative CLI (Forge)
@@ -40,6 +44,7 @@ Commands:
   dev               Build and rebuild on change (developer preview)
   doctor            Diagnose your environment
   info              Show CLI + environment info
+  ai explain <err>  Explain an error with AI   (needs MINDEES_AI_* env)
   help              Show this help
 
 Run \`mindees create --help\` style flags inline. Templates: ${templateNames().join(', ')}.`
@@ -83,6 +88,22 @@ export function runCli(argv: readonly string[], ctx: CliContext): CommandResult 
       err(ctx.write, `Unknown command "${command}". Run \`mindees help\`.`)
       return { exitCode: 1 }
   }
+}
+
+/**
+ * The async CLI entry. Handles the model-calling `ai` command (which is asynchronous) and
+ * delegates every synchronous command to {@link runCli}. The `bin` calls this; tests can call
+ * either (sync commands stay testable through `runCli`).
+ */
+export function runCliAsync(argv: readonly string[], ctx: CliContext): Promise<CommandResult> {
+  const [command, ...rest] = argv
+  if (command === 'ai') {
+    return runAiCommand(rest, {
+      write: ctx.write,
+      ...(ctx.aiBackend ? { backend: ctx.aiBackend } : {}),
+    })
+  }
+  return Promise.resolve(runCli(argv, ctx))
 }
 
 function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {

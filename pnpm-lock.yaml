@@ -71,6 +71,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@mindees/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@mindees/compiler':
         specifier: workspace:*
         version: link:../compiler

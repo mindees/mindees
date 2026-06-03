@@ -173,8 +173,11 @@ See [STATUS.md](./STATUS.md) for current maturity.
       order; 4-point abort; non-mutating transcript), mock scripted tool-call mode, and
       openai/anthropic tool wire mapping. See
       [ADR-0020](./docs/adr/0020-synapse-tool-calling.md).
-  - [ ] **Phase 11D — Dev-time error explainer** — a `mindees ai explain` CLI tool over
-    the same contract (dev/build path only, never on device).
+  - [x] **Phase 11D — Dev-time error explainer** ✅ `explainError` (`@mindees/ai/devtools`)
+    turns a thrown error into a validated `{ summary, likelyCauses, suggestedFixes }` via
+    `generateObject`, plus a `mindees ai explain <error>` CLI command (server backend wired
+    from `MINDEES_AI_*` env). Dev/build path only — never bundled on device. See
+    [ADR-0021](./docs/adr/0021-synapse-devtools.md). **Phase 11 (Synapse) complete.**
 - [ ] **Phase 12 — `@mindees/atlas` (Atlas) + first-party capability modules**
   Accessible primitives + recycling list (web impls; native research-track).
 - [ ] **Phase 13 — Examples, docs, benchmarks, release & governance**

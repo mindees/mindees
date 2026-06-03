@@ -1,8 +1,9 @@
 #!/usr/bin/env node
+
 /**
  * The `mindees` executable — a thin adapter that wires real Node capabilities
- * (filesystem, environment probe, stdout/stderr) into the tested {@link runCli}
- * core. All logic lives in the core; this file only does I/O wiring.
+ * (filesystem, environment probe, stdout/stderr, AI backend) into the tested
+ * {@link runCliAsync} core. All logic lives in the core; this file only does I/O wiring.
  *
  * @module
  */
@@ -10,7 +11,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { type CliContext, runCli } from './cli'
+import type { AiBackend } from '@mindees/ai'
+import { type AdapterName, createServerBackend, type FetchLike } from '@mindees/ai/server'
+import { type CliContext, runCliAsync } from './cli'
 import type { FileSystem } from './fs'
 import { VERSION } from './index'
 import type { EnvProbe, OutputLine } from './types'
@@ -55,20 +58,48 @@ function probeEnv(cwd: string): EnvProbe {
   }
 }
 
-function main(): void {
+/** Build a server AI backend from `MINDEES_AI_*` env, or `undefined` if not configured. */
+function aiBackendFromEnv(): AiBackend | undefined {
+  const baseUrl = process.env.MINDEES_AI_BASE_URL
+  const model = process.env.MINDEES_AI_MODEL
+  if (!baseUrl || !model) return undefined
+  // Fail loud on a mistyped adapter rather than silently defaulting to openai (which would
+  // build the wrong auth headers and yield confusing HTTP errors). Empty/unset → openai.
+  const adapterEnv = process.env.MINDEES_AI_ADAPTER
+  if (adapterEnv && adapterEnv !== 'openai' && adapterEnv !== 'anthropic') {
+    process.stderr.write(
+      `mindees: unknown MINDEES_AI_ADAPTER "${adapterEnv}" (expected "openai" or "anthropic"); AI backend not configured.\n`,
+    )
+    return undefined
+  }
+  const adapter: AdapterName = adapterEnv === 'anthropic' ? 'anthropic' : 'openai'
+  return createServerBackend({
+    // The global `fetch` is structurally compatible at runtime; the minimal FetchLike
+    // intentionally avoids the DOM lib, so cast rather than pull in those types.
+    fetch: globalThis.fetch as unknown as FetchLike,
+    baseUrl,
+    model,
+    adapter,
+    ...(process.env.MINDEES_AI_API_KEY ? { apiKey: process.env.MINDEES_AI_API_KEY } : {}),
+  })
+}
+
+async function main(): Promise<void> {
   const cwd = process.cwd()
   const write = (line: OutputLine): void => {
     const stream = line.stream === 'err' ? process.stderr : process.stdout
     stream.write(`${line.text}\n`)
   }
+  const backend = aiBackendFromEnv()
   const ctx: CliContext = {
     fs: nodeFileSystem(),
     env: probeEnv(cwd),
     cwd,
     version: VERSION,
     write,
+    ...(backend ? { aiBackend: backend } : {}),
   }
-  const { exitCode } = runCli(process.argv.slice(2), ctx)
+  const { exitCode } = await runCliAsync(process.argv.slice(2), ctx)
   process.exitCode = exitCode
 }
 
