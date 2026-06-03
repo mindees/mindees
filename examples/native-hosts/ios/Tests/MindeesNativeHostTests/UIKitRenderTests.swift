@@ -31,14 +31,17 @@ final class UIKitRenderTests: XCTestCase {
             onEvent: { fired.append($0) }
         )
 
-        // A <view> containing a "Hello" label and a button (with a press handler).
+        // A <view> (with a press handler) containing a "Hello" label and a button.
+        // The press is registered on the plain <view>, not the button: a UIButton
+        // ships with built-in gesture recognizers, so a plain UIView gives a
+        // deterministic recognizer count for the wiring assertion.
         try host.apply(decode("""
         [
           {"type":"createNode","id":"v","tag":"view"},
+          {"type":"registerEvent","id":"v","eventName":"press","handlerId":"h1"},
           {"type":"createText","id":"t","text":"Hello"},
           {"type":"insertChild","parentId":"v","childId":"t","index":0},
           {"type":"createNode","id":"b","tag":"button"},
-          {"type":"registerEvent","id":"b","eventName":"press","handlerId":"h1"},
           {"type":"insertChild","parentId":"v","childId":"b","index":1},
           {"type":"insertChild","parentId":"host-root","childId":"v","index":0}
         ]
@@ -50,8 +53,8 @@ final class UIKitRenderTests: XCTestCase {
         XCTAssertEqual(view.subviews.count, 2)
         XCTAssertEqual((view.subviews[0] as? UILabel)?.text, "Hello")
         XCTAssertTrue(view.subviews[1] is UIButton)
-        // The press registration wired a real gesture recognizer onto the button.
-        XCTAssertEqual(view.subviews[1].gestureRecognizers?.count, 1)
+        // The press registration wired exactly one real gesture recognizer onto the view.
+        XCTAssertEqual(view.gestureRecognizers?.count, 1)
         XCTAssertTrue(fired.isEmpty) // not tapped yet
 
         // updateText patches the live label.
