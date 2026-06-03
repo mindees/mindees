@@ -103,10 +103,13 @@ See [STATUS.md](./STATUS.md) for current maturity.
     content-addressed `getAsset` (deltas included). It **never signs** — it serves
     pre-signed manifests. A runnable `node:http` adapter lives in
     `examples/pulse-server/`. See [ADR-0010](./docs/adr/0010-pulse-reference-server.md).
-  - [ ] **Phase 9D — Server-driven UI (SDUI)**
-    An allowlisted, schema-versioned JSON component tree → `createElement`, with named
-    (never `eval`'d) action handlers, reactive data bindings, and incremental
-    (RFC 7396 / safe RFC 6902) patches — re-validated before render.
+  - [x] **Phase 9D — Server-driven UI (SDUI)** ✅
+    `compileSdui` at the `@mindees/updates/sdui` subpath turns an allowlisted,
+    schema-versioned JSON component tree into a `@mindees/core` `MindeesNode`: named
+    (never `eval`'d) action handlers, reactive `$bind` data bindings, prototype-pollution
+    defense, and hard depth/node/string/prop limits. Incremental updates via pure-TS
+    RFC 7396 merge-patch + a safe RFC 6902 subset (`add`/`remove`/`replace`), re-validated
+    before render. See [ADR-0011](./docs/adr/0011-pulse-sdui.md). **Phase 9 (Pulse) complete.**
 - [ ] **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
   Reactive offline store, delta sync, conflict resolution.
 - [ ] **Phase 11 — `@mindees/ai` (Synapse): on-device contract + dev-time AI**

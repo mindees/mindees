@@ -53,6 +53,24 @@ serves content-addressed blobs (delta blobs included). A runnable `node:http` ad
 lives in [`examples/pulse-server/`](../../examples/pulse-server/). See
 [ADR-0010](../../docs/adr/0010-pulse-reference-server.md).
 
+## Server-driven UI (SDUI)
+
+The `@mindees/updates/sdui` subpath ships UI **as data** over OTA. `compileSdui`
+validates an untrusted, schema-versioned JSON tree against an injected **allowlist**
+registry and compiles it to a `@mindees/core` `MindeesNode`:
+
+- **named actions** — `{ "onPress": { "$action": "increment", "args": {…} } }` →
+  a function calling a pre-registered handler (**no code is ever transported or `eval`'d**),
+- **reactive bindings** — `{ "label": { "$bind": "count" } }` → a `() => value`
+  accessor the renderer treats as a fine-grained reactive region,
+- **fail-closed + safe** — unknown tags/actions, missing bindings, dangerous keys
+  (`__proto__`/`constructor`/`prototype`), and depth/node/string/prop limit breaches all
+  throw `SduiError`.
+
+Incremental updates use a pure-TS RFC 7396 merge-patch (`applyMergePatch`) and a safe
+RFC 6902 subset (`applyJsonPatch` — `add`/`remove`/`replace`); a patched tree must be
+re-run through `compileSdui` before render. Design: [ADR-0011](../../docs/adr/0011-pulse-sdui.md).
+
 ## Quick start
 
 ```ts

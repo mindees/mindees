@@ -220,7 +220,7 @@ upgrades).
 | `@mindees/atlas` | Atlas | Batteries-included component library | 🚧 Scaffold |
 | `@mindees/ai` | Synapse | On-device + dev-time intelligence | 🚧 Scaffold |
 | `@mindees/data` | Continuum | Local-first store & sync | 🚧 Scaffold |
-| [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** (SDUI next) | 🧪 Experimental |
+| [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** + **server-driven UI (SDUI)** | 🧪 Experimental |
 | [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
 
 > 🧪 **Experimental** = implemented & tested, API may still change before `1.0`.
@@ -246,7 +246,8 @@ upgrades).
 - ✅ **Phase 9A** — Pulse **signed OTA core**: hash-addressed manifest + Ed25519 signing/verify (threshold + key rotation, pure-JS `@noble`) + content-addressed store + an update client with atomic generations & crash-loop rollback
 - ✅ **Phase 9B** — Pulse **differential downloads**: a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`) so a changed asset ships as just its delta against a stored base, verified by the existing SHA-256 gate with a full-fetch fallback
 - ✅ **Phase 9C** — Pulse **reference update server**: a pure, capability-injected `createUpdateServer` (channel selection, staged rollout, anti-downgrade, freeze, rollback directives, content-addressed asset serving; never signs) + a runnable `node:http` adapter example
-- ⏭️ **Phases 8F / 9D–13** — end-to-end native app (embedded JS engine + JS↔native bridge); Pulse SDUI; then local-first data, on-device AI, Atlas UI, examples & release
+- ✅ **Phase 9D** — Pulse **server-driven UI (SDUI)**: `compileSdui` turns an allowlisted JSON tree into a reactive `MindeesNode` (named actions + `$bind` bindings, no `eval`, prototype-pollution-safe) + RFC 7396 / safe RFC 6902 patches — **Phase 9 (Pulse) complete**
+- ⏭️ **Phases 8F / 10–13** — end-to-end native app (embedded JS engine + JS↔native bridge); then local-first data, on-device AI, Atlas UI, examples & release
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 

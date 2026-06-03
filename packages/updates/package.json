@@ -16,6 +16,10 @@
     "./server": {
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js"
+    },
+    "./sdui": {
+      "types": "./dist/sdui.d.ts",
+      "import": "./dist/sdui.js"
     }
   },
   "publishConfig": {
