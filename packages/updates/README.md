@@ -41,6 +41,18 @@ installed apps without an app-store release, safely.
     confirms itself (readiness handshake), down to previous → embedded.
   - `notifyReady()` / `rollback()` — confirm a good launch, or revert manually.
 
+## Reference update server
+
+The `@mindees/updates/server` subpath ships a **pure, capability-injected**
+`createUpdateServer` — the other side of the wire. It **never signs** (it serves
+**pre-signed** manifests; signing stays offline) and is deterministic + headlessly
+testable. `resolveUpdate({ runtimeVersion, channel, currentVersion, rolloutKey })`
+does channel selection, **deterministic staged rollout**, an **anti-downgrade** mirror
+of the client's own gate, **freeze** (expiry), and **rollback directives**; `getAsset`
+serves content-addressed blobs (delta blobs included). A runnable `node:http` adapter
+lives in [`examples/pulse-server/`](../../examples/pulse-server/). See
+[ADR-0010](../../docs/adr/0010-pulse-reference-server.md).
+
 ## Quick start
 
 ```ts

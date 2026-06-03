@@ -40,6 +40,7 @@ export {
   sha256Hex,
   sign,
   toHex,
+  utf8,
   verify,
 } from './crypto'
 export { type ApplyDeltaOptions, applyDelta, diff } from './delta'

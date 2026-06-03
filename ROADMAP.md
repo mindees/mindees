@@ -96,10 +96,13 @@ See [STATUS.md](./STATUS.md) for current maturity.
     reconstructed from a small delta against a base blob the client already holds,
     gated by the existing post-apply SHA-256 check with a full-fetch fallback. See
     [ADR-0009](./docs/adr/0009-pulse-differential-diff.md).
-  - [ ] **Phase 9C — Pulse reference update server**
-    A pure, capability-injected server core (selection / staged rollout / anti-downgrade;
-    serves pre-signed manifests — never signs) plus a thin `node:http` adapter in
-    `examples/`, using the diff layer to serve deltas.
+  - [x] **Phase 9C — Pulse reference update server** ✅
+    A pure, capability-injected server core (`createUpdateServer` at the
+    `@mindees/updates/server` subpath): channel selection, deterministic staged
+    rollout, an anti-downgrade mirror, freeze (expiry), rollback directives, and
+    content-addressed `getAsset` (deltas included). It **never signs** — it serves
+    pre-signed manifests. A runnable `node:http` adapter lives in
+    `examples/pulse-server/`. See [ADR-0010](./docs/adr/0010-pulse-reference-server.md).
   - [ ] **Phase 9D — Server-driven UI (SDUI)**
     An allowlisted, schema-versioned JSON component tree → `createElement`, with named
     (never `eval`'d) action handlers, reactive data bindings, and incremental
