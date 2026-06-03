@@ -156,9 +156,12 @@ See [STATUS.md](./STATUS.md) for current maturity.
     `AiError`), streaming as `AsyncIterable` only; a deterministic `createMockBackend`
     (offline, no keys); a `createOnDeviceBackend` research-track seam that throws. See
     [ADR-0017](./docs/adr/0017-synapse-ai-contract.md).
-  - [ ] **Phase 11B — Server/HTTP backend** — `createServerBackend({ fetch, … })` over an
-    injected `fetch`, a pure-TS SSE→`AsyncIterable` parser, and openai/anthropic mappers
-    (golden-fixture tested, zero real network).
+  - [x] **Phase 11B — Server/HTTP backend** ✅
+    `createServerBackend({ fetch, … })` over an injected `fetch`, a pure-TS
+    SSE→`AsyncIterable` parser (buffer-capped against newline-starved servers), and
+    openai/anthropic mappers — defensive untrusted-JSON parsing, golden-fixture tested with
+    zero real network, exported from the `@mindees/ai/server` subpath. See
+    [ADR-0018](./docs/adr/0018-synapse-server-backend.md).
   - [ ] **Phase 11C — Structured output + tool calling** — `generateObject`/`streamObject`
     (Standard-Schema validated, no `eval`, bounded repairs) + a bounded tool-calling loop
     (validate args before invoking; hard step ceiling).
