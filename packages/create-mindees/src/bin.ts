@@ -11,7 +11,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import process from 'node:process'
-import type { FileSystem } from '@mindees/cli'
+import { type FileSystem, quoteShellPath } from '@mindees/cli'
 import { parseCreateCommand } from './args'
 import { runCreate } from './index'
 
@@ -64,7 +64,9 @@ function main(): void {
   process.stdout.write(
     `Created "${command.args.appName}" from the ${result.template} template (${result.written.length} files).\n`,
   )
-  process.stdout.write(`Next: cd ${command.displayDir} && pnpm install && mindees dev\n`)
+  process.stdout.write(
+    `Next: cd ${quoteShellPath(command.displayDir)} && pnpm install && mindees dev\n`,
+  )
 }
 
 main()

@@ -56,6 +56,7 @@ function normalizeLogicalPath(path: string): string {
 
 function pathBasename(path: string): string {
   const normalized = toPosixPath(path).replace(/\/+$/, '')
+  if (/^[a-zA-Z]:$/.test(normalized)) return ''
   const parts = normalized.split('/').filter(Boolean)
   return parts.at(-1) ?? ''
 }
@@ -80,6 +81,11 @@ function sanitizePackageName(rawName: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 214)
     .replace(/-+$/g, '')
+}
+
+/** Quote a path for the `cd "<path>" && ...` command hints printed by create commands. */
+export function quoteShellPath(path: string): string {
+  return `"${path.replace(/"/g, '\\"')}"`
 }
 
 /**

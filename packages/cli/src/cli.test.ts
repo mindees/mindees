@@ -78,7 +78,7 @@ describe('runCli — create', () => {
     const pkg = JSON.parse(snap['E:/MiND/mindees-create-smoke/package.json'] as string)
     expect(pkg.name).toBe('mindees-create-smoke')
     expect(text()).toMatch(/Created "mindees-create-smoke"/)
-    expect(text()).toMatch(/Next: cd E:\/MiND\/mindees-create-smoke/)
+    expect(text()).toMatch(/Next: cd "E:\/MiND\/mindees-create-smoke"/)
   })
 
   it('resolves a relative parent target before scaffolding', () => {
@@ -94,13 +94,14 @@ describe('runCli — create', () => {
   })
 
   it('sanitizes a path basename into a valid npm package name', () => {
-    const { ctx } = makeCtx()
+    const { ctx, text } = makeCtx()
     const result = runCli(['create', 'My App!'], ctx)
 
     expect(result.exitCode).toBe(0)
     const snap = (ctx.fs as ReturnType<typeof createMemoryFileSystem>).snapshot()
     const pkg = JSON.parse(snap['My App!/package.json'] as string)
     expect(pkg.name).toBe('my-app')
+    expect(text()).toMatch(/Next: cd "My App!"/)
   })
 
   it('requires an app name', () => {

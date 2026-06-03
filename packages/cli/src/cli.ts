@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util'
 import type { AiBackend } from '@mindees/ai'
 import { runAiCommand } from './ai'
 import { buildProject } from './build'
-import { resolveCreateTarget } from './create-target'
+import { quoteShellPath, resolveCreateTarget } from './create-target'
 import { doctorSummary, renderDoctor, runDoctor } from './doctor'
 import type { FileSystem } from './fs'
 import { naturalLanguageToTemplate } from './nl'
@@ -179,7 +179,7 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
     ctx.write,
     `Created "${target.packageName}" from the ${result.template} template (${result.written.length} files).`,
   )
-  out(ctx.write, `Next: cd ${target.displayDir} && pnpm install && mindees dev`)
+  out(ctx.write, `Next: cd ${quoteShellPath(target.displayDir)} && pnpm install && mindees dev`)
   return { exitCode: 0 }
 }
 

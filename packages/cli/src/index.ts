@@ -9,7 +9,12 @@ export { type BuildOptions, type BuildResult, buildProject } from './build'
 /** CLI dispatch. `runCli` is synchronous; `runCliAsync` adds the async `ai` command. */
 export { type CliContext, runCli, runCliAsync } from './cli'
 /** Create target path + package-name resolution. */
-export { type CreateTarget, type CreateTargetResult, resolveCreateTarget } from './create-target'
+export {
+  type CreateTarget,
+  type CreateTargetResult,
+  quoteShellPath,
+  resolveCreateTarget,
+} from './create-target'
 /** Dev orchestrator (rebuild-on-change). */
 export { type DevOptions, type DevSession, startDev, type Watcher } from './dev'
 /** Environment diagnostics. */
