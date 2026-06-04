@@ -1,6 +1,7 @@
 package dev.mindees.example
 
 import android.app.Activity
+import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -49,7 +50,7 @@ class MainActivity : Activity() {
 
         bridge = MindeesRuntimeBridge(
             host = host,
-            runtime = QuickJsMindeesRuntime(appJs),
+            runtime = QuickJsMindeesRuntime(appJs, environmentJson()),
             applyOnHostThread = { action ->
                 if (Looper.myLooper() == Looper.getMainLooper()) {
                     action()
@@ -66,6 +67,23 @@ class MainActivity : Activity() {
         bridge?.close()
         bridge = null
         super.onDestroy()
+    }
+
+    /**
+     * The platform environment for `@mindees/atlas` device hooks (useWindowDimensions,
+     * useColorScheme, …), as JSON. Logical dp = pixels / density.
+     */
+    private fun environmentJson(): String {
+        val dm = resources.displayMetrics
+        val cfg = resources.configuration
+        val widthDp = (dm.widthPixels / dm.density)
+        val heightDp = (dm.heightPixels / dm.density)
+        val isDark =
+            (cfg.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        return """
+            {"window":{"width":$widthDp,"height":$heightDp,"scale":${dm.density},""" +
+            """"fontScale":${cfg.fontScale}},"colorScheme":"${if (isDark) "dark" else "light"}"}
+            """.trimIndent()
     }
 
     private companion object {

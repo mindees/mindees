@@ -5,7 +5,7 @@
  * @module
  */
 
-import { Button, Column, Row, Text } from '@mindees/atlas'
+import { Button, Column, Row, Text, useColorScheme, useWindowDimensions } from '@mindees/atlas'
 import { signal } from '@mindees/core'
 import { useRouter } from '@mindees/router'
 import { accentButton, cardStyle, headingStyle, palette, slateButton } from '../theme'
@@ -15,6 +15,8 @@ const done = signal(0)
 
 export default function Home() {
   const router = useRouter()
+  const dimensions = useWindowDimensions()
+  const colorScheme = useColorScheme()
   return (
     <Column style={cardStyle}>
       <Text style={headingStyle}>MindeesNative</Text>
@@ -28,6 +30,11 @@ export default function Home() {
         <Button title="Mark done" onPress={() => done.set(done() + 1)} style={accentButton} />
         <Button title="About →" onPress={() => router.navigate('/about')} style={slateButton} />
       </Row>
+      <Text style={{ fontSize: 13, color: palette.muted, paddingTop: 4 }}>
+        {() =>
+          `Screen ${Math.round(dimensions().width)}×${Math.round(dimensions().height)} · ${colorScheme()}`
+        }
+      </Text>
     </Column>
   )
 }
