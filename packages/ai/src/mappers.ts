@@ -330,11 +330,18 @@ export const anthropicMapper: ProviderMapper = {
     )
   },
   createStreamParser() {
-    // Anthropic's message_delta carries stop_reason and usage together, so this parser is
-    // stateless — but it's still created per stream to satisfy the contract.
+    // Anthropic reports input_tokens once on `message_start` and the (cumulative)
+    // output_tokens on `message_delta`. They arrive in SEPARATE events, so the parser
+    // must remember input_tokens from the start event to report it on the finish chunk —
+    // otherwise every streamed response loses its prompt-token count.
+    let inputTokens: number | undefined
     return (data) => {
       const root = asRecord(data)
       const type = asString(root?.type)
+      if (type === 'message_start') {
+        inputTokens = asNumber(asRecord(asRecord(root?.message)?.usage)?.input_tokens)
+        return []
+      }
       if (type === 'content_block_delta') {
         const delta = asString(asRecord(root?.delta)?.text)
         return delta ? [{ type: 'text-delta', delta }] : []
@@ -346,7 +353,7 @@ export const anthropicMapper: ProviderMapper = {
           {
             type: 'finish',
             finishReason: ANTHROPIC_FINISH[stop ?? ''] ?? 'stop',
-            usage: usageOf(undefined, asNumber(usage?.output_tokens)),
+            usage: usageOf(inputTokens, asNumber(usage?.output_tokens)),
           },
         ]
       }

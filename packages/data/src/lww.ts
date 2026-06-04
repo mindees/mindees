@@ -49,7 +49,9 @@ function tieKey(value: unknown): string {
     case 'boolean':
       return `b:${value}`
     case 'number':
-      return Number.isNaN(value) ? 'n:NaN' : `n:${value}`
+      // `-0` and `+0` are distinct under Object.is but both stringify to "0"; tag `-0`
+      // so a same-stamp -0-vs-0 tie still picks one winner deterministically.
+      return Number.isNaN(value) ? 'n:NaN' : Object.is(value, -0) ? 'n:-0' : `n:${value}`
     case 'bigint':
       return `i:${value}`
     case 'string':

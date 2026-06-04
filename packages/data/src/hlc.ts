@@ -128,9 +128,11 @@ export function createClock(options: ClockOptions): Clock {
         throw new TypeError(`remote HLC out of bounds: ${remote.wallMs}:${remote.counter}`)
       }
       // Clock-poisoning guard: never let a remote push our local clock more than
-      // maxDriftMs beyond where it already is. Anchor the ceiling to our own high-water
-      // mark (not just physical time), so a stamp at/below our clock is always adopted.
-      const ceiling = Math.max(wallMs, pt) + maxDriftMs
+      // maxDriftMs beyond PHYSICAL time. Anchoring to `pt + maxDriftMs` (not
+      // `wallMs + maxDriftMs`) means repeated far-future merges can't ratchet the clock
+      // forward — each is clamped to the same ceiling. The `max(wallMs, …)` floor keeps a
+      // stamp at/below our current clock always adopted (it advances nothing).
+      const ceiling = Math.max(wallMs, pt + maxDriftMs)
       const remoteWall = Math.min(remote.wallMs, ceiling)
       const w = Math.max(wallMs, remoteWall, pt)
       let c: number

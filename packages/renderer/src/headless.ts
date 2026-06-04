@@ -67,6 +67,12 @@ function serializeHeadless(node: HeadlessNode, options?: SerializeOptions): stri
   if (node.type === TEXT) return escapeText(node.text)
   const mapTag = options?.mapTag ?? ((t: string) => t)
   const tag = mapTag(node.type)
+  // The tag is interpolated into `<tag>`/`</tag>` unescaped, so a tag containing `>`,
+  // whitespace, etc. would break out of the element and inject markup. Reject any tag
+  // that isn't a valid name (same grammar as attribute names) — fail closed.
+  if (!isValidAttrName(tag)) {
+    throw new Error(`refusing to serialize unsafe element tag: ${JSON.stringify(tag)}`)
+  }
   const attrs = Object.entries(node.props)
     .filter(([key]) => !isEventProp(key) && isValidAttrName(key))
     .map(([key, value]) =>

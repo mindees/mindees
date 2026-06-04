@@ -91,13 +91,20 @@ export function createFlattenTransformer(tsmod: typeof ts): {
     tsmod.forEachChild(node, countElements)
   }
 
+  /** Whether a binding name (incl. destructuring patterns) binds `name`. */
+  const bindingHasName = (binding: ts.BindingName, name: string): boolean => {
+    if (tsmod.isIdentifier(binding)) return binding.text === name
+    // Object/Array binding pattern: recurse into each element's binding name.
+    return binding.elements.some(
+      (el) => tsmod.isBindingElement(el) && bindingHasName(el.name, name),
+    )
+  }
+
   /** Whether the module already binds `name` at the top level (var/fn/class/import). */
   const bindsTopLevel = (sf: ts.SourceFile, name: string): boolean =>
     sf.statements.some((s) => {
       if (tsmod.isVariableStatement(s)) {
-        return s.declarationList.declarations.some(
-          (d) => tsmod.isIdentifier(d.name) && d.name.text === name,
-        )
+        return s.declarationList.declarations.some((d) => bindingHasName(d.name, name))
       }
       if (tsmod.isFunctionDeclaration(s) || tsmod.isClassDeclaration(s)) {
         return s.name?.text === name
