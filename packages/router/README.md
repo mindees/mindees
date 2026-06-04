@@ -16,6 +16,12 @@ Router and React Router for TypeScript cross-platform apps.
 > route registry and file-based route scanning are a later phase — see
 > [ROADMAP](../../ROADMAP.md).
 
+## Install
+
+```bash
+pnpm add @mindees/router
+```
+
 ## Why Quantum?
 
 | | **Quantum** | Expo Router v6 | React Router v7 |

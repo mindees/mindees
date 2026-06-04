@@ -49,6 +49,10 @@ mindees-example-app/
 
 ## Build + test (JVM unit tests — no device needed)
 
+> This project ships **no Gradle wrapper jar**. If you don't open it in Android
+> Studio, first bootstrap one with a system Gradle (matching CI):
+> `gradle wrapper --gradle-version 9.4.1`. Then use `./gradlew` as below.
+
 ```sh
 cd examples/native-hosts/android
 ./gradlew :mindees-host:test     # apply + strict validation + JSON-codec, on the JVM

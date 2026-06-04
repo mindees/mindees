@@ -51,7 +51,7 @@ atomically.
   TypeScript 6 (typecheck) + tsdown (emit) + Biome + Vitest + Changesets +
   lefthook/commitlint.
 - **Atomic upgrades**: because everything moves together, an upgrade is one
-  version bump for the whole platform, with codemods (planned, Phase 12) to
+  version bump for the whole platform, with codemods (deferred under Phase 13) to
   migrate breaking changes mechanically.
 
 ## Drawbacks
@@ -75,8 +75,8 @@ atomically.
 
 ## Unresolved questions
 
-- The LTS policy and codemod tooling for breaking upgrades are deferred to
-  Phase 12.
+- The LTS policy and codemod tooling for breaking upgrades are deferred under
+  Phase 13.
 
 ## Future possibilities
 

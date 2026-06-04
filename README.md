@@ -15,7 +15,7 @@ OTA updates. Built in the open.
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
-[![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](./STATUS.md)
+[![Status: v0.1.0 experimental](https://img.shields.io/badge/status-v0.1.0%20experimental-orange.svg)](./STATUS.md)
 
 [Status](./STATUS.md) · [Roadmap](./ROADMAP.md) · [Contributing](./CONTRIBUTING.md) · [RFCs](./rfcs/README.md) · [Discussions](https://github.com/mindees/mindees/discussions)
 
@@ -23,7 +23,7 @@ OTA updates. Built in the open.
 
 ---
 
-> ### ⚠️ Pre-alpha — building in the open
+> ### ⚠️ v0.1.0 — experimental, building in the open
 >
 > MindeesNative is **not production-ready yet** — we are building it phase by
 > phase, bottom-up, and we follow one rule above all: **everything we ship
@@ -263,9 +263,23 @@ Benchmark evidence for implemented hot paths lives in [`docs/benchmarks.md`](./d
 
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
-## 🚀 Quickstart (contributors)
+## 🚀 Quickstart
 
-There's no end-user install yet — to hack on the framework:
+Scaffold a new app (the packages are published on npm at `0.1.0`, 🧪 experimental):
+
+```bash
+npm create mindees@latest my-app -- --template counter
+```
+
+Or add packages to an existing project:
+
+```bash
+pnpm add @mindees/core @mindees/renderer
+```
+
+### Developing the framework (contributors)
+
+To hack on the framework itself:
 
 ```bash
 corepack enable
@@ -305,8 +319,8 @@ you're into language runtimes, compilers, reactivity, mobile, or docs.
 **Is MindeesNative a React Native alternative?**
 That's the goal — a TypeScript cross-platform framework that keeps React
 Native's strengths (familiar language, native UI, OTA updates) while removing
-its pain points (dependency hell, single-thread limits, debugging). It's
-pre-alpha today.
+its pain points (dependency hell, single-thread limits, debugging). It's at an
+early, experimental `v0.1.0` today.
 
 **Is it a Flutter alternative?**
 Yes — without requiring a new language (Dart). You write TypeScript, target iOS,
@@ -316,7 +330,7 @@ Android and web, and get fine-grained reactivity and native UI.
 100% TypeScript. No new language to learn.
 
 **Can I build mobile apps with it today?**
-Not for production yet - it's pre-alpha. The reactive core, **web** renderer (with
+Not for production yet — it's an early, experimental `v0.1.0`. The reactive core, **web** renderer (with
 SSR), compiler, CLI, typed router, Pulse OTA, Continuum data, Synapse AI, Atlas UI,
 and the native rendering foundation all work in their documented experimental scope.
 The repo also has CI-verified iOS/Android host projects, an Android example app

@@ -215,10 +215,11 @@ See [STATUS.md](./STATUS.md) for current maturity.
     package's source `VERSION` equal to its `package.json` — wired into `version-packages`, so the
     automated version PR also updates the versions `create-mindees` pins), a CI drift guard
     (`pnpm check:versions`), and a guarded `release` that refuses to publish `0.0.0` or with
-    drifted sources. The Release workflow opens a version PR only; publishing is maintainer-gated.
+    drifted sources. The Release workflow opens a version PR and, when that PR is merged, **publishes
+    automatically** (`publish: pnpm run release`, authenticated with the `NPM_TOKEN` secret).
     See [ADR-0024](./docs/adr/0024-release-pipeline.md) + [RELEASING.md](./RELEASING.md).
-  - [ ] **First publish (`v0.x.0`)** — a deliberate maintainer action (confirm npm names + auth),
-    not automated.
+  - [x] **First publish (`v0.1.0`)** ✅ all 10 packages (`@mindees/*` + `create-mindees`) published
+    to npm at `0.1.0`, triggered by merging the version PR.
   - [ ] Deferred: runnable web example, docs site, enforced perf budgets, codemods.
 
 > Phases are gated: each is completed and reviewed before the next begins.

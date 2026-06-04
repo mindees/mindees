@@ -10,6 +10,12 @@ manifest, and a **plugin API**.
 > is a research track (`compileToNative` throws `NotImplementedError`). APIs may
 > change before `1.0`.
 
+## Install
+
+```bash
+pnpm add -D @mindees/compiler
+```
+
 ## Why the TypeScript Compiler API?
 
 Only TypeScript can **type-check** — the compiler's #1 job. It also does JSX
