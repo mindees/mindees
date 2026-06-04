@@ -3,9 +3,8 @@ name: Native Android host
 # Compiles + tests the reference Android host (examples/native-hosts/android) so the
 # "authored" Kotlin code is actually verified by CI — the project's dev/CI has no
 # Android toolchain locally, so this Linux runner (with the Android SDK) is the
-# source of truth for it. Path-filtered; not a required check. It also compiles a
-# runnable Android example app with an embedded QuickJS bridge; emulator/physical
-# device smoke execution remains a further step.
+# source of truth for it. Path-filtered; not a required check. It also compiles and
+# runs the Android example app with an embedded QuickJS bridge on an emulator.
 
 on:
   push:
@@ -28,8 +27,9 @@ concurrency:
 
 jobs:
   android-host:
-    name: Android host (gradle test + assemble)
+    name: Android host (gradle test + emulator smoke)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: examples/native-hosts/android
@@ -50,12 +50,29 @@ jobs:
           gradle --version
           echo "ANDROID_HOME=$ANDROID_HOME"
 
-      # Ensure the compileSdk platform is present + licenses accepted (AGP fetches the
-      # rest, e.g. build-tools, on demand).
-      - name: Install Android SDK platform
+      # Ensure compileSdk + emulator components are present and licenses accepted
+      # (AGP fetches build-tools on demand).
+      - name: Install Android SDK components
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "emulator" \
+            "platforms;android-36" \
+            "system-images;android-35;google_apis;x86_64"
+
+      - name: Enable KVM for emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Create emulator
+        run: |
+          echo "no" | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            --force \
+            --name mindees-api-35 \
+            --package "system-images;android-35;google_apis;x86_64"
 
       # The project ships no Gradle wrapper jar (binary); bootstrap one at a known
       # version with the preinstalled Gradle, then use it for the real build.
@@ -73,3 +90,38 @@ jobs:
 
       - name: Assemble example app (embeds QuickJS bridge)
         run: ./gradlew :mindees-example-app:assembleDebug --no-daemon --stacktrace
+
+      - name: Run example app on emulator
+        run: |
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          "$ANDROID_HOME/emulator/emulator" -avd mindees-api-35 \
+            -no-window \
+            -gpu swiftshader_indirect \
+            -no-snapshot \
+            -no-audio \
+            -no-boot-anim \
+            -camera-back none \
+            -camera-front none &
+          EMULATOR_PID=$!
+          trap 'kill "$EMULATOR_PID" || true' EXIT
+
+          timeout 300 "$ADB" wait-for-device
+          boot_completed=""
+          for _ in {1..60}; do
+            boot_completed="$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+            if [ "$boot_completed" = "1" ]; then
+              break
+            fi
+            sleep 5
+          done
+          if [ "$boot_completed" != "1" ]; then
+            "$ADB" devices
+            exit 1
+          fi
+
+          "$ADB" shell input keyevent 82 || true
+          "$ADB" shell settings put global window_animation_scale 0 || true
+          "$ADB" shell settings put global transition_animation_scale 0 || true
+          "$ADB" shell settings put global animator_duration_scale 0 || true
+
+          ./gradlew :mindees-example-app:connectedDebugAndroidTest --no-daemon --stacktrace

@@ -6,10 +6,13 @@
 > runs `:mindees-host:test` (incl. a **Robolectric** render test against real
 > `android.view` widgets, with click dispatch via `performClick()`) and
 > `:mindees-host:assembleDebug` (compiles `AndroidViewRenderer`) on every change.
-> The same workflow now runs `:mindees-example-app:testDebugUnitTest` and
-> `:mindees-example-app:assembleDebug`, so the Android example app compiles with an
-> embedded QuickJS bridge. AGP 9.2 / Gradle 9.4.1 / JDK 17. What is **not** yet
-> verified: an emulator/physical-device smoke run. To open locally, use Android
+> The same workflow now runs `:mindees-example-app:testDebugUnitTest`,
+> `:mindees-example-app:assembleDebug`, and
+> `:mindees-example-app:connectedDebugAndroidTest` on an Android API 35 emulator.
+> The connected test boots the example Activity, asserts the native `TextView` /
+> `Button` tree, performs a native click, and verifies the label updates through
+> the embedded QuickJS bridge. AGP 9.2 / Gradle 9.4.1 / JDK 17. What is **not**
+> yet verified: physical-device smoke execution. To open locally, use Android
 > Studio (it provides Gradle); align the AGP/SDK versions in `settings.gradle.kts`
 > / module build files with your toolchain if Gradle complains. Not a production
 > host.
@@ -38,6 +41,8 @@ mindees-example-app/
   src/main/kotlin/dev/mindees/example/
     MainActivity.kt            # runnable Android app
     MindeesRuntimeBridge.kt    # JSON command bridge + QuickJS runtime adapter
+  src/androidTest/kotlin/dev/mindees/example/
+    MindeesExampleInstrumentedTest.kt
   src/test/kotlin/dev/mindees/example/
     MindeesRuntimeBridgeTest.kt
 ```
@@ -54,6 +59,17 @@ cd examples/native-hosts/android
 
 The host, `ModelRenderer`, and `NativeCommandCodec` are exercised by JVM unit
 tests (no emulator). `AndroidViewRenderer` is the device-facing layer.
+
+## Connected smoke test (emulator/device needed)
+
+```sh
+cd examples/native-hosts/android
+./gradlew :mindees-example-app:connectedDebugAndroidTest
+```
+
+The connected test launches `MainActivity` on Android, finds the native counter
+label and button, clicks the button with `performClick()`, and asserts the
+QuickJS bridge updates the live `TextView` to `Count: 1`.
 
 ## Use the host on a device
 
@@ -100,9 +116,9 @@ command protocol used by `@mindees/renderer`.
 - ✅ **Phase 8E** — `AndroidRenderTest` (Robolectric) renders a command stream into
   real `android.view` widgets, asserts the hierarchy + updates + disposal, and
   verifies click dispatch via `performClick()`.
-- 🧪 **Phase 8F-A** — Android example app with an embedded QuickJS runtime and a
-  real JS↔native command bridge. CI unit-tests the bridge contract and assembles
-  the APK. Emulator/physical-device execution and the iOS equivalent remain future
-  Phase 8F work.
+- 🧪 **Phase 8F-A/B** — Android example app with an embedded QuickJS runtime and a
+  real JS↔native command bridge. CI unit-tests the bridge contract, assembles the
+  APK, and runs an emulator-connected smoke test against the live Activity.
+  Physical-device execution and the iOS equivalent remain future Phase 8F work.
 - The tag→view mapping and prop application are an intentional MVP — extend
   `AndroidViewRenderer` for a real design system.

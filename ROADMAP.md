@@ -83,7 +83,11 @@ See [STATUS.md](./STATUS.md) for current maturity.
       QuickJS, exposes `MindeesHost.emit(json)` for command batches, routes native
       `press` callbacks back to `MindeesApp.dispatchEvent(handlerId)`, unit-tests
       the bridge contract, and assembles an APK in Android CI.
-    - [ ] Emulator/physical-device smoke execution for the Android app.
+    - [x] **Phase 8F-B — Android emulator smoke execution.** Android CI creates an
+      API 35 emulator and runs `:mindees-example-app:connectedDebugAndroidTest`,
+      proving the example Activity renders native `TextView`/`Button` widgets and
+      handles a native press through the embedded QuickJS bridge.
+    - [ ] Physical-device smoke execution for the Android app.
     - [ ] iOS embedded-runtime bridge/example parity.
 - **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
   Ship new JS + assets to installed apps with no app-store release, safely.
