@@ -83,7 +83,7 @@ export { hydrate, renderToString } from './ssr'
 export const name = '@mindees/renderer'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.1.0'
+export const VERSION = '0.2.0'
 
 /**
  * Current maturity. The Helix **web/DOM** renderer (reconciler, DOM backend,

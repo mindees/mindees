@@ -1,5 +1,62 @@
 # @mindees/atlas
 
+## 0.2.0
+
+### Minor Changes
+
+- bee8227: Add a component library: **Card, Divider, Badge, Avatar, Chip, Switch, SafeAreaView,
+  KeyboardAvoidingView, ProgressBar** (determinate).
+
+  Each is composed purely from the existing primitives + device hooks — no new host
+  concepts — so they render on web _and_ native today, and stay fine-grained: reactive
+  parts (Switch/Chip state, ProgressBar fill, SafeAreaView/KeyboardAvoidingView padding)
+  are accessor styles, so only the changed node updates, never a component re-render.
+
+  Defaults follow the 2026 UI/UX handbook: 8pt spacing, 12–16 corner radius, WCAG-AA tone
+  contrast (badge tones use -700 shades for ≥4.5:1 on white), and proper roles
+  (`separator`, `progressbar`, `switch`, `status`). Also adds the `separator` and
+  `progressbar` ARIA roles to `Role`.
+
+- 0a61015: Add a design-token layer + theming (2026 UI/UX handbook §7–24, §31).
+
+  - **Primitive scales**: `space` (8pt), `radius`, `fontSize` (1.25 type scale), `lineHeight`,
+    `fontWeight`, `duration`/`easing` (motion), and color `palette` ramps — plus a `tokens`
+    aggregate of the non-color scales.
+  - **Semantic theming**: a `Theme` (`bg`/`surface`/`surfaceVariant`/`text`/`textMuted`/`border`/
+    `primary`/`onPrimary`/`success`·`warning`·`danger`·`info`) with light & dark variants.
+    **Dark mode is a token-set swap** (§23/§31): `useTheme()` returns a reactive theme driven by
+    `useColorScheme()`, and `getTheme(scheme)` resolves one non-reactively.
+  - **Components are now themed**: Card, Divider, Badge, Avatar, Chip, Switch, ProgressBar consume
+    the theme, so they re-theme automatically light↔dark — fine-grained (only color nodes update),
+    with WCAG-AA tone contrast in both modes.
+
+- e254642: Add device hooks + a platform environment — the signal-backed equivalents of React
+  Native's `useWindowDimensions`, `useColorScheme`, `useSafeAreaInsets`, and `Keyboard`.
+
+  - **`useWindowDimensions()`**, **`useColorScheme()`**, **`useSafeAreaInsets()`**,
+    **`useKeyboard()`** return Quantum-style reactive accessors, so reads are
+    fine-grained — rotating the device or switching theme re-runs only the nodes that
+    read that value, never the whole tree (RN re-renders the component).
+  - **`setEnvironment(partial)`** / **`getEnvironment()`** — the host/runtime feeds the
+    environment (on launch and on rotation/theme/keyboard changes); each field is a
+    separate signal so updates stay isolated.
+
+  Closes a real RN-parity gap (MindeesNative previously had no dimensions/appearance
+  API). The Android example wires it end-to-end: the host injects window size + color
+  scheme, and the home screen shows them live.
+
+- 3e2ef33: Add `SectionList` (on the `@mindees/atlas/list` subpath) — a **virtualized** sectioned list
+  built on `createList`. Sections are flattened to a single header/row entry stream and windowed,
+  so only the visible headers and rows render (RN-parity `SectionList`, perf-optimized). Provides
+  `SectionList`/`createSectionList`, `Section`, `SectionListOptions`, and the pure `flattenSections`
+  helper. `renderSectionHeader` is optional (defaults to the section title); fixed row height in v1
+  (headers share it), matching the List's current model.
+
+### Patch Changes
+
+- Updated dependencies [c29f76c]
+  - @mindees/core@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
