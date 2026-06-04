@@ -21,6 +21,7 @@ import {
   type Signal,
   signal,
 } from '@mindees/core'
+import { setActiveRouter } from './active'
 import {
   createLoaderManager,
   type LoaderData,
@@ -503,7 +504,7 @@ export function createRouter(options: CreateRouterOptions): Router {
     loaders.preload(matchLocation(flatMemo(), parseHref(href)))
   }
 
-  return {
+  const router: Router = {
     state: () => stateMemo(),
     location: () => locationSig(),
     matches: () => stateMemo().matches,
@@ -521,6 +522,9 @@ export function createRouter(options: CreateRouterOptions): Router {
     history,
     dispose,
   }
+  // Register as the active router so hooks (useRouter, …) and the bound Link resolve it.
+  setActiveRouter(router)
+  return router
 }
 
 /** A document that may support the View Transitions API. */

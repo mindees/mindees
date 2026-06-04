@@ -1,6 +1,23 @@
 if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'function') { globalThis.queueMicrotask = function (cb) { Promise.resolve().then(cb); }; }
 (function() {
 
+//#region \0rolldown/runtime.js
+	var __defProp = Object.defineProperty;
+	var __exportAll = (all, no_symbols) => {
+		let target = {};
+		for (var name in all) {
+			__defProp(target, name, {
+				get: all[name],
+				enumerable: true
+			});
+		}
+		if (!no_symbols) {
+			__defProp(target, Symbol.toStringTag, { value: "Module" });
+		}
+		return target;
+	};
+
+//#endregion
 
 //#region ../../../../../packages/renderer/dist/headless.js
 /** Whether a prop key is an event handler (`onClick`, `onPress`, …). */
@@ -1435,6 +1452,18 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	}
 
 //#endregion
+//#region ../../../../../packages/router/dist/active.js
+	let active = null;
+	/** Register `router` as the active router (called by {@link createRouter}). */
+	function setActiveRouter(router) {
+		active = router;
+	}
+	/** The active router, or `null` if none has been created yet. */
+	function getActiveRouter() {
+		return active;
+	}
+
+//#endregion
 //#region ../../../../../packages/router/dist/data.js
 	const IDLE = Object.freeze({ status: "idle" });
 	/** Create a loader manager. */
@@ -1789,7 +1818,7 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			const href = resolveHref(to, locationSig());
 			loaders.preload(matchLocation(flatMemo(), parseHref(href)));
 		};
-		return {
+		const router = {
 			state: () => stateMemo(),
 			location: () => locationSig(),
 			matches: () => stateMemo().matches,
@@ -1806,6 +1835,8 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			history,
 			dispose
 		};
+		setActiveRouter(router);
+		return router;
 	}
 	/**
 	* Run `commit` inside `document.startViewTransition` when available (web only),
@@ -1840,6 +1871,187 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	}
 
 //#endregion
+//#region ../../../../../packages/router/dist/file-routes.js
+	const ROUTE_EXT = /\.(tsx|ts|jsx|js)$/;
+	function isGroup(seg) {
+		return seg.startsWith("(") && seg.endsWith(")");
+	}
+	/** Convert one path segment to its route form (`index`→``, `[id]`→`:id`, `[...x]`→`:x*`). */
+	function segmentToPath(seg) {
+		if (seg === "index") return "";
+		const rest = seg.match(/^\[\.\.\.(.+)\]$/);
+		if (rest?.[1]) return `:${rest[1]}*`;
+		const param = seg.match(/^\[(.+)\]$/);
+		if (param?.[1]) return `:${param[1]}`;
+		return seg;
+	}
+	/** Build a {@link RouteRecord} from a module, copying only the fields it defines. */
+	function recordFrom(path, mod, children) {
+		const record = { path };
+		if (mod.default) record.component = mod.default;
+		if (mod.loader) record.loader = mod.loader;
+		if (mod.loaderDeps) record.loaderDeps = mod.loaderDeps;
+		if (mod.searchSchema) record.searchSchema = mod.searchSchema;
+		if (mod.staleTime !== void 0) record.staleTime = mod.staleTime;
+		if (mod.meta) record.meta = mod.meta;
+		if (children && children.length > 0) record.children = children;
+		return record;
+	}
+	function emptyDir() {
+		return {
+			files: [],
+			dirs: /* @__PURE__ */ new Map()
+		};
+	}
+	/** Group the flat module map into a directory tree, pulling out a top-level not-found. */
+	function buildTree(modules) {
+		const root = emptyDir();
+		let notFound;
+		for (const rawKey of Object.keys(modules).sort()) {
+			const parts = rawKey.replace(/^\.\//, "").replace(/^app\//, "").replace(ROUTE_EXT, "").split("/").filter((s) => s.length > 0);
+			if (parts.length === 0) continue;
+			const filename = parts[parts.length - 1];
+			const mod = modules[rawKey];
+			if (filename === "+not-found") {
+				notFound = mod;
+				continue;
+			}
+			let node = root;
+			for (const dir of parts.slice(0, -1)) {
+				let next = node.dirs.get(dir);
+				if (!next) {
+					next = emptyDir();
+					node.dirs.set(dir, next);
+				}
+				node = next;
+			}
+			if (filename === "_layout") node.layout = mod;
+			else node.files.push({
+				seg: filename,
+				module: mod
+			});
+		}
+		return {
+			root,
+			notFound
+		};
+	}
+	/** Convert a directory node into the route records *relative to that node*. */
+	function nodeToRoutes(node) {
+		const routes = [];
+		for (const file of node.files) routes.push(recordFrom(segmentToPath(file.seg), file.module));
+		for (const [dirName, child] of node.dirs) {
+			const childRoutes = nodeToRoutes(child);
+			const seg = isGroup(dirName) ? "" : dirName;
+			if (child.layout) routes.push(recordFrom(seg, child.layout, childRoutes));
+			else if (seg === "") routes.push(...childRoutes);
+			else routes.push({
+				path: seg,
+				children: childRoutes
+			});
+		}
+		return routes;
+	}
+	/**
+	* Build a Quantum route table ({@link RouteRecord}[]) from a file-based module map.
+	* Pure — use it directly, or via {@link createFileRouter}.
+	*/
+	function routesFromModules(modules) {
+		const { root, notFound } = buildTree(modules);
+		const routes = nodeToRoutes(root);
+		if (notFound?.default) routes.push({
+			path: "/:__notFound*",
+			component: notFound.default
+		});
+		return routes;
+	}
+	/**
+	* Create a router from a file-based module map — the file-based equivalent of
+	* {@link createRouter}. Pass any other router options (history, guard, …).
+	*
+	* @example
+	* // web (Vite): const modules = import.meta.glob('./app/**\/*.tsx', { eager: true })
+	* const router = createFileRouter(modules, { history: createMemoryHistory() })
+	*/
+	function createFileRouter(modules, options = {}) {
+		return createRouter({
+			...options,
+			routes: routesFromModules(modules)
+		});
+	}
+
+//#endregion
+//#region ../../../../../packages/router/dist/hooks.js
+/**
+	* Ergonomic hooks + a bound `Link`, resolving the active router so components don't
+	* prop-drill it — the familiar Expo Router surface (`useRouter`, `useLocalSearchParams`,
+	* `<Link>`), on Quantum's fine-grained, validated core.
+	*
+	* The hooks return Quantum's reactive **accessors** (call them inside JSX/effects), so
+	* reads stay fine-grained — only what changed re-runs (no whole-stack re-render).
+	*
+	* @module
+	*/
+	/** The active router. Throws if none has been created (call `createRouter`/`createFileRouter`). */
+	function useRouter() {
+		const router = getActiveRouter();
+		if (!router) throw new Error("useRouter(): no active router. Create one with createRouter() or createFileRouter() first.");
+		return router;
+	}
+
+//#endregion
+//#region src/theme.ts
+/** Shared palette + styles for the example's screens. */
+	const palette = {
+		screenBg: "#0b1021",
+		cardBg: "#171c33",
+		accent: "#5b8cff",
+		accentText: "#ffffff",
+		slateBg: "#2a3050",
+		heading: "#e8ecff",
+		muted: "#9aa4d2",
+		body: "#c3cbf0"
+	};
+	const screenStyle = {
+		flexGrow: 1,
+		width: "100%",
+		padding: 24,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: palette.screenBg
+	};
+	const cardStyle = {
+		backgroundColor: palette.cardBg,
+		padding: 28,
+		gap: 14,
+		borderRadius: 20,
+		alignItems: "center",
+		minWidth: 280
+	};
+	const headingStyle = {
+		fontSize: 24,
+		fontWeight: 800,
+		color: palette.heading
+	};
+	const buttonBase = {
+		color: palette.accentText,
+		paddingTop: 12,
+		paddingBottom: 12,
+		paddingLeft: 20,
+		paddingRight: 20,
+		borderRadius: 12,
+		fontWeight: 600
+	};
+	const accentButton = {
+		...buttonBase,
+		backgroundColor: palette.accent
+	};
+	const slateButton = {
+		...buttonBase,
+		backgroundColor: palette.slateBg
+	};
+
+//#endregion
 //#region ../../../../../packages/core/dist/jsx-runtime.js
 /**
 	* Automatic JSX runtime for MindeesNative — the target of TypeScript's `react-jsx`
@@ -1872,63 +2084,53 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	const jsxs = jsxImpl;
 
 //#endregion
-//#region src/App.tsx
+//#region src/app/about.tsx
 /**
-	* The example app — written the way an app author writes MindeesNative: plain TSX,
-	* `@mindees/*` only, no `createElement` imports, no renderer/host plumbing.
-	*
-	* - JSX via the automatic runtime (`jsxImportSource: "@mindees/core"`, see tsconfig)
-	* - @mindees/atlas primitives, @mindees/core signals
-	* - @mindees/router (Quantum) for Home ⇄ About navigation
-	*
-	* The entry that mounts this (main.tsx) is three lines thanks to `createNativeApp`.
+	* About route — `app/about.tsx` maps to `/about`. Navigates back with `useRouter()`.
 	*
 	* @module
 	*/
-	const palette = {
-		screenBg: "#0b1021",
-		cardBg: "#171c33",
-		accent: "#5b8cff",
-		accentText: "#ffffff",
-		slateBg: "#2a3050",
-		heading: "#e8ecff",
-		muted: "#9aa4d2",
-		body: "#c3cbf0"
-	};
-	const cardStyle = {
-		backgroundColor: palette.cardBg,
-		padding: 28,
-		gap: 14,
-		borderRadius: 20,
-		alignItems: "center",
-		minWidth: 280
-	};
-	const headingStyle = {
-		fontSize: 24,
-		fontWeight: 800,
-		color: palette.heading
-	};
-	const buttonBase = {
-		color: palette.accentText,
-		paddingTop: 12,
-		paddingBottom: 12,
-		paddingLeft: 20,
-		paddingRight: 20,
-		borderRadius: 12,
-		fontWeight: 600
-	};
-	const accentButton = {
-		...buttonBase,
-		backgroundColor: palette.accent
-	};
-	const slateButton = {
-		...buttonBase,
-		backgroundColor: palette.slateBg
-	};
-	/** App-level state survives navigation (module-scoped signal). */
+	var about_exports = /* @__PURE__ */ __exportAll({ default: () => About });
+	function About() {
+		const router = useRouter();
+		return /* @__PURE__ */ jsxs(Column, {
+			style: cardStyle,
+			children: [
+				/* @__PURE__ */ jsx(Text, {
+					style: headingStyle,
+					children: "About"
+				}),
+				/* @__PURE__ */ jsx(Text, {
+					style: {
+						fontSize: 15,
+						color: palette.body,
+						textAlign: "center",
+						lineHeight: 22
+					},
+					children: "File-based routes (app/index.tsx, app/about.tsx) navigated by the Quantum router via the useRouter hook — all TypeScript, running native in an embedded engine."
+				}),
+				/* @__PURE__ */ jsx(Button, {
+					title: "← Home",
+					onPress: () => router.navigate("/"),
+					style: accentButton
+				})
+			]
+		});
+	}
+
+//#endregion
+//#region src/app/index.tsx
+/**
+	* Home route — `app/index.tsx` maps to `/` (file-based routing). The default export
+	* is the screen; `useRouter()` resolves the active router with no prop-drilling.
+	*
+	* @module
+	*/
+	var app_exports = /* @__PURE__ */ __exportAll({ default: () => Home });
+	/** Module-scoped state survives navigation. */
 	const done = signal(0);
-	/** Home route — a counter + a link to the About route. */
 	function Home() {
+		const router = useRouter();
 		return /* @__PURE__ */ jsxs(Column, {
 			style: cardStyle,
 			children: [
@@ -1941,7 +2143,7 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 						fontSize: 15,
 						color: palette.muted
 					},
-					children: "Multi-screen · native · TypeScript"
+					children: "File-based routing · native · TypeScript"
 				}),
 				/* @__PURE__ */ jsx(Text, {
 					style: {
@@ -1971,53 +2173,27 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			]
 		});
 	}
-	/** About route — descriptive copy + a link back Home, proving real navigation. */
-	function About() {
-		return /* @__PURE__ */ jsxs(Column, {
-			style: cardStyle,
-			children: [
-				/* @__PURE__ */ jsx(Text, {
-					style: headingStyle,
-					children: "About"
-				}),
-				/* @__PURE__ */ jsx(Text, {
-					style: {
-						fontSize: 15,
-						color: palette.body,
-						textAlign: "center",
-						lineHeight: 22
-					},
-					children: "Real Atlas components, rendered as native Android views and navigated by the Quantum router — all TypeScript, running in an embedded engine."
-				}),
-				/* @__PURE__ */ jsx(Button, {
-					title: "← Home",
-					onPress: () => router.navigate("/"),
-					style: accentButton
-				})
-			]
-		});
-	}
-	const router = createRouter({
-		routes: [{
-			path: "/",
-			component: Home
-		}, {
-			path: "/about",
-			component: About
-		}],
-		history: createMemoryHistory({ initialEntries: ["/"] })
-	});
+
+//#endregion
+//#region src/App.tsx
+/**
+	* The example app — file-based routing, `@mindees/*` only, plain TSX.
+	*
+	* Routes live in `app/` (app/index.tsx → `/`, app/about.tsx → `/about`); the screens
+	* use the `useRouter()` hook (no router prop-drilling). `createFileRouter` turns the
+	* module map into a Quantum router with Expo-style conventions but a stronger core
+	* (validated params, fine-grained reads, codegen-free typing).
+	*
+	* @module
+	*/
+	const router = createFileRouter({
+		"index.tsx": app_exports,
+		"about.tsx": about_exports
+	}, { history: createMemoryHistory({ initialEntries: ["/"] }) });
 	/** Full-screen shell: dark background, centers the active route's card. */
 	function App() {
 		return /* @__PURE__ */ jsx(Column, {
-			style: {
-				flexGrow: 1,
-				width: "100%",
-				padding: 24,
-				alignItems: "center",
-				justifyContent: "center",
-				backgroundColor: palette.screenBg
-			},
+			style: screenStyle,
 			children: createRouterView(router)
 		});
 	}
