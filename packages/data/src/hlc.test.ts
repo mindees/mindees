@@ -96,6 +96,16 @@ describe('hlc — untrusted-input hardening', () => {
     expect(() => clock.update({ wallMs: 1_030_000, counter: 0, nodeId: 'b' })).not.toThrow()
     expect(() => encodeHlc(clock.tick())).not.toThrow()
   })
+
+  it('update() CLAMPS a far-future-but-encodable remote (keeps it usable) rather than rejecting it', () => {
+    // A far-future but representable remote (beyond drift, < MAX_WALL) must NOT throw:
+    // dropping it would break CRDT convergence. Instead its advance is clamped so the
+    // local clock cannot be poisoned past `max(local, physical) + maxDriftMs`.
+    const clock = createClock({ nodeId: 'a', now: () => 1_000_000, maxClockDriftMs: 60_000 })
+    const merged = clock.update({ wallMs: 1_000_000 + 10 * 60_000, counter: 0, nodeId: 'b' })
+    expect(merged.wallMs).toBeLessThanOrEqual(1_000_000 + 60_000) // clamped, not poisoned
+    expect(() => encodeHlc(clock.tick())).not.toThrow()
+  })
 })
 
 describe('hlc — properties', () => {

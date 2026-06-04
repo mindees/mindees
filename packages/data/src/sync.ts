@@ -132,6 +132,12 @@ export interface SyncSnapshot<T> {
   readonly registers: ReadonlyArray<readonly [Id, LwwRegister<T>]>
   /** Local ops applied but not yet acked (retried on next sync). */
   readonly outbox: readonly Op<T>[]
+  /**
+   * The local HLC high-water mark at export time. Restoring it seeds the clock so the
+   * first post-restart edit is strictly newer than the replica's pre-restart writes —
+   * without it the clock regresses to 0 and a same-record edit can lose the LWW merge.
+   */
+  readonly clock: Hlc
 }
 
 /** Options for {@link createSyncEngine}. */
@@ -173,7 +179,15 @@ export interface SyncEngine<T> {
 /** Create a {@link SyncEngine}. */
 export function createSyncEngine<T>(options: SyncEngineOptions<T>): SyncEngine<T> {
   const { nodeId, transport, snapshot } = options
-  const clock: Clock = createClock(options.now ? { nodeId, now: options.now } : { nodeId })
+  const clock: Clock = createClock({
+    nodeId,
+    ...(options.now ? { now: options.now } : {}),
+    // Seed from the persisted high-water mark so a restored replica's clock never
+    // regresses (a post-restart edit must out-stamp its own pre-restart writes).
+    ...(snapshot?.clock
+      ? { seed: { wallMs: snapshot.clock.wallMs, counter: snapshot.clock.counter } }
+      : {}),
+  })
   const log = createMutationLog<T>(snapshot?.registers)
   const outbox: Op<T>[] = snapshot ? [...snapshot.outbox] : []
   let seq = snapshot?.seq ?? 0
@@ -237,7 +251,7 @@ export function createSyncEngine<T>(options: SyncEngineOptions<T>): SyncEngine<T
     },
 
     export(): SyncSnapshot<T> {
-      return { seq, cursor, registers: log.dump(), outbox: [...outbox] }
+      return { seq, cursor, registers: log.dump(), outbox: [...outbox], clock: clock.peek() }
     },
   }
 
@@ -257,12 +271,16 @@ export function createSyncEngine<T>(options: SyncEngineOptions<T>): SyncEngine<T
     if (signal?.aborted) return
     for (const op of ops) {
       try {
-        // Validate the op's HLC against our clock FIRST (the 10B drift/shape guard),
-        // so a malformed or hostile-far-future op is skipped, not merged into state.
+        // Advance our local clock toward the op (clamped, so a clock-skewed peer can't
+        // poison it), then merge the op. clock.update throws ONLY for a structurally
+        // invalid (non-encodable) HLC — never for a merely far-future one — so a
+        // legitimately clock-skewed peer's op is still applied (CRDT convergence), and
+        // we only ever skip ops that are permanently unusable.
         clock.update(op.hlc)
         log.apply(op) // merges by HLC; our own returning ops re-apply idempotently
       } catch {
-        // skip a malformed/out-of-bounds op rather than aborting the whole pull
+        // A structurally-invalid op can never be ordered/stored, so skipping it (and
+        // letting the cursor advance past it) loses nothing — unlike a recoverable op.
       }
     }
     cursor = next

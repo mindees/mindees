@@ -46,4 +46,25 @@ describe('persistence', () => {
     expect(b.get('x')?.text).toBe('one')
     expect(b.get('y')?.text).toBe('two')
   })
+
+  it('restores the HLC clock so a same-record edit after restart wins (no regression)', async () => {
+    const server = createSyncServer<Note>({ log: createMemoryOpLog<Note>() })
+    const p = createMemoryPersistence()
+    // Session 1: write a record under a frozen clock, then persist.
+    const a1 = createSyncEngine<Note>({ nodeId: 'a', transport: server, now: () => 1000 })
+    a1.set('notes', 'x', { text: 'before' }) // stamp (1000,0,a)
+    await a1.sync()
+    await p.save('k', JSON.stringify(a1.export()))
+
+    // Session 2: restore and edit the SAME record under the SAME frozen physical time.
+    const restored = JSON.parse((await p.load('k')) as string) as SyncSnapshot<Note>
+    const a2 = createSyncEngine<Note>({
+      nodeId: 'a',
+      transport: server,
+      now: () => 1000,
+      snapshot: restored,
+    })
+    a2.set('notes', 'x', { text: 'after' }) // seeded clock ticks to (1000,1,a) > the persisted stamp
+    expect(a2.get('x')?.text).toBe('after') // pre-fix: 'before' — the edit lost the same-stamp tie
+  })
 })

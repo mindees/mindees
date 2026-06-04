@@ -144,4 +144,42 @@ describe('sync — two peers converge through a hub', () => {
     await a.sync()
     expect(a.get('y')?.text).toBe('ok')
   })
+
+  it('two replicas with >24h legitimate clock skew still converge (no data loss)', async () => {
+    const hub = createMemoryHub<Note>()
+    const TA = 1_000_000_000_000
+    const TB = TA + 25 * 60 * 60 * 1000 // B's device clock is ~25h ahead (> default 24h drift)
+    const a = createSyncEngine<Note>({ nodeId: 'a', transport: hub, now: () => TA })
+    const b = createSyncEngine<Note>({ nodeId: 'b', transport: hub, now: () => TB })
+    b.set('notes', 'x', { text: 'from-b' }) // op stamped ~TB, >24h ahead of A
+    await b.sync()
+    await a.sync() // A must APPLY b's op (clamp its clock, keep the data) — not drop it
+    expect(a.get('x')?.text).toBe('from-b') // pre-fix: undefined forever (op dropped)
+    await a.sync()
+    await b.sync()
+    expect(snapshot(a)).toEqual(snapshot(b)) // converged
+  })
+
+  it('clamps a far-future (but encodable) op so the local clock is not poisoned', async () => {
+    const hub = createMemoryHub<Note>()
+    const now = 1_000_000_000_000
+    const farFuture = now + 365 * 24 * 60 * 60 * 1000 // +1 year: beyond drift, still encodable
+    await hub.push([
+      {
+        id: 'evil:1',
+        actor: 'evil',
+        seq: 1,
+        collection: 'notes',
+        recordId: 'x',
+        hlc: { wallMs: farFuture, counter: 0, nodeId: 'evil' },
+        kind: 'set',
+        value: { text: 'far' },
+      },
+    ])
+    const a = createSyncEngine<Note>({ nodeId: 'a', transport: hub, now: () => now })
+    await a.sync()
+    expect(a.get('x')?.text).toBe('far') // applied (convergence), unlike the 1e16 structural case
+    const op = a.set('notes', 'y', { text: 'ok' })
+    expect(op.hlc.wallMs).toBeLessThan(farFuture) // our clock was clamped, not dragged to +1yr
+  })
 })

@@ -19,18 +19,52 @@ export type LwwRegister<V> =
  * Merge two registers: keep the one with the greater stamp. When two **different**
  * registers carry the **same** stamp (reachable via a reused `nodeId` across clock
  * instances, or a hostile sync peer that replays a stamp), the content is broken
- * deterministically — **delete wins** over set, and equal ops break by a stable
- * serialization order — so the result is independent of argument order (required for
- * convergence; a stamp-only compare would diverge by delivery order).
+ * deterministically — **delete wins** over set, and equal ops break by a stable,
+ * **total** key over the value — so the result is independent of argument order
+ * (required for convergence; a stamp-only compare would diverge by delivery order).
  */
 export function mergeRegister<V>(a: LwwRegister<V>, b: LwwRegister<V>): LwwRegister<V> {
   const c = compareHlc(a.stamp, b.stamp)
   if (c !== 0) return c > 0 ? a : b
   if (a.op !== b.op) return a.op === 'del' ? a : b // delete wins a same-stamp tie
   if (a.op === 'set' && b.op === 'set' && !Object.is(a.value, b.value)) {
-    return JSON.stringify(a.value) >= JSON.stringify(b.value) ? a : b
+    return tieKey(a.value) >= tieKey(b.value) ? a : b
   }
   return a
+}
+
+/**
+ * A **total**, type-tagged key for the same-stamp tie-break. Unlike raw
+ * `JSON.stringify`, it (a) never returns `undefined` (which would make the `>=`
+ * comparison `false` in BOTH orders → opposite winners → divergence), and (b)
+ * distinguishes values that stringify identically but are observably different
+ * (e.g. `NaN` and `null` both stringify to `"null"`). For JSON-representable values
+ * an equal key implies an equal value (so returning either side is convergent);
+ * functions/symbols can never arrive over sync, so their best-effort key is harmless.
+ */
+function tieKey(value: unknown): string {
+  switch (typeof value) {
+    case 'undefined':
+      return 'u'
+    case 'boolean':
+      return `b:${value}`
+    case 'number':
+      return Number.isNaN(value) ? 'n:NaN' : `n:${value}`
+    case 'bigint':
+      return `i:${value}`
+    case 'string':
+      return `s:${value}`
+    case 'object': {
+      if (value === null) return 'z'
+      try {
+        return `o:${JSON.stringify(value)}`
+      } catch {
+        return 'o:circular' // unserializable object — cannot sync as data anyway
+      }
+    }
+    default:
+      return `f:${String(value)}` // function | symbol — never crosses the sync boundary
+  }
 }
 
 /** A per-field last-write-wins map: each field is an independent {@link LwwRegister}. */

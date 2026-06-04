@@ -29,11 +29,20 @@ export interface ClockOptions {
   /** Injected physical clock in ms. Default `() => Date.now()`. */
   readonly now?: () => number
   /**
-   * Reject a received timestamp whose wall clock is more than this far ahead of ours
-   * (a corrupt/hostile peer must not be able to push our clock arbitrarily forward).
-   * Default 24h.
+   * Bound how far a received timestamp may push our **local** clock forward (a
+   * corrupt/skewed peer must not be able to drag our clock arbitrarily into the
+   * future). A remote beyond this bound is **clamped** when advancing our clock — it
+   * is *not* rejected, so the op's own stamp is still merged by the data layer and
+   * convergence is preserved under clock skew. Default 24h.
    */
   readonly maxClockDriftMs?: number
+  /**
+   * Seed the clock's high-water mark on creation (e.g. restoring a persisted replica),
+   * so the first {@link Clock.tick} after restart is strictly greater than any stamp
+   * the replica produced before it. Without this a restored clock regresses to 0 and a
+   * post-restart edit can lose the LWW merge to its own pre-restart write.
+   */
+  readonly seed?: { readonly wallMs: number; readonly counter: number }
 }
 
 /** Max counter value that fits the encoded fixed width; overflow rolls into `wallMs`. */
@@ -47,7 +56,12 @@ const MAX_WALL = 10 ** WALL_WIDTH - 1
 export interface Clock {
   /** Produce a timestamp for a new local event (or an outgoing message). */
   tick(): Hlc
-  /** Merge a received timestamp; returns the new local timestamp (strictly greater than both). */
+  /**
+   * Merge a received timestamp into the local clock; returns the new local timestamp
+   * (strictly greater than the previous local one, and greater than the remote unless
+   * the remote is beyond the drift bound, in which case its advance is clamped).
+   * Throws only on a structurally-invalid remote (non-integer/negative/non-encodable).
+   */
   update(remote: Hlc): Hlc
   /** The current local timestamp without advancing the clock. */
   peek(): Hlc
@@ -58,8 +72,23 @@ export function createClock(options: ClockOptions): Clock {
   const { nodeId } = options
   const physical = options.now ?? (() => Date.now())
   const maxDriftMs = options.maxClockDriftMs ?? 24 * 60 * 60 * 1000
-  let wallMs = 0
-  let counter = 0
+  // Seed the high-water mark (sanitized — a corrupt snapshot must not break the clock).
+  const seedWall = options.seed?.wallMs
+  const seedCounter = options.seed?.counter
+  let wallMs =
+    typeof seedWall === 'number' &&
+    Number.isInteger(seedWall) &&
+    seedWall >= 0 &&
+    seedWall <= MAX_WALL
+      ? seedWall
+      : 0
+  let counter =
+    typeof seedCounter === 'number' &&
+    Number.isInteger(seedCounter) &&
+    seedCounter >= 0 &&
+    seedCounter <= MAX_COUNTER
+      ? seedCounter
+      : 0
 
   // Commit (wall, candidateCounter), rolling a logical-counter overflow into wall time
   // so the counter stays within its fixed encoding width while monotonicity holds.
@@ -82,22 +111,32 @@ export function createClock(options: ClockOptions): Clock {
 
     update(remote: Hlc): Hlc {
       const pt = physical()
-      // Validate untrusted input: a malformed or far-future remote must not poison this clock.
+      // Reject only a STRUCTURALLY-invalid remote (non-integer/negative, or beyond the
+      // fixed encodable range) — such a stamp can never be ordered or stored, so the
+      // caller skips that op. A merely far-future *but representable* remote is NOT
+      // rejected here: the data merge (mergeRegister) is independent of our clock, so
+      // dropping it would break CRDT convergence. We instead CLAMP how far it advances
+      // our local clock (below) to keep the clock from being poisoned.
       if (
         !Number.isInteger(remote.wallMs) ||
         remote.wallMs < 0 ||
-        remote.wallMs > pt + maxDriftMs
+        remote.wallMs > MAX_WALL ||
+        !Number.isInteger(remote.counter) ||
+        remote.counter < 0 ||
+        remote.counter > MAX_COUNTER
       ) {
-        throw new TypeError(`remote HLC wallMs out of bounds: ${remote.wallMs}`)
+        throw new TypeError(`remote HLC out of bounds: ${remote.wallMs}:${remote.counter}`)
       }
-      if (!Number.isInteger(remote.counter) || remote.counter < 0 || remote.counter > MAX_COUNTER) {
-        throw new TypeError(`remote HLC counter out of bounds: ${remote.counter}`)
-      }
-      const w = Math.max(wallMs, remote.wallMs, pt)
+      // Clock-poisoning guard: never let a remote push our local clock more than
+      // maxDriftMs beyond where it already is. Anchor the ceiling to our own high-water
+      // mark (not just physical time), so a stamp at/below our clock is always adopted.
+      const ceiling = Math.max(wallMs, pt) + maxDriftMs
+      const remoteWall = Math.min(remote.wallMs, ceiling)
+      const w = Math.max(wallMs, remoteWall, pt)
       let c: number
-      if (w === wallMs && w === remote.wallMs) c = Math.max(counter, remote.counter) + 1
+      if (w === wallMs && w === remoteWall) c = Math.max(counter, remote.counter) + 1
       else if (w === wallMs) c = counter + 1
-      else if (w === remote.wallMs) c = remote.counter + 1
+      else if (w === remoteWall) c = remote.counter + 1
       else c = 0
       return commit(w, c)
     },

@@ -48,6 +48,18 @@ describe('lww-map', () => {
     const v2 = lwwSet<string>({}, 'f', 'V2', s)
     expect(lwwGet(mergeLwwMap(v1, v2), 'f')).toBe(lwwGet(mergeLwwMap(v2, v1), 'f'))
   })
+
+  it('breaks a same-stamp tie commutatively for values JSON.stringify cannot order', () => {
+    const s = hlc(5, 0, 'a')
+    // (1) `undefined` stringifies to `undefined` (not a string): both orders must agree.
+    const A = lwwSet<string | undefined>({}, 'f', undefined, s)
+    const B = lwwSet<string | undefined>({}, 'f', 'X', s)
+    expect(lwwGet(mergeLwwMap(A, B), 'f')).toBe(lwwGet(mergeLwwMap(B, A), 'f'))
+    // (2) NaN and null both stringify to "null" yet are distinct: must still converge.
+    const P = lwwSet<number | null>({}, 'g', Number.NaN, s)
+    const Q = lwwSet<number | null>({}, 'g', null, s)
+    expect(lwwGet(mergeLwwMap(P, Q), 'g')).toBe(lwwGet(mergeLwwMap(Q, P), 'g'))
+  })
 })
 
 describe('lww-map — CvRDT laws', () => {
