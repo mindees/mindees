@@ -5,11 +5,13 @@ import { NotImplementedError, notImplemented } from '@mindees/core'
 export { compileToNative, type NativeTarget } from './aot'
 /** Tree-flattening optimizer pass. */
 export { createFlattenTransformer, STATIC_MARKER } from './flatten'
-/** Per-route code-splitting manifest. */
+/** Per-route code-splitting manifest + file-based route codegen. */
 export {
   buildRouteManifest,
   chunkName,
   fileToRoute,
+  type GenerateRouteModuleOptions,
+  generateRouteModule,
   type RouteEntry,
   type RouteManifest,
 } from './routes'

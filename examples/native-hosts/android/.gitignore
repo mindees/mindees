@@ -11,3 +11,6 @@ build/
 
 # Local SDK pointer
 local.properties
+
+# Generated file-based route map (codegen: app-js/scripts/gen-routes.mjs)
+mindees-example-app/app-js/src/routes.gen.ts
