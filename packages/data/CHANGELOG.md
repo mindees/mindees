@@ -1,0 +1,47 @@
+# @mindees/data
+
+## 0.1.0
+
+### Minor Changes
+
+- bf948be: First public release — **v0.1.0**.
+
+  MindeesNative's foundation is complete and audited: fine-grained reactivity, the
+  component model + selector-isolated context, the priority scheduler and thread-pool
+  abstraction (`@mindees/core`); the Helix renderer with web/DOM + headless backends,
+  SSR/hydration, and a CI-verified native strand on iOS (JavaScriptCore) and Android
+  (QuickJS) (`@mindees/renderer` + `examples/native-hosts`); the build-time optimizer
+  (`@mindees/compiler`); the Forge CLI + `create-mindees` scaffolder; the Quantum typed
+  router with data loaders, guards, and view transitions (`@mindees/router`); the Pulse
+  signed-OTA + SDUI system (`@mindees/updates`); the Continuum local-first CRDT store +
+  sync engine (`@mindees/data`); the Synapse AI gateway (`@mindees/ai`); and the Atlas
+  accessible primitives + virtualized list (`@mindees/atlas`).
+
+  APIs are 🧪 experimental (pre-1.0); see `STATUS.md`. This `minor` bump versions the
+  whole locked `@mindees/*` line at `0.1.0`.
+
+### Patch Changes
+
+- 230b62f: Audit hardening for `@mindees/data` (Continuum). An adversarial distributed-systems review of the HLC, CRDTs, sync engine, and persistence confirmed five convergence/causality defects; each is fixed with a regression test:
+
+  - **Clock-skew causes permanent divergence + data loss (critical)** — the HLC drift guard threw on a far-future remote, and the sync loop treated that throw as "skip this op" _and_ advanced the cursor past it, so a legitimately clock-skewed peer (>24h, e.g. a wrong device date) had its committed write silently dropped forever — replicas never reconverged. `clock.update` now **clamps** how far a remote advances the local clock (anti-poisoning) instead of rejecting it, and the sync loop always merges the op (a CvRDT merge is independent of the local clock). Only structurally-invalid (non-encodable) stamps are skipped, which are permanently unusable.
+  - **Drift bound anchored to physical time, not the clock (medium)** — folded into the fix above: the clamp ceiling is now `max(localWall, physical) + maxDriftMs`, so a stamp at/below the local clock is always accepted (it cannot poison a clock already past it).
+  - **Same-stamp LWW tie-break non-commutative (high)** — the tie-break used `JSON.stringify`, which returns `undefined` for `undefined`/functions/symbols (flipping the winner by argument order) and collides `NaN` with `null` (both `"null"`). Replaced with a total, type-tagged key so equal-stamp registers converge to the same value on every replica regardless of delivery order.
+  - **Persistence dropped the HLC high-water mark (high)** — `export()`/restore omitted the clock, so a restored replica's clock regressed to 0 and a same-record edit right after restart could lose the LWW merge to its own pre-restart write. The snapshot now carries the clock and the restored engine seeds it, so post-restart edits are strictly newer.
+
+  Also freezes the exported `info` object (consistency with the other packages).
+
+- 86e5b94: Post-review hardening pass over the audit fixes (follow-ups confirmed with regression tests), plus a cross-package typecheck repair:
+
+  - **`@mindees/renderer` — SSR element-tag injection (security)** — `serializeHeadless` interpolated the (possibly `mapTag`-mapped) tag into `<tag>`/`</tag>` unescaped, so a tag containing `>`/whitespace could break out and inject markup. The tag is now validated against the attribute-name grammar and rejected (fail closed) if unsafe.
+  - **`@mindees/atlas` — `Pressable` style typecheck regression** — tightening `Accessor<T>` to a strict `() => T` left the 1-arg interaction-state style fn leaking into the `resolveStyle` branch. The arity-narrowed branch now asserts `Reactive<StyleInput>`, mirroring the state-fn cast, so the package typechecks again.
+  - **`@mindees/atlas` — horizontal `ScrollView` layout was inert** — the row layout set `flexDirection`/`flexWrap` without `display: 'flex'`, so the element stayed in default block flow. `display: 'flex'` is now included.
+  - **`@mindees/ai` — Anthropic streaming dropped `input_tokens`** — prompt tokens arrive on `message_start` while output tokens arrive on `message_delta`; the parser now carries `input_tokens` through to the finish chunk instead of reporting only output tokens.
+  - **`@mindees/data` — HLC drift ceiling could ratchet** — the clamp ceiling is anchored to `physical + maxDriftMs` (not `max(localWall, physical) + maxDriftMs` re-added per merge), so repeated far-future merges can't walk the clock forward. The LWW same-stamp tie-break also tags `-0` distinctly from `+0` so a `-0`-vs-`+0` tie still converges.
+  - **`@mindees/updates` — non-idempotent re-apply** — re-applying the already-current generation fell through and rewrote state, resetting `pendingVerification`/`bootAttempts` and un-confirming a generation that had already passed its readiness handshake. It now short-circuits to a true no-op.
+  - **`@mindees/compiler` — marker collision missed destructuring** — the `_static` top-level collision check ignored destructuring bindings (`const { _static } = x`); it now recurses object/array binding patterns so flattening still bails on a real collision.
+  - **`@mindees/cli` — overly specific scaffold error** — the unreadable-target message asserted "not a directory" for every `readDir` failure even though it could be a permission/I/O error; the message no longer claims a cause it didn't verify.
+
+- Updated dependencies [43c3d33]
+- Updated dependencies [bf948be]
+  - @mindees/core@0.1.0
