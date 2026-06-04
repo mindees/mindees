@@ -88,5 +88,20 @@ export {
   type ViewProps,
 } from './primitives'
 export { flattenStyle, type StyleInput, type StyleObject, type StyleValue } from './style'
+export {
+  duration,
+  easing,
+  fontSize,
+  fontWeight,
+  getTheme,
+  lineHeight,
+  palette,
+  radius,
+  space,
+  type Theme,
+  type ThemeColors,
+  tokens,
+  useTheme,
+} from './tokens'
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }

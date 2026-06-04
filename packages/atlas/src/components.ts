@@ -4,9 +4,8 @@
  * renders on web *and* native today, and stays fine-grained: reactive bits are accessor
  * styles, so only the changed node re-runs (no component re-render).
  *
- * Defaults follow the 2026 UI/UX handbook — 8pt spacing, 12–16 radius, WCAG-AA tone
- * contrast, ≥24/44 targets. Colors are neutral/semantic literals for now; the design-token
- * layer (next) will make them themeable.
+ * Colors come from the design tokens via {@link useTheme}, so components re-theme
+ * automatically light↔dark (handbook §23/§31). Spacing/radius/type use the token scales.
  *
  * @module
  */
@@ -16,9 +15,7 @@ import { useKeyboard, useSafeAreaInsets } from './environment'
 import type { BaseProps, Reactive } from './host'
 import { Image, Pressable, Text, View } from './primitives'
 import { flattenStyle, type StyleInput } from './style'
-
-/** A neutral hairline that reads on both light and dark surfaces. */
-const HAIRLINE = 'rgba(127, 127, 127, 0.24)'
+import { fontWeight, radius as radiusScale, space, type Theme, useTheme } from './tokens'
 
 /** Merge a base style with a caller's (possibly reactive) style, staying reactive if either is. */
 function mergeStyle(
@@ -57,14 +54,25 @@ export interface CardProps extends BaseProps {
   readonly radius?: number
 }
 export const Card: Component<CardProps> = (props) => {
-  const { variant = 'elevated', padding = 16, radius = 16, style, children, ...rest } = props
-  const surface: StyleInput =
-    variant === 'outlined'
-      ? { borderWidth: 1, borderColor: HAIRLINE }
-      : variant === 'filled'
-        ? { backgroundColor: 'rgba(127, 127, 127, 0.08)' }
-        : { backgroundColor: 'rgba(127, 127, 127, 0.06)', borderWidth: 1, borderColor: HAIRLINE }
-  const base: StyleInput = { padding, borderRadius: radius, ...surface }
+  const theme = useTheme()
+  const {
+    variant = 'elevated',
+    padding = space.md,
+    radius = radiusScale.lg,
+    style,
+    children,
+    ...rest
+  } = props
+  const base: Accessor<StyleInput> = () => {
+    const c = theme().color
+    const surface: StyleInput =
+      variant === 'outlined'
+        ? { borderWidth: 1, borderColor: c.border }
+        : variant === 'filled'
+          ? { backgroundColor: c.surfaceVariant }
+          : { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }
+    return { padding, borderRadius: radius, ...surface }
+  }
   return createElement(View, { ...rest, style: mergeStyle(base, style) }, children)
 }
 
@@ -76,14 +84,18 @@ export const Card: Component<CardProps> = (props) => {
 export interface DividerProps extends BaseProps {
   readonly orientation?: 'horizontal' | 'vertical'
   readonly thickness?: number
+  /** Override color (defaults to the theme border). */
   readonly color?: string
 }
 export const Divider: Component<DividerProps> = (props) => {
-  const { orientation = 'horizontal', thickness = 1, color = HAIRLINE, style, ...rest } = props
-  const base: StyleInput =
-    orientation === 'horizontal'
-      ? { height: thickness, alignSelf: 'stretch', backgroundColor: color }
-      : { width: thickness, alignSelf: 'stretch', backgroundColor: color }
+  const theme = useTheme()
+  const { orientation = 'horizontal', thickness = 1, color, style, ...rest } = props
+  const base: Accessor<StyleInput> = () => {
+    const bg = color ?? theme().color.border
+    return orientation === 'horizontal'
+      ? { height: thickness, alignSelf: 'stretch', backgroundColor: bg }
+      : { width: thickness, alignSelf: 'stretch', backgroundColor: bg }
+  }
   return createElement(View, {
     ...rest,
     role: rest.role ?? 'separator',
@@ -95,38 +107,43 @@ export const Divider: Component<DividerProps> = (props) => {
 // Badge
 // ---------------------------------------------------------------------------
 
-/** Tone → AA-contrast {bg, fg} (white text on -700 shades, ≥4.5:1 for small text). */
-const BADGE_TONES = {
-  neutral: { bg: '#475569', fg: '#ffffff' },
-  info: { bg: '#1d4ed8', fg: '#ffffff' },
-  success: { bg: '#15803d', fg: '#ffffff' },
-  warning: { bg: '#b45309', fg: '#ffffff' },
-  danger: { bg: '#b91c1c', fg: '#ffffff' },
-} as const
+export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
+
+/** Resolve a tone to its {bg, fg} in the active theme. */
+function toneColors(tone: BadgeTone, theme: Theme): { bg: string; fg: string } {
+  const c = theme.color
+  if (tone === 'neutral') return { bg: c.surfaceVariant, fg: c.text }
+  return { bg: c[tone], fg: c.onTone }
+}
 
 /** A compact status/count pill. */
 export interface BadgeProps extends BaseProps {
   readonly children?: MindeesNode
-  readonly tone?: keyof typeof BADGE_TONES
+  readonly tone?: BadgeTone
 }
 export const Badge: Component<BadgeProps> = (props) => {
+  const theme = useTheme()
   const { tone = 'neutral', style, children, ...rest } = props
-  const { bg, fg } = BADGE_TONES[tone]
-  const base: StyleInput = {
+  const base: Accessor<StyleInput> = () => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 2,
-    paddingBottom: 2,
-    paddingLeft: 8,
-    paddingRight: 8,
-    borderRadius: 999,
-    backgroundColor: bg,
-  }
+    paddingTop: space['3xs'],
+    paddingBottom: space['3xs'],
+    paddingLeft: space.xs,
+    paddingRight: space.xs,
+    borderRadius: radiusScale.full,
+    backgroundColor: toneColors(tone, theme()).bg,
+  })
+  const textStyle: Accessor<StyleInput> = () => ({
+    fontSize: 12,
+    fontWeight: fontWeight.semibold,
+    color: toneColors(tone, theme()).fg,
+  })
   return createElement(
     View,
     { ...rest, role: rest.role ?? 'status', style: mergeStyle(base, style) },
-    createElement(Text, { style: { fontSize: 12, fontWeight: 600, color: fg } }, children),
+    createElement(Text, { style: textStyle }, children),
   )
 }
 
@@ -151,8 +168,9 @@ export interface AvatarProps extends BaseProps {
   readonly size?: number
 }
 export const Avatar: Component<AvatarProps> = (props) => {
+  const theme = useTheme()
   const { src, name, size = 40, style, ...rest } = props
-  const base: StyleInput = {
+  const base: Accessor<StyleInput> = () => ({
     width: size,
     height: size,
     borderRadius: size / 2,
@@ -160,8 +178,8 @@ export const Avatar: Component<AvatarProps> = (props) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#475569',
-  }
+    backgroundColor: theme().color.surfaceVariant,
+  })
   const content = src
     ? createElement(Image, {
         src,
@@ -171,7 +189,13 @@ export const Avatar: Component<AvatarProps> = (props) => {
       })
     : createElement(
         Text,
-        { style: { fontSize: Math.round(size * 0.4), fontWeight: 600, color: '#ffffff' } },
+        {
+          style: () => ({
+            fontSize: Math.round(size * 0.4),
+            fontWeight: fontWeight.semibold,
+            color: theme().color.text,
+          }),
+        },
         name ? initialsOf(name) : '?',
       )
   return createElement(
@@ -196,41 +220,42 @@ export interface ChipProps extends Omit<BaseProps, 'style'> {
   readonly style?: Reactive<StyleInput>
 }
 export const Chip: Component<ChipProps> = (props) => {
+  const theme = useTheme()
   const { label, selected = false, disabled, onPress, leading, trailing, style, ...rest } = props
   const isSelected = toAccessor(selected, false)
   const base: Accessor<StyleInput> = () => {
+    const c = theme().color
     const on = isSelected()
     return {
       display: 'flex',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
+      gap: space['2xs'],
       minHeight: 32,
-      paddingTop: 6,
-      paddingBottom: 6,
-      paddingLeft: 12,
-      paddingRight: 12,
-      borderRadius: 999,
+      paddingTop: space['2xs'],
+      paddingBottom: space['2xs'],
+      paddingLeft: space.sm,
+      paddingRight: space.sm,
+      borderRadius: radiusScale.full,
       borderWidth: 1,
-      borderColor: on ? '#1d4ed8' : HAIRLINE,
-      backgroundColor: on ? '#1d4ed8' : 'transparent',
+      borderColor: on ? c.primary : c.border,
+      backgroundColor: on ? c.primary : 'transparent',
       opacity: disabled ? 0.5 : 1,
     }
   }
-  const text = () =>
-    createElement(
-      Text,
-      {
-        style: () => ({
-          fontSize: 14,
-          fontWeight: 500,
-          color: isSelected() ? '#ffffff' : '#cbd5e1',
-        }),
-      },
-      label,
-    )
-  const inner: MindeesNode = [leading, text(), trailing].filter((n) => n != null) as MindeesNode
+  const text = createElement(
+    Text,
+    {
+      style: () => ({
+        fontSize: 14,
+        fontWeight: fontWeight.medium,
+        color: isSelected() ? theme().color.onPrimary : theme().color.text,
+      }),
+    },
+    label,
+  )
+  const inner: MindeesNode = [leading, text, trailing].filter((n) => n != null) as MindeesNode
   return createElement(
     Pressable,
     {
@@ -257,6 +282,7 @@ export interface SwitchProps extends Omit<BaseProps, 'style'> {
   readonly style?: Reactive<StyleInput>
 }
 export const Switch: Component<SwitchProps> = (props) => {
+  const theme = useTheme()
   const { value, onValueChange, disabled, style, ...rest } = props
   const isOn = toAccessor(value, false)
   const track: Accessor<StyleInput> = () => ({
@@ -266,13 +292,18 @@ export const Switch: Component<SwitchProps> = (props) => {
     justifyContent: isOn() ? 'flex-end' : 'flex-start',
     width: 52,
     height: 32,
-    borderRadius: 999,
+    borderRadius: radiusScale.full,
     padding: 3,
-    backgroundColor: isOn() ? '#1d4ed8' : '#64748b',
+    backgroundColor: isOn() ? theme().color.primary : theme().color.textMuted,
     opacity: disabled ? 0.5 : 1,
   })
   const knob = createElement(View, {
-    style: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#ffffff' },
+    style: () => ({
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: theme().color.onPrimary,
+    }),
   })
   const handlePress = onValueChange && !disabled ? () => onValueChange(!isOn()) : undefined
   return createElement(
@@ -344,19 +375,20 @@ export interface ProgressBarProps extends BaseProps {
   readonly height?: number
 }
 export const ProgressBar: Component<ProgressBarProps> = (props) => {
-  const { value = 0, trackColor = HAIRLINE, color = '#5b8cff', height = 6, style, ...rest } = props
+  const theme = useTheme()
+  const { value = 0, trackColor, color, height = 6, style, ...rest } = props
   const progress = toAccessor(value, 0)
-  const track: StyleInput = {
+  const track: Accessor<StyleInput> = () => ({
     width: '100%',
     height,
     borderRadius: height / 2,
     overflow: 'hidden',
-    backgroundColor: trackColor,
-  }
+    backgroundColor: trackColor ?? theme().color.surfaceVariant,
+  })
   const fill: Accessor<StyleInput> = () => ({
     height,
     borderRadius: height / 2,
-    backgroundColor: color,
+    backgroundColor: color ?? theme().color.primary,
     width: `${Math.max(0, Math.min(1, progress())) * 100}%`,
   })
   return createElement(

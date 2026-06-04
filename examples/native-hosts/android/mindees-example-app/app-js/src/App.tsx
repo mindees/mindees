@@ -9,10 +9,9 @@
  * @module
  */
 
-import { Column } from '@mindees/atlas'
+import { Column, space, useTheme } from '@mindees/atlas'
 import { createFileRouter, createMemoryHistory, createRouterView } from '@mindees/router'
 import { routes } from './routes.gen'
-import { screenStyle } from './theme'
 
 // `routes` is generated from the `app/` directory (scripts/gen-routes.mjs +
 // @mindees/compiler `generateRouteModule`), so adding a file under `app/` adds a route
@@ -21,7 +20,21 @@ const router = createFileRouter(routes, {
   history: createMemoryHistory({ initialEntries: ['/'] }),
 })
 
-/** Full-screen shell: dark background, centers the active route's card. */
+/** Full-screen shell: themed background (re-themes light↔dark), centers the active route. */
 export function App() {
-  return <Column style={screenStyle}>{createRouterView(router)}</Column>
+  const theme = useTheme()
+  return (
+    <Column
+      style={() => ({
+        flexGrow: 1,
+        width: '100%',
+        padding: space.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme().color.bg,
+      })}
+    >
+      {createRouterView(router)}
+    </Column>
+  )
 }
