@@ -631,6 +631,159 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	}, props.children);
 
 //#endregion
+//#region ../../../../../packages/atlas/dist/tokens.js
+/**
+	* Design tokens + theming — the 2026-UI/UX-handbook token layer (§7–24, §31).
+	*
+	* Two tiers (the recommended default): **primitive** scales (raw `space`/`radius`/type/
+	* motion/color values) and **semantic** tokens (a {@link Theme}: `bg`/`surface`/`text`/
+	* `primary`/…) that carry intent. Dark mode is a **token-set swap** (§23/§31): the same
+	* semantic names resolve to different primitives. {@link useTheme} returns a reactive theme
+	* driven by {@link useColorScheme}, so themed UI re-themes light↔dark fine-grained — only
+	* the color nodes update.
+	*
+	* @module
+	*/
+	/** Spacing scale — 8pt system with 4 as the half-step (handbook §8). */
+	const space = {
+		none: 0,
+		"3xs": 2,
+		"2xs": 4,
+		xs: 8,
+		sm: 12,
+		md: 16,
+		lg: 24,
+		xl: 32,
+		"2xl": 48,
+		"3xl": 64
+	};
+	/** Corner-radius scale (handbook §19). */
+	const radius = {
+		none: 0,
+		sm: 8,
+		md: 12,
+		lg: 16,
+		xl: 20,
+		"2xl": 28,
+		full: 9999
+	};
+	/** Type scale (≈1.25 ratio, base 16) — handbook §9. */
+	const fontSize = {
+		caption: 12,
+		footnote: 13,
+		body: 16,
+		callout: 17,
+		headline: 20,
+		title3: 25,
+		title2: 31,
+		title1: 39,
+		display: 49
+	};
+	/** Font weights (handbook §9 — regular + semibold/bold do most of the work). */
+	const fontWeight = {
+		regular: 400,
+		medium: 500,
+		semibold: 600,
+		bold: 700,
+		heavy: 800
+	};
+	/** Raw color ramps (primitive tier — never apply directly; go through a {@link Theme}). */
+	const palette = {
+		white: "#ffffff",
+		black: "#000000",
+		neutral: {
+			50: "#f8fafc",
+			100: "#f1f5f9",
+			200: "#e2e8f0",
+			300: "#cbd5e1",
+			400: "#94a3b8",
+			500: "#64748b",
+			600: "#475569",
+			700: "#334155",
+			800: "#1e293b",
+			900: "#0f172a",
+			950: "#020617"
+		},
+		blue: {
+			400: "#60a5fa",
+			500: "#3b82f6",
+			600: "#2563eb",
+			700: "#1d4ed8"
+		},
+		green: {
+			400: "#4ade80",
+			500: "#22c55e",
+			600: "#16a34a",
+			700: "#15803d"
+		},
+		amber: {
+			400: "#fbbf24",
+			500: "#f59e0b",
+			600: "#d97706",
+			700: "#b45309"
+		},
+		red: {
+			400: "#f87171",
+			500: "#ef4444",
+			600: "#dc2626",
+			700: "#b91c1c"
+		}
+	};
+	const lightTheme = {
+		colorScheme: "light",
+		color: {
+			bg: palette.neutral[50],
+			surface: palette.white,
+			surfaceVariant: palette.neutral[100],
+			text: palette.neutral[900],
+			textMuted: palette.neutral[500],
+			border: palette.neutral[200],
+			primary: palette.blue[600],
+			onPrimary: palette.white,
+			success: palette.green[700],
+			warning: palette.amber[700],
+			danger: palette.red[700],
+			info: palette.blue[700],
+			onTone: palette.white
+		}
+	};
+	const darkTheme = {
+		colorScheme: "dark",
+		color: {
+			bg: palette.neutral[950],
+			surface: palette.neutral[900],
+			surfaceVariant: palette.neutral[800],
+			text: palette.neutral[50],
+			textMuted: palette.neutral[400],
+			border: palette.neutral[700],
+			primary: palette.blue[500],
+			onPrimary: palette.white,
+			success: palette.green[400],
+			warning: palette.amber[400],
+			danger: palette.red[400],
+			info: palette.blue[400],
+			onTone: palette.neutral[950]
+		}
+	};
+	/** The theme for a given color scheme (non-reactive). */
+	function getTheme(colorScheme) {
+		return colorScheme === "dark" ? darkTheme : lightTheme;
+	}
+	/**
+	* The active theme as a reactive accessor — flips light↔dark with
+	* {@link useColorScheme}. Use it in accessor styles so dark mode is an automatic,
+	* fine-grained token swap (only color nodes re-run).
+	*
+	* @example
+	* const theme = useTheme()
+	* <View style={() => ({ backgroundColor: theme().color.surface })} />
+	*/
+	function useTheme() {
+		const colorScheme = useColorScheme();
+		return () => getTheme(colorScheme());
+	}
+
+//#endregion
 //#region ../../../../../packages/atlas/dist/components.js
 /**
 	* Atlas components — higher-level building blocks composed purely from the primitives
@@ -638,20 +791,19 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	* renders on web *and* native today, and stays fine-grained: reactive bits are accessor
 	* styles, so only the changed node re-runs (no component re-render).
 	*
-	* Defaults follow the 2026 UI/UX handbook — 8pt spacing, 12–16 radius, WCAG-AA tone
-	* contrast, ≥24/44 targets. Colors are neutral/semantic literals for now; the design-token
-	* layer (next) will make them themeable.
+	* Colors come from the design tokens via {@link useTheme}, so components re-theme
+	* automatically light↔dark (handbook §23/§31). Spacing/radius/type use the token scales.
 	*
 	* @module
 	*/
-	/** A neutral hairline that reads on both light and dark surfaces. */
-	const HAIRLINE = "rgba(127, 127, 127, 0.24)";
 	/** Merge a base style with a caller's (possibly reactive) style, staying reactive if either is. */
 	function mergeStyle(base, style) {
 		const baseFn = typeof base === "function" ? base : null;
-		if (baseFn || typeof style === "function") {
-			const styleFn = typeof style === "function" ? style : null;
-			return () => flattenStyle([baseFn ? baseFn() : base, styleFn ? styleFn() : style]);
+		const styleFn = typeof style === "function" ? style : null;
+		if (baseFn || styleFn) {
+			const baseVal = base;
+			const styleVal = style;
+			return () => flattenStyle([baseFn ? baseFn() : baseVal, styleFn ? styleFn() : styleVal]);
 		}
 		return flattenStyle([base, style]);
 	}
@@ -661,18 +813,22 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		return () => value === void 0 ? fallback : value;
 	}
 	const Card = (props) => {
-		const { variant = "elevated", padding = 16, radius = 16, style, children, ...rest } = props;
-		const base = {
-			padding,
-			borderRadius: radius,
-			...variant === "outlined" ? {
-				borderWidth: 1,
-				borderColor: HAIRLINE
-			} : variant === "filled" ? { backgroundColor: "rgba(127, 127, 127, 0.08)" } : {
-				backgroundColor: "rgba(127, 127, 127, 0.06)",
-				borderWidth: 1,
-				borderColor: HAIRLINE
-			}
+		const theme = useTheme();
+		const { variant = "elevated", padding = space.md, radius: radius$1 = radius.lg, style, children, ...rest } = props;
+		const base = () => {
+			const c = theme().color;
+			return {
+				padding,
+				borderRadius: radius$1,
+				...variant === "outlined" ? {
+					borderWidth: 1,
+					borderColor: c.border
+				} : variant === "filled" ? { backgroundColor: c.surfaceVariant } : {
+					backgroundColor: c.surface,
+					borderWidth: 1,
+					borderColor: c.border
+				}
+			};
 		};
 		return createElement(View, {
 			...rest,
@@ -680,15 +836,19 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		}, children);
 	};
 	const Divider = (props) => {
-		const { orientation = "horizontal", thickness = 1, color = HAIRLINE, style, ...rest } = props;
-		const base = orientation === "horizontal" ? {
-			height: thickness,
-			alignSelf: "stretch",
-			backgroundColor: color
-		} : {
-			width: thickness,
-			alignSelf: "stretch",
-			backgroundColor: color
+		const theme = useTheme();
+		const { orientation = "horizontal", thickness = 1, color, style, ...rest } = props;
+		const base = () => {
+			const bg = color ?? theme().color.border;
+			return orientation === "horizontal" ? {
+				height: thickness,
+				alignSelf: "stretch",
+				backgroundColor: bg
+			} : {
+				width: thickness,
+				alignSelf: "stretch",
+				backgroundColor: bg
+			};
 		};
 		return createElement(View, {
 			...rest,
@@ -696,54 +856,45 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			style: mergeStyle(base, style)
 		});
 	};
-	/** Tone → AA-contrast {bg, fg} (white text on -700 shades, ≥4.5:1 for small text). */
-	const BADGE_TONES = {
-		neutral: {
-			bg: "#475569",
-			fg: "#ffffff"
-		},
-		info: {
-			bg: "#1d4ed8",
-			fg: "#ffffff"
-		},
-		success: {
-			bg: "#15803d",
-			fg: "#ffffff"
-		},
-		warning: {
-			bg: "#b45309",
-			fg: "#ffffff"
-		},
-		danger: {
-			bg: "#b91c1c",
-			fg: "#ffffff"
-		}
-	};
+	/** Resolve a tone to its {bg, fg} in the active theme. */
+	function toneColors(tone, theme) {
+		const c = theme.color;
+		if (tone === "neutral") return {
+			bg: c.surfaceVariant,
+			fg: c.text
+		};
+		return {
+			bg: c[tone],
+			fg: c.onTone
+		};
+	}
 	const Badge = (props) => {
+		const theme = useTheme();
 		const { tone = "neutral", style, children, ...rest } = props;
-		const { bg, fg } = BADGE_TONES[tone];
-		const base = {
+		const base = () => ({
 			display: "flex",
 			alignItems: "center",
 			justifyContent: "center",
-			paddingTop: 2,
-			paddingBottom: 2,
-			paddingLeft: 8,
-			paddingRight: 8,
-			borderRadius: 999,
-			backgroundColor: bg
-		};
+			paddingTop: space["3xs"],
+			paddingBottom: space["3xs"],
+			paddingLeft: space.xs,
+			paddingRight: space.xs,
+			borderRadius: radius.full,
+			backgroundColor: toneColors(tone, theme()).bg
+		});
+		const textStyle = () => ({
+			fontSize: 12,
+			fontWeight: fontWeight.semibold,
+			color: toneColors(tone, theme()).fg
+		});
 		return createElement(View, {
 			...rest,
 			role: rest.role ?? "status",
 			style: mergeStyle(base, style)
-		}, createElement(Text, { style: {
-			fontSize: 12,
-			fontWeight: 600,
-			color: fg
-		} }, children));
+		}, createElement(Text, { style: textStyle }, children));
 	};
 	const Switch = (props) => {
+		const theme = useTheme();
 		const { value, onValueChange, disabled, style, ...rest } = props;
 		const isOn = toAccessor(value, false);
 		const track = () => ({
@@ -753,17 +904,17 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			justifyContent: isOn() ? "flex-end" : "flex-start",
 			width: 52,
 			height: 32,
-			borderRadius: 999,
+			borderRadius: radius.full,
 			padding: 3,
-			backgroundColor: isOn() ? "#1d4ed8" : "#64748b",
+			backgroundColor: isOn() ? theme().color.primary : theme().color.textMuted,
 			opacity: disabled ? .5 : 1
 		});
-		const knob = createElement(View, { style: {
+		const knob = createElement(View, { style: () => ({
 			width: 26,
 			height: 26,
 			borderRadius: 13,
-			backgroundColor: "#ffffff"
-		} });
+			backgroundColor: theme().color.onPrimary
+		}) });
 		const handlePress = onValueChange && !disabled ? () => onValueChange(!isOn()) : void 0;
 		return createElement(Pressable, {
 			...rest,
@@ -778,19 +929,20 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		}, knob);
 	};
 	const ProgressBar = (props) => {
-		const { value = 0, trackColor = HAIRLINE, color = "#5b8cff", height = 6, style, ...rest } = props;
+		const theme = useTheme();
+		const { value = 0, trackColor, color, height = 6, style, ...rest } = props;
 		const progress = toAccessor(value, 0);
-		const track = {
+		const track = () => ({
 			width: "100%",
 			height,
 			borderRadius: height / 2,
 			overflow: "hidden",
-			backgroundColor: trackColor
-		};
+			backgroundColor: trackColor ?? theme().color.surfaceVariant
+		});
 		const fill = () => ({
 			height,
 			borderRadius: height / 2,
-			backgroundColor: color,
+			backgroundColor: color ?? theme().color.primary,
 			width: `${Math.max(0, Math.min(1, progress())) * 100}%`
 		});
 		return createElement(View, {
@@ -2223,54 +2375,15 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 
 //#endregion
 //#region src/theme.ts
-/** Shared palette + styles for the example's screens. */
-	const palette = {
-		screenBg: "#0b1021",
-		cardBg: "#171c33",
-		accent: "#5b8cff",
-		accentText: "#ffffff",
-		slateBg: "#2a3050",
-		heading: "#e8ecff",
-		muted: "#9aa4d2",
-		body: "#c3cbf0"
-	};
-	const screenStyle = {
-		flexGrow: 1,
-		width: "100%",
-		padding: 24,
-		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: palette.screenBg
-	};
-	const cardStyle = {
-		backgroundColor: palette.cardBg,
-		padding: 28,
-		gap: 14,
-		borderRadius: 20,
-		alignItems: "center",
-		minWidth: 280
-	};
-	const headingStyle = {
-		fontSize: 24,
-		fontWeight: 800,
-		color: palette.heading
-	};
-	const buttonBase = {
-		color: palette.accentText,
-		paddingTop: 12,
-		paddingBottom: 12,
-		paddingLeft: 20,
-		paddingRight: 20,
-		borderRadius: 12,
-		fontWeight: 600
-	};
-	const accentButton = {
-		...buttonBase,
-		backgroundColor: palette.accent
-	};
-	const slateButton = {
-		...buttonBase,
-		backgroundColor: palette.slateBg
+/** Token-based shape helpers for the example (colors come from `useTheme` per screen). */
+	/** Shared button shape (background/foreground colors applied per screen from the theme). */
+	const buttonShape = {
+		paddingTop: space.sm,
+		paddingBottom: space.sm,
+		paddingLeft: space.lg,
+		paddingRight: space.lg,
+		borderRadius: radius.md,
+		fontWeight: fontWeight.semibold
 	};
 
 //#endregion
@@ -2309,19 +2422,21 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 //#region src/app/about.tsx
 /**
 	* About route — `app/about.tsx` maps to `/about`. Showcases Atlas components
-	* (Card, Badge, Divider, Switch, ProgressBar) and navigates back with `useRouter()`.
+	* (Card, Badge, Divider, Switch, ProgressBar) + design-token theming: the Switch
+	* toggles the device color scheme, so the whole UI re-themes light↔dark.
 	*
 	* @module
 	*/
 	var about_exports = /* @__PURE__ */ __exportAll({ default: () => About });
-	const notifications = signal(true);
 	function About() {
 		const router = useRouter();
+		const theme = useTheme();
+		const colorScheme = useColorScheme();
 		return /* @__PURE__ */ jsxs(Card, {
 			variant: "filled",
 			style: {
 				minWidth: 300,
-				gap: 14,
+				gap: space.md,
 				alignItems: "stretch"
 			},
 			children: [
@@ -2331,7 +2446,11 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 						alignItems: "center"
 					},
 					children: [/* @__PURE__ */ jsx(Text, {
-						style: headingStyle,
+						style: () => ({
+							fontSize: fontSize.title2,
+							fontWeight: 800,
+							color: theme().color.text
+						}),
 						children: "About"
 					}), /* @__PURE__ */ jsx(Badge, {
 						tone: "info",
@@ -2340,12 +2459,12 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 				}),
 				/* @__PURE__ */ jsx(Divider, {}),
 				/* @__PURE__ */ jsx(Text, {
-					style: {
-						fontSize: 15,
-						color: palette.body,
+					style: () => ({
+						fontSize: fontSize.body,
+						color: theme().color.textMuted,
 						lineHeight: 22
-					},
-					children: "File-based routes navigated by the Quantum router via the useRouter hook — built from Atlas components, all TypeScript, running native in an embedded engine."
+					}),
+					children: "File-based routes navigated by the Quantum router via the useRouter hook — built from themed Atlas components, all TypeScript, running native in an embedded engine."
 				}),
 				/* @__PURE__ */ jsxs(Row, {
 					style: {
@@ -2353,22 +2472,26 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 						alignItems: "center"
 					},
 					children: [/* @__PURE__ */ jsx(Text, {
-						style: {
-							fontSize: 15,
-							color: palette.body
-						},
-						children: "Notifications"
+						style: () => ({
+							fontSize: fontSize.body,
+							color: theme().color.text
+						}),
+						children: "Dark mode"
 					}), /* @__PURE__ */ jsx(Switch, {
-						value: notifications,
-						onValueChange: (v) => notifications.set(v),
-						label: "Notifications"
+						value: () => colorScheme() === "dark",
+						onValueChange: (v) => setEnvironment({ colorScheme: v ? "dark" : "light" }),
+						label: "Dark mode"
 					})]
 				}),
 				/* @__PURE__ */ jsx(ProgressBar, { value: .6 }),
 				/* @__PURE__ */ jsx(Button, {
 					title: "← Home",
 					onPress: () => router.navigate("/"),
-					style: accentButton
+					style: () => ({
+						...buttonShape,
+						backgroundColor: theme().color.primary,
+						color: theme().color.onPrimary
+					})
 				})
 			]
 		});
@@ -2377,8 +2500,8 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 //#endregion
 //#region src/app/index.tsx
 /**
-	* Home route — `app/index.tsx` maps to `/` (file-based routing). The default export
-	* is the screen; `useRouter()` resolves the active router with no prop-drilling.
+	* Home route — `app/index.tsx` maps to `/` (file-based routing). Themed via design
+	* tokens (`useTheme`), so it re-themes light↔dark with the device color scheme.
 	*
 	* @module
 	*/
@@ -2387,53 +2510,67 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	const done = signal(0);
 	function Home() {
 		const router = useRouter();
+		const theme = useTheme();
 		const dimensions = useWindowDimensions();
 		const colorScheme = useColorScheme();
-		return /* @__PURE__ */ jsxs(Column, {
-			style: cardStyle,
+		return /* @__PURE__ */ jsxs(Card, {
+			style: {
+				minWidth: 300,
+				gap: space.md,
+				alignItems: "center"
+			},
 			children: [
 				/* @__PURE__ */ jsx(Text, {
-					style: headingStyle,
+					style: () => ({
+						fontSize: fontSize.title2,
+						fontWeight: 800,
+						color: theme().color.text
+					}),
 					children: "MindeesNative"
 				}),
 				/* @__PURE__ */ jsx(Text, {
-					style: {
-						fontSize: 15,
-						color: palette.muted
-					},
+					style: () => ({
+						fontSize: fontSize.footnote,
+						color: theme().color.textMuted
+					}),
 					children: "File-based routing · native · TypeScript"
 				}),
 				/* @__PURE__ */ jsx(Text, {
-					style: {
+					style: () => ({
 						fontSize: 36,
 						fontWeight: 800,
-						color: palette.accent,
-						paddingTop: 6
-					},
+						color: theme().color.primary
+					}),
 					children: () => `Done today: ${done()}`
 				}),
 				/* @__PURE__ */ jsxs(Row, {
 					style: {
-						gap: 12,
-						justifyContent: "center",
-						paddingTop: 8
+						gap: space.sm,
+						justifyContent: "center"
 					},
 					children: [/* @__PURE__ */ jsx(Button, {
 						title: "Mark done",
 						onPress: () => done.set(done() + 1),
-						style: accentButton
+						style: () => ({
+							...buttonShape,
+							backgroundColor: theme().color.primary,
+							color: theme().color.onPrimary
+						})
 					}), /* @__PURE__ */ jsx(Button, {
 						title: "About →",
 						onPress: () => router.navigate("/about"),
-						style: slateButton
+						style: () => ({
+							...buttonShape,
+							backgroundColor: theme().color.surfaceVariant,
+							color: theme().color.text
+						})
 					})]
 				}),
 				/* @__PURE__ */ jsx(Text, {
-					style: {
-						fontSize: 13,
-						color: palette.muted,
-						paddingTop: 4
-					},
+					style: () => ({
+						fontSize: fontSize.footnote,
+						color: theme().color.textMuted
+					}),
 					children: () => `Screen ${Math.round(dimensions().width)}×${Math.round(dimensions().height)} · ${colorScheme()}`
 				})
 			]
@@ -2460,10 +2597,18 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	* @module
 	*/
 	const router = createFileRouter(routes, { history: createMemoryHistory({ initialEntries: ["/"] }) });
-	/** Full-screen shell: dark background, centers the active route's card. */
+	/** Full-screen shell: themed background (re-themes light↔dark), centers the active route. */
 	function App() {
+		const theme = useTheme();
 		return /* @__PURE__ */ jsx(Column, {
-			style: screenStyle,
+			style: () => ({
+				flexGrow: 1,
+				width: "100%",
+				padding: space.lg,
+				alignItems: "center",
+				justifyContent: "center",
+				backgroundColor: theme().color.bg
+			}),
 			children: createRouterView(router)
 		});
 	}
