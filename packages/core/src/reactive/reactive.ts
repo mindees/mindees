@@ -35,6 +35,9 @@ interface OwnerNode {
   cleanups: Array<() => void> | null
 }
 
+/** @internal Phantom brand making {@link Owner} nominal — see below. */
+declare const OWNER_BRAND: unique symbol
+
 /**
  * An opaque disposal-scope handle. Obtain one with {@link getOwner} and re-enter
  * it with {@link runWithOwner}. Its internal shape — the reactive graph nodes it
@@ -42,12 +45,16 @@ interface OwnerNode {
  * {@link Computation} graph never leaks (no `any`, no internal mutable fields)
  * into consumers' types. Treat it as a token: hold it, pass it back; do not reach
  * inside it.
+ *
+ * It is **nominal** (branded with a private phantom symbol) so a structural
+ * object literal — e.g. `{}` — is *not* assignable to it. Only a value handed out
+ * by {@link getOwner} is a valid `Owner`; this prevents a fabricated owner from
+ * flowing through {@link runWithOwner} into `onCleanup`/`adopt` and crashing on a
+ * missing `owned`/`cleanups` field.
  */
 export interface Owner {
-  /** @internal Reactive nodes owned by this scope. */
-  readonly owned?: unknown
-  /** @internal Cleanup callbacks registered in this scope. */
-  readonly cleanups?: unknown
+  /** @internal Phantom brand — never present at runtime; blocks fabrication. */
+  readonly [OWNER_BRAND]: never
 }
 
 // ---------------------------------------------------------------------------
@@ -597,7 +604,9 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
 
 /** The current owner scope, or `null` outside any reactive scope. */
 export function getOwner(): Owner | null {
-  return currentOwner
+  // OwnerNode → the nominal public Owner. The brand is phantom (never present at
+  // runtime), so the only honest way to produce an Owner is through this cast.
+  return currentOwner as unknown as Owner | null
 }
 
 /** Run `fn` with `owner` as the active scope (e.g. to re-attach cleanups). */
@@ -605,7 +614,7 @@ export function runWithOwner<T>(owner: Owner | null, fn: () => T): T {
   const prev = currentOwner
   // `owner` is an opaque public handle; internally it is always an OwnerNode we
   // handed out via getOwner(). This is the one trusted boundary cast.
-  currentOwner = owner as OwnerNode | null
+  currentOwner = owner as unknown as OwnerNode | null
   try {
     return fn()
   } finally {
