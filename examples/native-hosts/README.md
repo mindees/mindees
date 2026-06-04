@@ -8,8 +8,9 @@
 > correct native view trees on the platform runtime** (iOS Simulator XCTest; Android
 > Robolectric, incl. click dispatch — Phase 8E). Android also has a runnable example
 > app that embeds QuickJS and speaks the JS↔native command bridge; CI assembles the
-> APK and unit-tests the bridge, but does not yet run it on an emulator/physical
-> device. Not production hosts.
+> APK, unit-tests the bridge, and runs `:mindees-example-app:connectedDebugAndroidTest`
+> on an Android API 35 emulator. Physical-device proof is still pending. Not
+> production hosts.
 
 ## What this is
 
@@ -86,11 +87,11 @@ renderer, and each is **compiled + its core tested in CI**:
 | iOS host project (`ios/`) — compiles + conformance core | ✅ verified in CI (macOS; Phase 8C) |
 | Android host project (`android/`) — compiles + conformance core | ✅ verified in CI (Linux; Phase 8D) |
 | Hosts **render the command stream into correct native view trees** | ✅ verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch; Phase 8E) |
-| Android example app (embedded QuickJS + JS↔native command bridge) | 🧪 Phase 8F-A; CI unit-tests bridge + assembles APK |
-| Full app **on a physical device** (emulator/device smoke + iOS bridge parity) | ⏳ Phase 8F |
+| Android example app (embedded QuickJS + JS↔native command bridge) | 🧪 Phase 8F-A/B; CI unit-tests bridge + assembles APK + runs an API 35 emulator smoke test |
+| Full app **on a physical device** (physical-device smoke + iOS bridge parity) | ⏳ Phase 8F |
 
 **You cannot build a real mobile app with MindeesNative today.** The host projects
 compile, pass their conformance cores, and are verified to render the command stream
 into correct native view trees in CI. Android now has an embedded-QuickJS example
-app and bridge, but **there is no emulator/physical-device proof or iOS equivalent
-yet** (the rest of Phase 8F).
+app and bridge with **emulator smoke testing in CI, but physical-device proof and
+iOS parity are not yet done** (the rest of Phase 8F).

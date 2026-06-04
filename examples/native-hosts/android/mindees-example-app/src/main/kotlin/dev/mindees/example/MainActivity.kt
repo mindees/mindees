@@ -107,7 +107,7 @@ class MainActivity : Activity() {
                   },
                   {
                     type: "insertChild",
-                    parentId: "host-root",
+                    parentId: "$HOST_ROOT_ID",
                     childId: ids.screen,
                     index: 0
                   }

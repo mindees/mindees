@@ -76,6 +76,27 @@ class MindeesRuntimeBridgeTest {
         }
     }
 
+    @Test
+    fun closeFailureStillMarksBridgeAsClosed() {
+        val runtime = CloseFailingRuntime()
+        val renderer = ModelRenderer()
+        val root = renderer.makeElement("root")
+        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val bridge = MindeesRuntimeBridge(host, runtime)
+
+        bridge.start()
+        assertThrows(IllegalStateException::class.java) {
+            bridge.close()
+        }
+        assertEquals(1, runtime.closeCount)
+
+        bridge.close()
+        assertEquals(1, runtime.closeCount)
+        assertThrows(IllegalStateException::class.java) {
+            bridge.dispatchEvent("counter.increment")
+        }
+    }
+
     private fun inner(root: ModelNode): String = root.children.joinToString("") { it.serialize() }
 
     private class RecordingRuntime : MindeesScriptRuntime {
@@ -136,6 +157,21 @@ class MindeesRuntimeBridgeTest {
 
         override fun close() {
             closeCount += 1
+        }
+    }
+
+    private class CloseFailingRuntime : MindeesScriptRuntime {
+        var closeCount = 0
+
+        override fun start(sink: NativeCommandSink) = Unit
+
+        override fun dispatchEvent(handlerId: String) {
+            throw AssertionError("dispatchEvent should not be called after failed close")
+        }
+
+        override fun close() {
+            closeCount += 1
+            throw IllegalStateException("close failed")
         }
     }
 }

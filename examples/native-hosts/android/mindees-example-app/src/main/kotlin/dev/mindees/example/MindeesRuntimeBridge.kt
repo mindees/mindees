@@ -49,8 +49,11 @@ class MindeesRuntimeBridge<V>(
 
     override fun close() {
         if (started) {
-            runtime.close()
-            started = false
+            try {
+                runtime.close()
+            } finally {
+                started = false
+            }
         }
     }
 }
