@@ -114,7 +114,7 @@ export class Scheduler {
       while (this.sync.length > 0 || this.normal.length > 0) {
         const entry = this.sync.length > 0 ? this.sync.shift() : this.normal.shift()
         if (!entry) continue
-        if (entry.key !== null) this.keyed.delete(entry.key)
+        this.clearKey(entry)
         const fn = entry.fn
         entry.fn = null
         if (fn) this.run(fn)
@@ -147,7 +147,15 @@ export class Scheduler {
       fn()
     } catch (error) {
       if (this.onError) {
-        this.onError(error)
+        try {
+          this.onError(error)
+        } catch (hookError) {
+          // A throwing onError hook must not abort the flush or strand the tasks
+          // queued after it; surface it asynchronously like an unhandled task error.
+          this.scheduleMicrotask(() => {
+            throw hookError
+          })
+        }
       } else {
         // Surface without aborting the flush.
         this.scheduleMicrotask(() => {
@@ -157,11 +165,24 @@ export class Scheduler {
     }
   }
 
+  /**
+   * Remove an entry's dedup-key mapping, but only if the map still points at THIS
+   * entry. Keys are reused over time (a 'render' key is scheduled, runs, then
+   * scheduled again), so a stale handle or an already-dequeued entry must never
+   * evict a newer live entry's mapping — doing so would break dedup and let two
+   * same-key tasks both run.
+   */
+  private clearKey(entry: Entry): void {
+    if (entry.key !== null && this.keyed.get(entry.key) === entry) {
+      this.keyed.delete(entry.key)
+    }
+  }
+
   private makeHandle(entry: Entry): ScheduledTask {
     return {
       cancel: () => {
         entry.fn = null
-        if (entry.key !== null) this.keyed.delete(entry.key)
+        this.clearKey(entry)
       },
       get pending() {
         return entry.fn !== null

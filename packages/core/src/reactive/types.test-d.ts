@@ -1,5 +1,14 @@
 import { expectTypeOf } from 'expect-type'
-import { computed, effect, type Memo, type Signal, signal, untrack } from './reactive'
+import {
+  computed,
+  effect,
+  getOwner,
+  type Memo,
+  type Owner,
+  type Signal,
+  signal,
+  untrack,
+} from './reactive'
 
 // signal() returns a Signal<T> with the expected shape and inferred T.
 const count = signal(0)
@@ -25,3 +34,12 @@ expectTypeOf(effect(() => {})).toEqualTypeOf<() => void>()
 
 // untrack() preserves the callback's return type.
 expectTypeOf(untrack(() => count())).toEqualTypeOf<number>()
+
+// Owner is an OPAQUE, NOMINAL handle: getOwner() yields it, but it does not leak
+// the internal type-erased Computation graph (no `any`, no internal fields), and
+// it cannot be fabricated from a structural object literal — so a malformed owner
+// can never reach runWithOwner and crash onCleanup/adopt.
+expectTypeOf(getOwner()).toEqualTypeOf<Owner | null>()
+// @ts-expect-error - Owner is nominal; a plain object is not assignable to it.
+const _fabricated: Owner = {}
+void _fabricated

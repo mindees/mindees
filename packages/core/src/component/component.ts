@@ -179,10 +179,21 @@ export function renderComponent<P>(
   props: P,
 ): { node: MindeesNode; dispose: () => void } {
   let node!: MindeesNode
-  const dispose = createRoot((dispose) => {
-    node = component(props)
-    return dispose
-  })
+  // Capture the disposer eagerly: createRoot hands it to the callback synchronously
+  // *before* the component runs, so if the component throws mid-render we can still
+  // tear down anything it registered before the throw (effects, subscriptions,
+  // timers). Without this, createRoot re-throws without disposing and the caller
+  // never receives a disposer — the partial scope would leak forever.
+  let dispose!: () => void
+  try {
+    createRoot((d) => {
+      dispose = d
+      node = component(props)
+    })
+  } catch (error) {
+    dispose?.()
+    throw error
+  }
   return { node, dispose }
 }
 

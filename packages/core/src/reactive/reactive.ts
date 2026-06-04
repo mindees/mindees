@@ -23,15 +23,38 @@
 // ---------------------------------------------------------------------------
 
 /**
- * A disposal scope. Computations and roots own the cleanups and child
- * computations created while they are the active owner; disposing an owner
- * tears all of them down.
+ * @internal Engine-side disposal scope. Computations and roots own the cleanups
+ * and child computations created while they are the active owner; disposing an
+ * owner tears all of them down. This concrete shape stays internal — see the
+ * public {@link Owner} opaque handle.
  */
-export interface Owner {
+interface OwnerNode {
   /** Child computations created while this owner was active. */
   owned: AnyComputation[] | null
   /** Cleanup callbacks registered via {@link onCleanup}. */
   cleanups: Array<() => void> | null
+}
+
+/** @internal Phantom brand making {@link Owner} nominal — see below. */
+declare const OWNER_BRAND: unique symbol
+
+/**
+ * An opaque disposal-scope handle. Obtain one with {@link getOwner} and re-enter
+ * it with {@link runWithOwner}. Its internal shape — the reactive graph nodes it
+ * owns — is intentionally not part of the public type surface, so the type-erased
+ * {@link Computation} graph never leaks (no `any`, no internal mutable fields)
+ * into consumers' types. Treat it as a token: hold it, pass it back; do not reach
+ * inside it.
+ *
+ * It is **nominal** (branded with a private phantom symbol) so a structural
+ * object literal — e.g. `{}` — is *not* assignable to it. Only a value handed out
+ * by {@link getOwner} is a valid `Owner`; this prevents a fabricated owner from
+ * flowing through {@link runWithOwner} into `onCleanup`/`adopt` and crashing on a
+ * missing `owned`/`cleanups` field.
+ */
+export interface Owner {
+  /** @internal Phantom brand — never present at runtime; blocks fabrication. */
+  readonly [OWNER_BRAND]: never
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +92,7 @@ type AnyComputation = Computation<any>
 /** The computation currently executing, used for automatic dependency tracking. */
 let currentObserver: AnyComputation | null = null
 /** The active disposal scope for onCleanup / child registration. */
-let currentOwner: Owner | null = null
+let currentOwner: OwnerNode | null = null
 /** Outstanding `batch()` nesting depth; effects flush when this returns to 0. */
 let batchDepth = 0
 /** Effects marked stale and awaiting a flush. */
@@ -90,7 +113,7 @@ interface WithNode<T> {
 // Computation: the unit of reactivity (signal, computed, or effect)
 // ---------------------------------------------------------------------------
 
-class Computation<T> implements Owner {
+class Computation<T> implements OwnerNode {
   value: T
   fn: (() => T) | null
   state: State
@@ -107,6 +130,19 @@ class Computation<T> implements Owner {
    * a custom comparator would receive `undefined` and could throw.
    */
   private initialized: boolean
+  /**
+   * True only while this node's own {@link update} is on the stack. Lets
+   * {@link markStale} recognize a *self-write* — the body writing a signal the
+   * node observes — instead of dropping the mark (the node is already DIRTY).
+   */
+  private running = false
+  /**
+   * Set by {@link markStale} when a self-write occurs mid-update. {@link update}'s
+   * loop recomputes once more so the node converges on the value it just produced,
+   * honoring the contract that a computation reflects its dependencies' latest
+   * values. Reset at the start of every pass.
+   */
+  private restaleRequested = false
 
   constructor(value: T, fn: (() => T) | null, equals: EqualsFn<T> | false, isEffect: boolean) {
     this.value = value
@@ -140,6 +176,15 @@ class Computation<T> implements Owner {
 
   /** Color this node (and, transitively, its observers) as stale. */
   markStale(state: State): void {
+    // Self-write: this node is being marked stale while its own update() is
+    // running (its body just wrote a signal it observes). It is already DIRTY, so
+    // the gate below would silently drop the mark and the change would be lost.
+    // Instead request one more recompute pass (handled by update()'s loop); don't
+    // re-propagate here — the re-run will, once it produces a new value.
+    if (this.running) {
+      this.restaleRequested = true
+      return
+    }
     if (this.state < state) {
       const wasClean = this.state === CLEAN
       this.state = state
@@ -170,22 +215,59 @@ class Computation<T> implements Owner {
     }
   }
 
-  /** Recompute the derivation, re-tracking dependencies and notifying observers. */
+  /**
+   * Recompute the derivation, re-tracking dependencies and notifying observers.
+   *
+   * Runs in a bounded loop. If the body writes a signal it itself observes (a
+   * self-write), {@link markStale} sets {@link restaleRequested} rather than the
+   * mark being lost, and we recompute again so the node converges on the value it
+   * just produced. The loop is capped by {@link MAX_FLUSH_ITERATIONS} so a
+   * non-terminating self-writer (e.g. `effect(() => a.set(a() + 1))`) throws
+   * instead of hanging. A prior-run cleanup that throws during teardown must not
+   * abort the re-track/recompute (that would strand the node's children and
+   * dynamic deps); its error is captured and rethrown only after the node has
+   * rebuilt a consistent graph.
+   */
   private update(): void {
     const oldValue = this.value
-    disposeChildren(this)
-    unlinkSources(this)
-
-    const prevObserver = currentObserver
-    const prevOwner = currentOwner
-    currentObserver = this
-    currentOwner = this
+    let cleanupError: unknown
+    let hasCleanupError = false
+    let iterations = 0
+    this.running = true
     try {
-      // biome-ignore lint/style/noNonNullAssertion: update() only runs for derivations (fn != null).
-      this.value = this.fn!()
+      do {
+        this.restaleRequested = false
+        try {
+          disposeChildren(this)
+        } catch (err) {
+          if (!hasCleanupError) {
+            cleanupError = err
+            hasCleanupError = true
+          }
+        }
+        unlinkSources(this)
+
+        const prevObserver = currentObserver
+        const prevOwner = currentOwner
+        currentObserver = this
+        currentOwner = this
+        try {
+          // biome-ignore lint/style/noNonNullAssertion: update() only runs for derivations (fn != null).
+          this.value = this.fn!()
+        } finally {
+          currentObserver = prevObserver
+          currentOwner = prevOwner
+        }
+
+        if (++iterations > MAX_FLUSH_ITERATIONS) {
+          this.restaleRequested = false
+          throw new Error(
+            'MindeesNative: potential infinite reactive loop detected — a computation keeps writing a signal it reads.',
+          )
+        }
+      } while (this.restaleRequested)
     } finally {
-      currentObserver = prevObserver
-      currentOwner = prevOwner
+      this.running = false
     }
 
     // On the first computation there is no prior value to compare against, so
@@ -201,6 +283,10 @@ class Computation<T> implements Owner {
         o.state = DIRTY
       }
     }
+
+    // The graph is consistent again; now surface any error a previous-run cleanup
+    // threw during teardown (the body still re-ran, so children/deps are rebuilt).
+    if (hasCleanupError) throw cleanupError
   }
 }
 
@@ -209,6 +295,10 @@ class Computation<T> implements Owner {
 // ---------------------------------------------------------------------------
 
 function link(observer: AnyComputation, source: AnyComputation): void {
+  // Never subscribe a disposed observer — e.g. a node that disposed itself
+  // mid-run and then read another signal. The subscription would leak: nothing
+  // tears down a DISPOSED node again.
+  if (observer.state === DISPOSED) return
   if (observer.sources === null) observer.sources = []
   const sources = observer.sources
   if (!sources.includes(source)) {
@@ -232,7 +322,7 @@ function unlinkSources(node: AnyComputation): void {
   node.sources = null
 }
 
-function disposeChildren(owner: Owner): void {
+function disposeChildren(owner: OwnerNode): void {
   // Dispose every owned child AND run every cleanup even if some throw, so a
   // single faulty child/cleanup can't strand the rest or leak observers. `owned`
   // is nulled up front so a throw can't leave a half-disposed array behind.
@@ -266,6 +356,14 @@ function disposeChildren(owner: Owner): void {
 
 function disposeComputation(node: AnyComputation): void {
   if (node.state === DISPOSED) return
+  // If a node disposes itself mid-run, stop tracking and adopting onto it for the
+  // rest of the (now-aborted) body: a later tracked read would otherwise
+  // re-subscribe this DISPOSED node, and onCleanup/adopt would register work on a
+  // dead scope — none of which is ever torn down again (a leak). Clearing the
+  // globals makes read()/onCleanup/adopt no-op for the remainder of the body;
+  // update()'s finally restores the previous owner afterward.
+  if (node === currentObserver) currentObserver = null
+  if (node === currentOwner) currentOwner = null
   try {
     disposeChildren(node)
   } finally {
@@ -491,7 +589,7 @@ export function onCleanup(fn: () => void): void {
  * dispose() // tear down the effect
  */
 export function createRoot<T>(fn: (dispose: () => void) => T): T {
-  const root: Owner = { owned: null, cleanups: null }
+  const root: OwnerNode = { owned: null, cleanups: null }
   const prevObserver = currentObserver
   const prevOwner = currentOwner
   currentObserver = null
@@ -506,13 +604,17 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
 
 /** The current owner scope, or `null` outside any reactive scope. */
 export function getOwner(): Owner | null {
-  return currentOwner
+  // OwnerNode → the nominal public Owner. The brand is phantom (never present at
+  // runtime), so the only honest way to produce an Owner is through this cast.
+  return currentOwner as unknown as Owner | null
 }
 
 /** Run `fn` with `owner` as the active scope (e.g. to re-attach cleanups). */
 export function runWithOwner<T>(owner: Owner | null, fn: () => T): T {
   const prev = currentOwner
-  currentOwner = owner
+  // `owner` is an opaque public handle; internally it is always an OwnerNode we
+  // handed out via getOwner(). This is the one trusted boundary cast.
+  currentOwner = owner as unknown as OwnerNode | null
   try {
     return fn()
   } finally {
