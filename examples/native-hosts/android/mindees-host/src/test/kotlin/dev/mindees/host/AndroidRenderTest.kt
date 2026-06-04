@@ -12,6 +12,9 @@
 
 package dev.mindees.host
 
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -101,5 +104,117 @@ class AndroidRenderTest {
         // performClick() drives the real OnClickListener the renderer wired.
         container.getChildAt(0).performClick()
         assertEquals(listOf("h1"), fired)
+    }
+
+    @Test
+    fun composesTextNodeChildrenIntoTextElement() {
+        // Atlas Text renders as a `text` ELEMENT wrapping a text NODE. A TextView can't hold
+        // child views, so the element must compose its text-node children into its own text.
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"label","tag":"text"},
+                  {"type":"createText","id":"s","text":"Hello"},
+                  {"type":"insertChild","parentId":"label","childId":"s","index":0},
+                  {"type":"insertChild","parentId":"host-root","childId":"label","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        // The element is the single TextView child of the container, carrying the composed text.
+        assertEquals(1, container.childCount)
+        val label = container.getChildAt(0) as TextView
+        assertEquals("Hello", label.text.toString())
+
+        // A reactive updateText on the text node re-composes the owning element.
+        host.apply(NativeCommandCodec.decodeBatch("""[{"type":"updateText","id":"s","text":"World"}]"""))
+        assertEquals("World", label.text.toString())
+    }
+
+    @Test
+    fun appliesAtlasFlexBoxAndVisualStyle() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"row","tag":"view"},
+                  {"type":"setProp","id":"row","name":"style","value":{
+                    "flexDirection":"row","gap":12,"padding":16,"backgroundColor":"#161b2e",
+                    "borderRadius":20,"justifyContent":"center","alignItems":"center","width":"100%"
+                  }},
+                  {"type":"createText","id":"a","text":"A"},
+                  {"type":"createText","id":"b","text":"B"},
+                  {"type":"insertChild","parentId":"row","childId":"a","index":0},
+                  {"type":"insertChild","parentId":"row","childId":"b","index":1},
+                  {"type":"insertChild","parentId":"host-root","childId":"row","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val row = container.getChildAt(0) as LinearLayout
+        // flexDirection:'row' → HORIZONTAL; justify+align center → Gravity.CENTER.
+        assertEquals(LinearLayout.HORIZONTAL, row.orientation)
+        assertEquals(Gravity.CENTER, row.gravity)
+        // backgroundColor/borderRadius → a GradientDrawable background; padding applied.
+        assertTrue(row.background is GradientDrawable)
+        assertTrue(row.paddingTop > 0)
+        // width:'100%' → MATCH_PARENT layout param.
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, row.layoutParams.width)
+        // gap → leading margin on every child but the first (along the row axis).
+        assertEquals(0, (row.getChildAt(0).layoutParams as LinearLayout.LayoutParams).leftMargin)
+        assertTrue((row.getChildAt(1).layoutParams as LinearLayout.LayoutParams).leftMargin > 0)
+    }
+
+    @Test
+    fun appliesAtlasTextStyle() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createText","id":"t","text":"Big"},
+                  {"type":"setProp","id":"t","name":"style","value":{
+                    "color":"#5b8cff","fontSize":40,"fontWeight":700,"textAlign":"center"
+                  }},
+                  {"type":"insertChild","parentId":"host-root","childId":"t","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val label = container.getChildAt(0) as TextView
+        assertEquals(Color.parseColor("#5b8cff"), label.currentTextColor)
+        assertTrue(label.textSize > 0f)
+        assertEquals(Gravity.CENTER, label.gravity)
+        // Note: fontWeight→bold is applied by the renderer (setTypeface BOLD) but Robolectric
+        // doesn't faithfully model typeface style / synthetic bold, so it isn't asserted here;
+        // it is exercised by the on-device example and visible at runtime.
+    }
+
+    @Test
+    fun wiresAtlasClickEventOnAView() {
+        // Atlas's Pressable emits onClick → wire event "click" (not "press"); a plain
+        // styled 'view' (how Atlas Button renders) must still be tappable.
+        val fired = mutableListOf<String>()
+        val context = RuntimeEnvironment.getApplication()
+        val container = LinearLayout(context)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
+            fired.add(it)
+        }
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"v","tag":"view"},
+                  {"type":"registerEvent","id":"v","eventName":"click","handlerId":"inc"},
+                  {"type":"insertChild","parentId":"host-root","childId":"v","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        container.getChildAt(0).performClick()
+        assertEquals(listOf("inc"), fired)
     }
 }

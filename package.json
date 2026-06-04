@@ -28,6 +28,7 @@
     "benchmark": "pnpm run build && node scripts/benchmark.mjs",
     "benchmark:json": "pnpm run build && node scripts/benchmark.mjs --json",
     "smoke:cli": "node scripts/smoke-cli.mjs",
+    "build:android-example-js": "pnpm run build && tsdown --config examples/native-hosts/android/mindees-example-app/app-js/tsdown.config.ts",
     "verify": "pnpm run lint && pnpm run check:versions && pnpm run typecheck && pnpm run build && pnpm run check:exports && pnpm run check:pack && pnpm run smoke:cli && pnpm run test",
     "changeset": "changeset",
     "version-packages": "changeset version && node scripts/sync-versions.mjs",
