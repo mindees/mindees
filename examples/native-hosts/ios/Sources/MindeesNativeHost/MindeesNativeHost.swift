@@ -6,7 +6,7 @@
 //  `HostRenderer` builds/mutates the actual platform views. Use `UIKitRenderer` on a
 //  device, or `ModelRenderer` in tests (no UIKit needed → `swift test` runs anywhere).
 //
-//  ⚠️ Authored, not yet compiled by the maintainers — see Package.swift.
+//  CI-verified by the native iOS workflow.
 //
 
 import Foundation

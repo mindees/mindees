@@ -4,7 +4,7 @@
  *
  * Mirrors @mindees/renderer's TypeScript conformance suite.
  *
- * ⚠️ Authored, not yet run by the maintainers — please `./gradlew test` and report.
+ * CI-verified by the native Android workflow.
  */
 
 package dev.mindees.host

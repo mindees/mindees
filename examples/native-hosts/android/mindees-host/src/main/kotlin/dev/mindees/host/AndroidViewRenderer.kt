@@ -4,7 +4,7 @@
  * The device-facing layer (needs a device/emulator to actually render). Tag mapping
  * and prop application are an intentional MVP — extend for your design system.
  *
- * ⚠️ Authored, not yet compiled/run by the maintainers — see the module README.
+ * CI-verified by the native Android workflow; see the module README.
  */
 
 package dev.mindees.host

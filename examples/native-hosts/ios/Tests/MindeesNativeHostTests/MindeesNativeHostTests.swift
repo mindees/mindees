@@ -5,7 +5,7 @@
 //  These mirror @mindees/renderer's TypeScript conformance suite, so a passing run
 //  here means this host implements the same contract.
 //
-//  ⚠️ Authored, not yet run by the maintainers — please `swift test` and report.
+//  CI-verified by the native iOS workflow.
 //
 
 import XCTest

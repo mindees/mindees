@@ -33,10 +33,12 @@ OTA updates. Built in the open.
 > tested** — see the live examples below. The **native rendering strand** is real:
 > the command backend, a strict conformance contract, and **iOS + Android host
 > projects that render the command stream into correct native view trees** are all
-> verified in CI (Phases 8A–8E). Pulse OTA, Continuum data, Synapse AI, and Atlas UI
-> are implemented in their documented experimental scope. Still missing: native
-> iOS/Android apps **do not run end-to-end yet** — an embedded JS
-> engine + JS↔native bridge (Phase 8F) is what makes a full on-device app real.
+> verified in CI (Phases 8A-8E), Android now has an embedded QuickJS example
+> app that CI runs on an emulator through a real JS<->native bridge (Phase 8F-A/B),
+> and iOS has a JavaScriptCore bridge verified on an iOS Simulator (Phase 8F-C).
+> Pulse OTA, Continuum data, Synapse AI, and Atlas UI are implemented in their
+> documented experimental scope. Still missing: physical-device proof, app-store
+> packaging, and production hardening, so production native mobile apps are not ready.
 >
 > ⭐ **Star the repo** to follow along, and check the
 > [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
@@ -246,6 +248,8 @@ upgrades).
 - ✅ **Phase 8B** — native **host conformance contract**: a strict reference host (`createReferenceHost`) that replays + validates the command stream — the executable spec a real native host implements
 - ✅ **Phase 8C / 8D** — **iOS & Android host projects** ([examples/native-hosts/](./examples/native-hosts/)) compile + pass their conformance cores in CI (macOS runner for iOS; Linux + Android SDK for Android)
 - ✅ **Phase 8E** — both hosts **render** the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch)
+- 🧪 **Phase 8F-A/B** — Android embedded-runtime example app: QuickJS + JS↔native command bridge, APK assembly, and emulator-connected smoke test in CI
+- 🧪 **Phase 8F-C** - iOS embedded-runtime bridge: JavaScriptCore + JS<->native command bridge, model bridge tests, and iOS Simulator `UIButton` target/action smoke test in CI
 - ✅ **Phase 9A** — Pulse **signed OTA core**: hash-addressed manifest + Ed25519 signing/verify (threshold + key rotation, pure-JS `@noble`) + content-addressed store + an update client with atomic generations & crash-loop rollback
 - ✅ **Phase 9B** — Pulse **differential downloads**: a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`) so a changed asset ships as just its delta against a stored base, verified by the existing SHA-256 gate with a full-fetch fallback
 - ✅ **Phase 9C** — Pulse **reference update server**: a pure, capability-injected `createUpdateServer` (channel selection, staged rollout, anti-downgrade, freeze, rollback directives, content-addressed asset serving; never signs) + a runnable `node:http` adapter example
@@ -253,7 +257,7 @@ upgrades).
 - ✅ **Phase 10 (Continuum)** — **local-first data**: signals-native `createCollection` (10A) + Hybrid Logical Clock causality (10B) + CRDT conflict resolution — per-field LWW + add-wins OR-Set (10C) + a **delta-sync engine where two peers converge offline** (10D) + reference sync server and persistence export/restore (10E/10F)
 - ✅ **Phase 11 (Synapse) — provider-agnostic AI**: a pure-TS `AiBackend` (`createAi`) with a deterministic mock + an inject-`fetch` server backend (openai/anthropic), `AsyncIterable` streaming (11A/11B); Standard-Schema **structured output** (`generateObject`/`streamObject`, no `eval`, sanitize-before-validate) + a bounded **tool-calling loop** (`runTools`) (11C); and a dev-time **error explainer** (`mindees ai explain`) (11D) — on-device LLM inference is a labeled 🔬 research track
 - ✅ **Phase 12 (Atlas) — accessible UI primitives + virtualized list**: signals-native `View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button` + layout (`Stack`/`Row`/`Column`/`Spacer`/`ScrollView`), a curated cross-platform `StyleObject` (numbers → `px` on web), `role`/`aria-*` accessibility, real-DOM-event interaction, a structural theme (12A), and a **virtualized recycling `List`** that renders only the visible window and reuses rows as you scroll (12B) — renderer-agnostic trees, web real, native 🔬
-- ⏭️ **Phases 8F / 13** — end-to-end native app (embedded JS engine + JS↔native bridge); then examples, benchmarks, docs site & release
+- ⏭️ **Phases 8F / 13** - physical-device native proof, then examples, benchmarks, docs site & release
 
 Benchmark evidence for implemented hot paths lives in [`docs/benchmarks.md`](./docs/benchmarks.md).
 
@@ -312,13 +316,14 @@ Android and web, and get fine-grained reactivity and native UI.
 100% TypeScript. No new language to learn.
 
 **Can I build mobile apps with it today?**
-Not yet — it's pre-alpha. The reactive core, **web** renderer (with SSR), compiler,
-CLI, typed router, Pulse OTA, Continuum data, Synapse AI, and Atlas UI work in
-their documented experimental scope. The native rendering foundation is more than
-a stub: the command backend, reference host, iOS/Android host projects, and
-platform-runtime render verification are CI-verified. A full native app still does
-not run end-to-end because the embedded JS engine + JS↔native bridge (Phase 8F) is
-not implemented. ⭐ Star and watch the repo to follow progress.
+Not for production yet - it's pre-alpha. The reactive core, **web** renderer (with
+SSR), compiler, CLI, typed router, Pulse OTA, Continuum data, Synapse AI, Atlas UI,
+and the native rendering foundation all work in their documented experimental scope.
+The repo also has CI-verified iOS/Android host projects, an Android example app
+that runs on an emulator through an embedded QuickJS JS<->native bridge, and an
+iOS JavaScriptCore bridge exercised on an iOS Simulator. Still missing:
+physical-device proof, app-store packaging, and the production hardening expected
+before real mobile apps.
 
 **Is it open source?**
 Yes — dual-licensed **MIT OR Apache-2.0**, built fully in the open.

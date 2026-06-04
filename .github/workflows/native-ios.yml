@@ -54,7 +54,70 @@ jobs:
       - name: Compile for iOS
         run: xcodebuild build -scheme MindeesNativeHost -destination 'generic/platform=iOS' -skipPackagePluginValidation
 
+      # Create a concrete simulator because macos-latest images can expose only the
+      # generic "Any iOS Simulator Device" placeholder until a device is created.
+      - name: Prepare iOS Simulator
+        id: ios-simulator
+        run: |
+          set -euo pipefail
+          DEVICE_TYPE_ID="$(python3 - <<'PY'
+          import json
+          import subprocess
+
+          data = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "-j"], text=True)
+          )["devicetypes"]
+          iphones = [d for d in data if d.get("name", "").startswith("iPhone")]
+          if not iphones:
+              raise SystemExit("No iPhone simulator device types are installed")
+
+          preferred = [
+              "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+              "com.apple.CoreSimulator.SimDeviceType.iPhone-15",
+              "com.apple.CoreSimulator.SimDeviceType.iPhone-14",
+          ]
+          by_id = {d["identifier"]: d for d in iphones}
+          for identifier in preferred:
+              if identifier in by_id:
+                  print(identifier)
+                  break
+          else:
+              print(iphones[-1]["identifier"])
+          PY
+          )"
+          RUNTIME_ID="$(python3 - <<'PY'
+          import json
+          import subprocess
+
+          def version_key(runtime):
+              parts = []
+              for part in runtime.get("version", "0").split("."):
+                  try:
+                      parts.append(int(part))
+                  except ValueError:
+                      parts.append(0)
+              return parts
+
+          data = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "-j"], text=True)
+          )["runtimes"]
+          runtimes = [
+              r for r in data
+              if r.get("isAvailable", True)
+              and (r.get("platform") == "iOS" or ".iOS-" in r.get("identifier", ""))
+          ]
+          if not runtimes:
+              raise SystemExit("No available iOS simulator runtimes are installed")
+
+          runtimes.sort(key=version_key)
+          print(runtimes[-1]["identifier"])
+          PY
+          )"
+          UDID="$(xcrun simctl create "Mindees iPhone" "$DEVICE_TYPE_ID" "$RUNTIME_ID")"
+          echo "Created simulator $UDID ($DEVICE_TYPE_ID / $RUNTIME_ID)"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
       # Run the UIKit render tests on an iOS Simulator — proves the command stream
       # renders into a correct, real UIView hierarchy (Phase 8E).
       - name: Render test on iOS Simulator
-        run: xcodebuild test -scheme MindeesNativeHost -destination 'platform=iOS Simulator,name=iPhone 16' -skipPackagePluginValidation
+        run: xcodebuild test -scheme MindeesNativeHost -destination 'platform=iOS Simulator,id=${{ steps.ios-simulator.outputs.udid }}' -skipPackagePluginValidation

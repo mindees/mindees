@@ -4,7 +4,20 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** Documentation consistency pass; product status through Phase 13 release infrastructure.
+**Last updated:** Phase 8F-C (iOS JavaScriptCore bridge parity; product status through Phase 13 release infrastructure).
+
+Phase 8F-C (native strand - iOS embedded-runtime bridge parity): the native strand
+now has embedded-runtime proof on both mobile hosts in CI. Android has the runnable
+Gradle example app (`examples/native-hosts/android/mindees-example-app`) with Cash
+App QuickJS, an API 35 emulator smoke test, and a native button click that updates
+the live `TextView` through the bridge. iOS now has `MindeesRuntimeBridge` plus
+`JavaScriptCoreMindeesRuntime` in the Swift package; `swift test` exercises the
+model bridge and the iOS Simulator test invokes a `UIButton` `.touchUpInside`
+target/action callback, routes the event through `MindeesApp.dispatchEvent(handlerId)`,
+and observes the JS-driven label update. This is still not a full Phase 8F completion:
+physical-device smoke execution is pending, so MindeesNative still cannot honestly
+claim production-ready native mobile apps end to end.
+
 **Phase 10 (Continuum) is complete**: on top of the core (10A–10D), `@mindees/data` now
 also has a capability-injected reference sync server (`@mindees/data/server` +
 `createSyncServer` over an injected op log, with a runnable `node:http` example) and a
@@ -79,9 +92,16 @@ compile, Phase 8C; Android `gradle test` + `assembleDebug`, Phase 8D) **and to r
 the command stream into correct native view trees on the platform runtime** (Phase 8E):
 an iOS Simulator XCTest asserts the real `UIView` hierarchy, and an Android Robolectric
 test asserts the real `android.view` hierarchy (incl. click dispatch via `performClick()`).
-**What is NOT yet done: a full app on a physical device** — there is no embedded JS
-engine / JS↔native bridge running the reactive app on-device, so **you cannot build a
-native mobile app end-to-end with MindeesNative today** — that is Phase 8F.
+**Phase 8F-A/B/C adds embedded-runtime bridge progress:** Android `mindees-example-app`
+embeds QuickJS and speaks the real serialized command protocol into
+`AndroidViewRenderer`; CI unit-tests the bridge, assembles the APK, and runs a
+connected emulator smoke test that presses the native button through the embedded
+runtime. iOS now embeds JavaScriptCore through `JavaScriptCoreMindeesRuntime`; CI
+tests the model bridge via `swift test` and runs an iOS Simulator smoke test that
+invokes a `UIButton` `.touchUpInside` target/action callback and observes the
+JS-driven label update. **What is NOT
+yet done: physical-device proof**, so **you cannot build a production native mobile
+app end-to-end with MindeesNative today** - the rest of Phase 8F remains.
 
 Phase 7 (Quantum Router II) — complete (render integration +
 data/guards/transitions). `@mindees/router` renders (`createRouterView` —
@@ -126,7 +146,9 @@ without state reset, and injectable history (memory + browser).
 | Native command backend (element tree + reactive updates → serializable `NativeCommand` stream) | ✅ done (Phase 8A) — `@mindees/renderer` |
 | Native host conformance contract (strict reference host: replay + validate the command stream) | ✅ done (Phase 8B) — `@mindees/renderer` |
 | Native host projects compile + conformance core verified in CI (iOS `swift test`/iOS compile; Android `gradle test`/`assemble`) | ✅ done (Phase 8C iOS, 8D Android) — `examples/native-hosts/` |
-| Native hosts render the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric incl. click dispatch) | ✅ done (Phase 8E) — `examples/native-hosts/` (full app on a physical device over a JS↔native bridge 🔬, Phase 8F) |
+| Native hosts render the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric incl. click dispatch) | ✅ done (Phase 8E) — `examples/native-hosts/` |
+| Android embedded-runtime example app (QuickJS + JS↔native command bridge) | 🧪 in progress (Phase 8F-A/B) - `examples/native-hosts/android/mindees-example-app`; bridge unit-tested + APK assembled + emulator-smoke tested in CI; physical-device smoke pending |
+| iOS embedded-runtime bridge (JavaScriptCore + JS↔native command bridge) | 🧪 in progress (Phase 8F-C) - `examples/native-hosts/ios`; model bridge tested via `swift test` + UIKit `UIButton` target/action callback smoke tested on iOS Simulator in CI; physical-device smoke pending |
 | Compiler: type-check gate + TSX transform + tree-flatten + route manifest | ✅ done (Phase 4) — `@mindees/compiler` (TS→native AOT 🔬) |
 | CLI: create + build + doctor + info + dev orchestrator; `npm create mindees` | ✅ done (Phase 5) — `@mindees/cli` + `create-mindees` (dev HTTP/HMR transport = preview) |
 | Router: typed params + validated typed search + signals-native state + typed/relative navigation | ✅ done (Phase 6) — `@mindees/router` |
@@ -150,7 +172,7 @@ without state reset, and injectable history (memory + browser).
 | `@mindees/compiler` | 🧪 Experimental | MDC build-time optimizer (type-check gate, TSX→createElement, tree-flattening, per-route manifest, plugin API) on the TS Compiler API shipped in Phase 4. TS→native AOT is 🔬. |
 | `@mindees/cli` | 🧪 Experimental | Forge CLI shipped in Phase 5: create (+ templates), build (via the compiler), doctor, info, dev rebuild-orchestrator. **Phase 11D** adds `mindees ai explain <error>` — a dev-time error explainer over Synapse's `explainError` (server backend wired from `MINDEES_AI_*` env; deterministically testable with the mock). Live dev-server HTTP/HMR transport is a preview. |
 | `@mindees/router` | 🧪 Experimental | Quantum Router I (Phase 6) + II (Phase 7). I: codegen-free typed path params, Standard-Schema validated typed search params, signals-native router state with selector isolation, typed + relative navigation, dynamic reconfiguration, memory + browser history. II: nested route tree + match chain, `createRouterView` (fine-grained, layout-preserving nested rendering), typed `createLink`, SWR data loaders (+ AbortSignal, `invalidate`, `preload`), navigation guards (cancel/redirect/idempotent), web view transitions. Deferred 📋: global typed route registry, file-based scanning + bundler plugin, per-key fine-grained loader signals, native shared-element transitions. |
-| `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. **Phase 8A** added the native command backend (`createNativeCommandBackend()`): a serializable `NativeCommand` protocol + a `HostBackend` that emits it (events as stable handler ids; subtree-safe disposal). **Phase 8B** added `createReferenceHost()`: a strict reference host that replays + validates the stream — the conformance contract real native hosts implement. The `examples/native-hosts/` iOS + Android host projects compile + pass their conformance cores in CI (Phase 8C/8D) and render the command stream into correct native view trees on the platform runtime (iOS Simulator XCTest; Android Robolectric — Phase 8E). A full app on a physical device over a JS↔native bridge (Phase 8F) + GPU canvas are 🔬. |
+| `@mindees/renderer` | 🧪 Experimental | Helix reconciler + web/DOM backend + SSR/hydration + headless backend shipped in Phase 3. Phase 8A added `createNativeCommandBackend()`; Phase 8B added `createReferenceHost()`. The `examples/native-hosts/` iOS + Android host projects compile + pass their conformance cores in CI (Phase 8C/8D) and render the command stream into correct native view trees on the platform runtime (iOS Simulator XCTest; Android Robolectric - Phase 8E). Phase 8F-A/B adds an Android QuickJS example app with emulator smoke coverage. Phase 8F-C adds the iOS JavaScriptCore bridge and iOS Simulator `UIButton` target/action callback smoke coverage. Physical-device smoke execution and GPU canvas remain research-track/planned. |
 | `@mindees/atlas` | 🧪 Experimental | Atlas UI primitives shipped in Phase 12A: accessible, signals-native `View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button`/`Stack`/`Row`/`Column`/`Spacer`/`ScrollView` — function components over `@mindees/core` `createElement` returning renderer-agnostic `MindeesNode` trees (web real via the Helix DOM backend; native 🔬). One curated cross-platform `StyleObject` + `flattenStyle` (numbers → `px` on web via the renderer, raw on native), `Reactive<T>` props (a function value is a fine-grained binding), typed accessibility lowered to `role`/`aria-*`, `Pressable` interaction state (`usePressable`) wired via **real** DOM events (`onPress` invoked from `click`/Enter/Space — never a fake `press` host prop that no-ops on web), and a structural theme on the `@mindees/atlas/theme` subpath (selector-isolated; no `@mindees/tokens` dep). **Phase 12B** adds a virtualized recycling `List` on the `@mindees/atlas/list` subpath: a fixed pool of per-slot reactive regions (not `items.map()`, which the reconciler would fully remount on each scroll) so in-view rows keep identity and `renderItem` runs once per row as it scrolls in; a pure exhaustively-tested `computeWindow`, a spacer-sized scrollbar, `transform`-positioned rows, `onEndReached`, and a `getScrollOffset` seam make it headless-testable with zero real scroll (fixed row height; variable height is a 🔬 research track). `@mindees/core` runtime dep only (renderer is a peer). **Phase 12 (Atlas) complete.** Native rendering is a 🔬 research track. |
 | `@mindees/ai` | 🧪 Experimental | Synapse AI: the contract (Phase 11A) — `createAi` + the `AiBackend` seam (messages/parts, `GenerateRequest`/`AiResult`/`AiChunk`, `AiError`), streaming as `AsyncIterable` only (Node/browser/Hermes-safe), a deterministic `createMockBackend` (offline, no-keys — the working fallback), and a `createOnDeviceBackend` research-track seam that throws. **Phase 11B** adds a real server/HTTP backend on the `@mindees/ai/server` subpath: `createServerBackend({ fetch, baseUrl, model, … })` over an **injected `fetch`** (capability injection — no global/DOM dep), a pure-TS SSE→`AsyncIterable` parser (buffers across chunk boundaries, joins multi-line `data:`, caps the unparsed buffer against newline-starved servers), and defensive openai/anthropic wire mappers (untrusted-JSON-safe, null-proto finish maps, streamed-usage capture) — golden-fixture tested with zero real network, abort honored before and mid-stream. **Phase 11C** adds **structured output**: `generateObject`/`streamObject` validate model JSON against any Standard Schema (Zod/Valibot/ArkType — vendored types, no `@mindees/router` dep) built purely on `AiBackend` so the mock runs it offline; no `eval`, deep sanitize-before-validate (prototype-pollution + depth/node/string/prop limits), bounded repair (`1 + maxRepairs`, concrete issues fed back, usage accumulated), `streamObject` validates the assembled value once at stream end with opt-in unvalidated previews — **plus tool calling**: `runTools` is a bounded loop (step = one `generate` with a hard `maxSteps` ceiling; tool args deep-pollution-rejected + Standard-Schema-validated **before** `execute`; invalid args fed back recoverably while `TOOL_FAILED` is reserved for an `execute` throw; identical calls deduped; parallel execution appended in requested order; four-point abort; non-mutating transcript), with a scripted-tool mock and openai/anthropic tool wire mapping (`tool_calls`/`tool_use`, with the loop's tool messages round-tripped). **Phase 11D** adds a build/dev-only error explainer on the `@mindees/ai/devtools` subpath: `explainError(backend, error)` turns a thrown error into a validated `{ summary, likelyCauses, suggestedFixes }` via `generateObject` (works offline against the mock), plus `formatExplanation` for terminals — surfaced as the `mindees ai explain <error>` CLI command. `@mindees/core` only. **Phase 11 (Synapse) complete.** On-device LLM inference is inherently native → 🔬. |
 | `@mindees/data` | 🧪 Experimental | Continuum reactive local-first store shipped in Phase 10A: `createCollection` — a signals-native, in-memory document store with fine-grained reactive reads (`get`/`has`/`all`/`where`/`size` via per-record + per-collection version signals), atomic mutations (`insert`/`upsert`/`update`/`delete`/`clear`/`tx`), and `optimistic()` changes with `rollback()`. `@mindees/core` only; zero third-party deps. HLC causality (10B), CRDT merge (10C), delta sync (10D), the reference sync server (10E), and the persistence contract/export/restore path (10F) build on it. Native durable adapters, production sync hardening, and CRDT-library/rich-text interop are 🔬 research tracks. |
@@ -171,9 +193,12 @@ These are real seams in the architecture, deliberately **not** faked. Each has
   their conformance cores in CI** (macOS runner: iOS `swift test` + iOS-SDK compile,
   Phase 8C; Linux runner: Android `gradle test` + `assemble`, Phase 8D), **and render
   the command stream into correct native view trees on the platform runtime** (iOS
-  Simulator XCTest; Android Robolectric incl. click dispatch — Phase 8E). What remains
-  🔬 is a **full app on a physical device** (embedded JS engine + JS↔native bridge
-  running the reactive app on-device) — Phase 8F. Fallback today: web/DOM.
+  Simulator XCTest; Android Robolectric incl. click dispatch - Phase 8E). Android now
+  has a **runnable embedded-QuickJS example app** with a JS<->native command bridge
+  (Phase 8F-A/B), unit-tested, assembled, and emulator-smoke tested in CI. iOS now
+  has an embedded JavaScriptCore bridge with a model bridge test and iOS Simulator
+  `UIButton` target/action callback smoke test (Phase 8F-C). What remains research-track/planned is
+  physical-device proof before Phase 8F can be called complete. Fallback today: web/DOM.
   _(Phase 3, 8A, 8B, 8C, 8D, 8E)_
 - **GPU canvas strand (wgpu/WebGPU).** _(Phase 3+)_
 - **On-device LLM runtime (ExecuTorch / Apple Foundation Models / Gemini Nano).**

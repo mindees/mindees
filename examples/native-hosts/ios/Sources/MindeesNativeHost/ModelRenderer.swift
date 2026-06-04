@@ -4,7 +4,7 @@
 //  Lets `MindeesNativeHost` be exercised with `swift test` on any platform — no
 //  simulator/device needed. It is the Swift twin of the TS reference host's model.
 //
-//  ⚠️ Authored, not yet compiled by the maintainers — see Package.swift.
+//  CI-verified by the native iOS workflow.
 //
 
 import Foundation

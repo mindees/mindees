@@ -4,7 +4,7 @@
 //  Mirrors `@mindees/renderer`'s `native-protocol.ts`. Decode a batch with:
 //      let commands = try JSONDecoder().decode([NativeCommand].self, from: jsonData)
 //
-//  ⚠️ Authored, not yet compiled by the maintainers — see Package.swift.
+//  CI-verified by the native iOS workflow.
 //
 
 import Foundation

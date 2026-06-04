@@ -6,7 +6,7 @@
 //  platforms without UIKit. Tag mapping + prop application are intentionally minimal
 //  (an MVP) — extend `applyProp` / `makeElement` for your design system.
 //
-//  ⚠️ Authored, not yet compiled/run by the maintainers — see Package.swift.
+//  CI-verified by the native iOS workflow.
 //
 
 #if canImport(UIKit)
@@ -82,6 +82,15 @@ public final class UIKitRenderer: HostRenderer {
     public func addEvent(_ view: UIView, eventName: String, handlerId: String, fire: @escaping () -> Void) {
         guard eventName == "press" else { return } // MVP: only tap/press
         view.isUserInteractionEnabled = true
+        if let control = view as? UIControl {
+            if let existing = objc_getAssociatedObject(control, &ControlForwarder.assocKey) as? ControlForwarder {
+                control.removeTarget(existing, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
+            }
+            let forwarder = ControlForwarder(fire)
+            control.addTarget(forwarder, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
+            objc_setAssociatedObject(control, &ControlForwarder.assocKey, forwarder, .OBJC_ASSOCIATION_RETAIN)
+            return
+        }
         // Replace any prior recognizer so repeated registrations don't stack.
         if let existing = objc_getAssociatedObject(view, &TapForwarder.assocKey) as? TapForwarder {
             view.removeGestureRecognizer(existing.recognizer)
@@ -93,6 +102,12 @@ public final class UIKitRenderer: HostRenderer {
 
     public func removeEvent(_ view: UIView, eventName: String, handlerId: String) {
         guard eventName == "press" else { return }
+        if let control = view as? UIControl,
+           let existing = objc_getAssociatedObject(control, &ControlForwarder.assocKey) as? ControlForwarder {
+            control.removeTarget(existing, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
+            objc_setAssociatedObject(control, &ControlForwarder.assocKey, nil, .OBJC_ASSOCIATION_RETAIN)
+            return
+        }
         if let existing = objc_getAssociatedObject(view, &TapForwarder.assocKey) as? TapForwarder {
             view.removeGestureRecognizer(existing.recognizer)
             objc_setAssociatedObject(view, &TapForwarder.assocKey, nil, .OBJC_ASSOCIATION_RETAIN)
@@ -117,5 +132,18 @@ private final class TapForwarder {
     }
 
     @objc private func handleTap() { fire() }
+}
+
+/// Bridges a UIControl touch-up event to the same `press` callback.
+private final class ControlForwarder: NSObject {
+    static var assocKey: UInt8 = 0
+    private let fire: () -> Void
+
+    init(_ fire: @escaping () -> Void) {
+        self.fire = fire
+        super.init()
+    }
+
+    @objc func handlePress() { fire() }
 }
 #endif

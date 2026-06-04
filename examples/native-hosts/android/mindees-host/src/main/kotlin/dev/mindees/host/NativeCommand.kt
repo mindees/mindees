@@ -5,7 +5,7 @@
  * Kotlin (unit-testable on the JVM); `NativeCommandCodec` decodes JSON via
  * org.json (Android) and is exercised on-device.
  *
- * ⚠️ Authored, not yet compiled/run by the maintainers — see the module README.
+ * CI-verified by the native Android workflow; see the module README.
  */
 
 package dev.mindees.host

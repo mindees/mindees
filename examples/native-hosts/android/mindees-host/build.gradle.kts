@@ -1,5 +1,5 @@
-// ⚠️ Authored, not yet built by the maintainers (no Android SDK in dev/CI).
-// Align compileSdk / Java / plugin versions with your installed toolchain if needed.
+// CI-verified by .github/workflows/native-android.yml. Align compileSdk / Java /
+// plugin versions with your installed toolchain if needed.
 
 plugins {
     // AGP 9 includes built-in Kotlin support — no separate kotlin-android plugin.

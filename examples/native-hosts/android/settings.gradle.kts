@@ -1,6 +1,6 @@
-// ⚠️ Authored, not yet built by the maintainers (no Android SDK in dev/CI).
-// Open in Android Studio (it provides Gradle + the wrapper) or run with a local
-// Gradle. Align the plugin/SDK versions below with your installed toolchain.
+// CI-verified through .github/workflows/native-android.yml. Open in Android
+// Studio (it provides Gradle + the wrapper) or run with a local Gradle. Align
+// the plugin/SDK versions below with your installed toolchain if needed.
 
 pluginManagement {
     repositories {
@@ -13,6 +13,7 @@ pluginManagement {
         // org.jetbrains.kotlin.android plugin is no longer applied (AGP errors if it
         // is). Align AGP with your toolchain if Gradle complains (AGP 9.x needs
         // JDK 17+ and a recent Gradle).
+        id("com.android.application") version "9.2.0"
         id("com.android.library") version "9.2.0"
     }
 }
@@ -26,3 +27,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "mindees-native-host-android"
 include(":mindees-host")
+include(":mindees-example-app")

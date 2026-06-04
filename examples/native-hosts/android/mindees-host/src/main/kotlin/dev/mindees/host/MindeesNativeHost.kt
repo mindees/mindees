@@ -6,7 +6,7 @@
  * [HostRenderer] builds/mutates the actual views. Use [AndroidViewRenderer] on a
  * device, or [ModelRenderer] in JVM unit tests (`./gradlew test`, no device needed).
  *
- * ⚠️ Authored, not yet compiled/run by the maintainers — see the module README.
+ * CI-verified by the native Android workflow; see the module README.
  */
 
 package dev.mindees.host
