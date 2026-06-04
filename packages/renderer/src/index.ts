@@ -38,6 +38,12 @@ export {
   type NativeCommandBackendOptions,
   type NativeCommandNode,
 } from './native'
+/** One-call native app entry — wires the command backend + host contract. */
+export {
+  type CreateNativeAppOptions,
+  createNativeApp,
+  type NativeApp,
+} from './native-app'
 /**
  * The strict reference native host — applies a command stream to a model tree and
  * validates it (the executable conformance contract real native hosts implement).

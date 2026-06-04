@@ -7,15 +7,18 @@ const here = dirname(fileURLToPath(import.meta.url))
 // app-js is 5 levels below the repo root.
 const repoRoot = resolve(here, '..', '..', '..', '..', '..')
 const dist = (pkg: string) => resolve(repoRoot, 'packages', pkg, 'dist', 'index.js')
+const coreSub = (sub: string) => resolve(repoRoot, 'packages', 'core', 'dist', `${sub}.js`)
 
 /**
- * Bundles the real Atlas + Helix app (src/main.ts) into a single QuickJS-safe IIFE
- * the Android example loads from assets. `@mindees/*` are inlined (the framework has
- * no runtime deps), the engine target is conservative, and a banner polyfills
- * `queueMicrotask` (some embedded engines lack it) before any module initializes.
+ * Bundles the real, TSX-authored Atlas + Helix + Quantum app (src/main.tsx) into a
+ * single QuickJS-safe IIFE the Android example loads from assets. `@mindees/*` are
+ * inlined (the framework has no runtime deps), JSX uses the automatic runtime
+ * (`jsxImportSource: "@mindees/core"`, see tsconfig.json), the engine target is
+ * conservative, and a banner polyfills `queueMicrotask` (some embedded engines lack
+ * it) before any module initializes.
  */
 export default defineConfig({
-  entry: [resolve(here, 'src/main.ts')],
+  entry: [resolve(here, 'src/main.tsx')],
   outDir: resolve(here, '..', 'src', 'main', 'assets'),
   format: ['iife'],
   globalName: 'MindeesAppBundle',
@@ -30,6 +33,9 @@ export default defineConfig({
   // workspace member, so bare-specifier resolution can't find them); everything is
   // then inlined into the IIFE.
   alias: {
+    // The automatic JSX runtime emits imports of these subpaths; resolve them too.
+    '@mindees/core/jsx-runtime': coreSub('jsx-runtime'),
+    '@mindees/core/jsx-dev-runtime': coreSub('jsx-dev-runtime'),
     '@mindees/core': dist('core'),
     '@mindees/atlas': dist('atlas'),
     '@mindees/renderer': dist('renderer'),
