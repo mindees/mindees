@@ -33,6 +33,7 @@ export default defineConfig({
     '@mindees/core': dist('core'),
     '@mindees/atlas': dist('atlas'),
     '@mindees/renderer': dist('renderer'),
+    '@mindees/router': dist('router'),
   },
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   outputOptions: {

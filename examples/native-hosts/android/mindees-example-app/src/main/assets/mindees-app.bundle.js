@@ -387,6 +387,24 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		return attachNode(accessor, node);
 	}
 	/**
+	* Create a memoized derived value. The function re-runs only when one of the
+	* reactive values it reads has actually changed, and only when the result is
+	* observed (lazy).
+	*
+	* @example
+	* const doubled = computed(() => count() * 2)
+	*/
+	function computed(fn, options) {
+		const node = new Computation(void 0, fn, options?.equals ?? equalsDefault, false);
+		adopt(node);
+		const accessor = (() => node.read());
+		accessor.peek = () => {
+			node.updateIfNecessary();
+			return node.value;
+		};
+		return attachNode(accessor, node);
+	}
+	/**
 	* Run a side effect that re-runs whenever its reactive dependencies change.
 	* Runs once immediately to establish dependencies.
 	*
@@ -1075,20 +1093,823 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	}
 
 //#endregion
+//#region ../../../../../packages/router/dist/errors.js
+/** An error thrown by the Quantum router. */
+	var RouterError = class extends Error {
+		constructor(code, message, issues) {
+			super(message);
+			_defineProperty(
+				this,
+				/** Machine-readable error code. */
+				"code",
+				void 0
+			);
+			_defineProperty(
+				this,
+				/** Standard Schema issues, present only for `VALIDATE_SEARCH`. */
+				"issues",
+				void 0
+			);
+			this.name = "RouterError";
+			this.code = code;
+			if (issues !== void 0) this.issues = issues;
+		}
+	};
+
+//#endregion
+//#region ../../../../../packages/router/dist/pattern.js
+/**
+	* Route patterns — matching, building, and **codegen-free** typed params.
+	*
+	* A pattern is a `/`-separated path where each segment is one of:
+	* - a **static** segment (`posts`) — matches itself literally;
+	* - a **dynamic** segment (`:postId`) — matches exactly one non-empty segment;
+	* - a **catch-all** segment (`:rest*`) — must be last; matches the remaining
+	*   segments (zero or more), joined with `/`.
+	*
+	* This mirrors the manifest paths emitted by `@mindees/compiler`
+	* (`buildRouteManifest`: `[param]` → `:param`, `[...rest]` → `:rest*`).
+	*
+	* The headline win over Expo Router / React Router: params are typed by parsing
+	* the pattern string with **template-literal types** ({@link PathParams}) — no
+	* generated `.d.ts`, no dev server, and required params are typed as *required*
+	* (not optional). See ADR-0003.
+	*
+	* @module
+	*/
+	/** Split a pathname into non-empty segments (tolerates leading/trailing slashes). */
+	function splitPath(path) {
+		return path.split("/").filter((s) => s.length > 0);
+	}
+	/** Reject an empty param name (`/:` or `/:*`) so downstream never sees `params['']`. */
+	function requireName(name, pattern) {
+		if (name.length === 0) throw new RouterError("INVALID_PATTERN", `Param name cannot be empty in pattern "${pattern}".`);
+		return name;
+	}
+	/**
+	* Parse a pattern into segments, validating it. Throws {@link RouterError}
+	* (`INVALID_PATTERN`) if a catch-all is not the final segment, or a param name
+	* is empty.
+	*/
+	function parsePattern(pattern) {
+		const segments = splitPath(pattern).map((s) => {
+			if (s.startsWith(":") && s.endsWith("*")) return {
+				kind: "catchAll",
+				value: requireName(s.slice(1, -1), pattern)
+			};
+			if (s.startsWith(":")) return {
+				kind: "param",
+				value: requireName(s.slice(1), pattern)
+			};
+			return {
+				kind: "static",
+				value: s
+			};
+		});
+		const catchAllIndex = segments.findIndex((s) => s.kind === "catchAll");
+		if (catchAllIndex !== -1 && catchAllIndex !== segments.length - 1) throw new RouterError("INVALID_PATTERN", `Catch-all segment must be last in pattern "${pattern}".`);
+		return segments;
+	}
+	/**
+	* Match a `pathname` against a `pattern`. Returns the extracted params, or
+	* `null` if it does not match. Param values are URI-decoded.
+	*
+	* @example
+	* matchPattern('/posts/:id', '/posts/42')   // { id: '42' }
+	* matchPattern('/files/:rest*', '/files/a/b') // { rest: 'a/b' }
+	* matchPattern('/about', '/contact')        // null
+	*/
+	function matchPattern(pattern, pathname) {
+		const segments = parsePattern(pattern);
+		const parts = splitPath(pathname);
+		const params = {};
+		for (let i = 0; i < segments.length; i++) {
+			const seg = segments[i];
+			if (seg === void 0) return null;
+			if (seg.kind === "catchAll") {
+				params[seg.value] = parts.slice(i).map((p) => safeDecode$1(p)).join("/");
+				return params;
+			}
+			const part = parts[i];
+			if (part === void 0) return null;
+			if (seg.kind === "static") {
+				if (part !== seg.value) return null;
+			} else params[seg.value] = safeDecode$1(part);
+		}
+		return parts.length === segments.length ? params : null;
+	}
+	/** Decode a URI segment, falling back to the raw value on malformed input. */
+	function safeDecode$1(value) {
+		try {
+			return decodeURIComponent(value);
+		} catch {
+			return value;
+		}
+	}
+	/**
+	* Build a pathname from a `pattern` and `params`. Param values are URI-encoded.
+	* Throws {@link RouterError} (`MISSING_PARAM`) if a required dynamic param is
+	* absent. A missing/empty catch-all simply contributes nothing.
+	*
+	* @example
+	* buildPath('/posts/:id', { id: '42' })       // '/posts/42'
+	* buildPath('/files/:rest*', { rest: 'a/b' }) // '/files/a/b'
+	* buildPath('/about', {})                     // '/about'
+	*/
+	function buildPath(pattern, params = {}) {
+		const segments = parsePattern(pattern);
+		const out = [];
+		for (const seg of segments) {
+			if (seg.kind === "static") {
+				out.push(seg.value);
+				continue;
+			}
+			const value = params[seg.value];
+			if (seg.kind === "param") {
+				if (value === void 0 || value === "") throw new RouterError("MISSING_PARAM", `Missing value for required param ":${seg.value}" in pattern "${pattern}".`);
+				out.push(encodeURIComponent(String(value)));
+			} else if (value !== void 0 && value !== "") out.push(String(value).split("/").filter((s) => s.length > 0).map((s) => encodeURIComponent(s)).join("/"));
+		}
+		return `/${out.join("/")}`;
+	}
+	/** Per-segment specificity weights: static > param > (end of pattern) > catch-all. */
+	const SEGMENT_WEIGHT = {
+		static: 4,
+		param: 3,
+		catchAll: 1
+	};
+	/**
+	* Weight for a "missing" segment slot (the pattern ended). It outranks a
+	* catch-all (so the root `/` beats a bare `/:rest*`) but loses to a static or
+	* dynamic segment (so a longer, more specific pattern still wins).
+	*/
+	const END_WEIGHT = 2;
+	/**
+	* Specificity score for a pattern: a per-segment weight tuple. Static segments
+	* outrank dynamic, which outrank a pattern's end, which outranks a catch-all.
+	* Used to sort routes so the most specific match wins.
+	*/
+	function score(pattern) {
+		return parsePattern(pattern).map((s) => SEGMENT_WEIGHT[s.kind]);
+	}
+	/**
+	* Compare two patterns by specificity. Returns a negative number if `a` is more
+	* specific than `b` (so `routes.sort(compareSpecificity)` puts the most specific
+	* first), positive if less specific, 0 if equal.
+	*/
+	function compareSpecificity(a, b) {
+		const sa = score(a);
+		const sb = score(b);
+		const len = Math.max(sa.length, sb.length);
+		for (let i = 0; i < len; i++) {
+			const wa = sa[i] ?? END_WEIGHT;
+			const wb = sb[i] ?? END_WEIGHT;
+			if (wa !== wb) return wb - wa;
+		}
+		return 0;
+	}
+
+//#endregion
+//#region ../../../../../packages/router/dist/search.js
+/**
+	* Search (query) params — parsing, serializing, and **typed, validated** access.
+	*
+	* Search params are first-class typed state in Quantum. A route declares a
+	* {@link StandardSchemaV1} schema; reads are validated and fully typed via
+	* {@link StandardSchemaV1.InferOutput}. This is the capability Expo Router and
+	* React Router lack (they return raw, untyped strings). See ADR-0003.
+	*
+	* Conventions:
+	* - repeated keys (`?tag=a&tag=b`) parse to a `string[]`; single keys to a `string`;
+	* - coercion (string → number/boolean/date) is delegated to the schema
+	*   (e.g. `z.coerce.number()`), so this module never guesses types.
+	*
+	* @module
+	*/
+	/**
+	* Parse a query string into a record. Accepts an optional leading `?`. Repeated
+	* keys collapse into an array, preserving order.
+	*
+	* @example
+	* parseQuery('?page=2&tag=a&tag=b') // { page: '2', tag: ['a', 'b'] }
+	*/
+	function parseQuery(search) {
+		const out = Object.create(null);
+		const query = search.startsWith("?") ? search.slice(1) : search;
+		if (query.length === 0) return out;
+		for (const pair of query.split("&")) {
+			if (pair.length === 0) continue;
+			const eq = pair.indexOf("=");
+			const rawKey = eq === -1 ? pair : pair.slice(0, eq);
+			const rawValue = eq === -1 ? "" : pair.slice(eq + 1);
+			const key = safeDecode(rawKey);
+			const value = safeDecode(rawValue);
+			const existing = out[key];
+			if (existing === void 0) out[key] = value;
+			else if (Array.isArray(existing)) existing.push(value);
+			else out[key] = [existing, value];
+		}
+		return out;
+	}
+	/**
+	* Serialize a record into a query string (no leading `?`). `null`/`undefined`
+	* values are skipped; arrays emit one `key=value` pair each. Keys are sorted for
+	* deterministic, cache-friendly output.
+	*
+	* @example
+	* stringifyQuery({ page: 2, tag: ['a', 'b'] }) // 'page=2&tag=a&tag=b'
+	*/
+	function stringifyQuery(query) {
+		const parts = [];
+		for (const key of Object.keys(query).sort()) {
+			const value = query[key];
+			if (value === null || value === void 0) continue;
+			const encKey = encodeURIComponent(key);
+			if (Array.isArray(value)) for (const item of value) parts.push(`${encKey}=${encodeURIComponent(String(item))}`);
+			else parts.push(`${encKey}=${encodeURIComponent(String(value))}`);
+		}
+		return parts.join("&");
+	}
+	/**
+	* Validate `input` against a Standard Schema, **without throwing** on invalid
+	* input — returns a discriminated result. Throws {@link RouterError}
+	* (`ASYNC_SCHEMA`) only for the programming error of passing an async schema,
+	* since navigation-time parsing must be synchronous.
+	*/
+	function safeValidateSearch(schema, input) {
+		const result = schema["~standard"].validate(input);
+		if (result instanceof Promise) throw new RouterError("ASYNC_SCHEMA", "Asynchronous schemas are not supported for synchronous search-param validation.");
+		if (result.issues) return {
+			ok: false,
+			issues: result.issues
+		};
+		return {
+			ok: true,
+			value: result.value
+		};
+	}
+	/** Decode a URI component, falling back to the raw value on malformed input. */
+	function safeDecode(value) {
+		try {
+			return decodeURIComponent(value.replace(/\+/g, " "));
+		} catch {
+			return value;
+		}
+	}
+
+//#endregion
+//#region ../../../../../packages/router/dist/components.js
+/**
+	* Render integration — `createRouterView` (renders the matched route chain) and
+	* `createLink` (typed navigation links). Built on `@mindees/core`'s
+	* `createElement` + signals; the renderer turns the returned function nodes into
+	* fine-grained reactive regions. See ADR-0004.
+	*
+	* Nesting uses **explicit composition** (no ambient context): each matched route
+	* component receives the next route in the chain as `children` (the outlet), and
+	* the router exposes the chain as the reactive `matches` array. Each depth is a
+	* reactive region keyed on that depth's route identity, so navigating a leaf
+	* re-mounts only the leaf — parent layouts (and their state) are preserved.
+	*
+	* @module
+	*/
+	/** Shared idle loader state for routes without a loader. */
+	const IDLE_LOADER_DATA = Object.freeze({ status: "idle" });
+	/**
+	* Create the router's view: a node that renders the matched route **chain**
+	* top-down, nesting each child into its parent's `children` (the outlet). Render
+	* it with the Helix renderer (`render(createRouterView(router), backend, root)`);
+	* it re-renders fine-grainedly as navigation changes the matched routes.
+	*
+	* @example
+	* const view = createRouterView(router, { notFound: NotFound })
+	* render(view, backend, root)
+	*/
+	function createRouterView(router, options = {}) {
+		const outletAt = (depth) => () => {
+			const route = router.select((s) => s.matches[depth]?.route ?? null)();
+			if (route === null) return depth === 0 && options.notFound ? createElement(options.notFound, {}) : null;
+			const child = outletAt(depth + 1);
+			const component = route.component;
+			if (component === void 0) return child;
+			return createElement(component, {
+				router,
+				params: router.params,
+				search: router.search,
+				data: () => {
+					const match = router.matches()[depth];
+					return match ? router.loaderData(match) : IDLE_LOADER_DATA;
+				},
+				children: child
+			});
+		};
+		return outletAt(0);
+	}
+
+//#endregion
+//#region ../../../../../packages/router/dist/history.js
+	const ROOT = {
+		pathname: "/",
+		search: "",
+		hash: ""
+	};
+	/** Parse an href string into a {@link RouterLocation} (no base required). */
+	function parseHref(href) {
+		let rest = href;
+		let hash = "";
+		const hashIndex = rest.indexOf("#");
+		if (hashIndex !== -1) {
+			hash = rest.slice(hashIndex);
+			rest = rest.slice(0, hashIndex);
+		}
+		let search = "";
+		const queryIndex = rest.indexOf("?");
+		if (queryIndex !== -1) {
+			search = rest.slice(queryIndex);
+			rest = rest.slice(0, queryIndex);
+		}
+		return {
+			pathname: rest.length === 0 ? "/" : rest.startsWith("/") ? rest : `/${rest}`,
+			search,
+			hash
+		};
+	}
+	/** Serialize a {@link RouterLocation} back into an href string. */
+	function createHref(location) {
+		return `${location.pathname}${location.search}${location.hash}`;
+	}
+	/** Clamp `n` to the inclusive range `[min, max]`. */
+	function clamp(n, min, max) {
+		return Math.min(max, Math.max(min, n));
+	}
+	/**
+	* Create an in-memory history. Deterministic and DOM-free — the primary tested
+	* path and the right adapter for SSR, tests, and non-browser hosts.
+	*/
+	function createMemoryHistory(options = {}) {
+		const entries = (options.initialEntries && options.initialEntries.length > 0 ? options.initialEntries : ["/"]).map(parseHref);
+		let index = clamp(options.initialIndex ?? entries.length - 1, 0, entries.length - 1);
+		const listeners = /* @__PURE__ */ new Set();
+		const current = () => entries[index] ?? ROOT;
+		const notify = () => {
+			const location = current();
+			for (const listener of listeners) listener(location);
+		};
+		const go = (delta) => {
+			const next = clamp(index + delta, 0, entries.length - 1);
+			if (next !== index) {
+				index = next;
+				notify();
+			}
+		};
+		return {
+			location: current,
+			push(to) {
+				entries.splice(index + 1);
+				entries.push(parseHref(to));
+				index = entries.length - 1;
+				notify();
+			},
+			replace(to) {
+				entries[index] = parseHref(to);
+				notify();
+			},
+			go,
+			back: () => go(-1),
+			forward: () => go(1),
+			subscribe(listener) {
+				listeners.add(listener);
+				return () => {
+					listeners.delete(listener);
+				};
+			}
+		};
+	}
+
+//#endregion
+//#region ../../../../../packages/router/dist/data.js
+	const IDLE = Object.freeze({ status: "idle" });
+	/** Create a loader manager. */
+	function createLoaderManager(options) {
+		const now = options.now ?? Date.now;
+		let cache = /* @__PURE__ */ new WeakMap();
+		const inFlight = /* @__PURE__ */ new Map();
+		const ids = /* @__PURE__ */ new WeakMap();
+		let nextId = 0;
+		let disposed = false;
+		const MAX_ENTRIES_PER_ROUTE = 64;
+		const idOf = (route) => {
+			let id = ids.get(route);
+			if (id === void 0) {
+				id = nextId++;
+				ids.set(route, id);
+			}
+			return id;
+		};
+		const innerKey = (route, match) => {
+			try {
+				const deps = route.loaderDeps ? route.loaderDeps({ search: match.search }) : null;
+				return JSON.stringify({
+					p: match.params,
+					d: deps
+				});
+			} catch {
+				return `${JSON.stringify({ p: match.params })}::unserializable-deps`;
+			}
+		};
+		const getEntry = (route, key) => cache.get(route)?.get(key);
+		const setEntry = (route, key, entry) => {
+			let m = cache.get(route);
+			if (!m) {
+				m = /* @__PURE__ */ new Map();
+				cache.set(route, m);
+			}
+			m.delete(key);
+			m.set(key, entry);
+			if (m.size > MAX_ENTRIES_PER_ROUTE) for (const [k, e] of m) {
+				if (m.size <= MAX_ENTRIES_PER_ROUTE) break;
+				if (e.status !== "pending") m.delete(k);
+			}
+		};
+		const ensure = (match) => {
+			if (disposed) return;
+			const route = match.route;
+			const loader = route.loader;
+			if (!loader) return;
+			const key = innerKey(route, match);
+			const gkey = `${idOf(route)}:${key}`;
+			const existing = getEntry(route, key);
+			const staleTime = route.staleTime ?? 0;
+			if (existing?.status === "success" && now() - existing.loadedAt < staleTime) return;
+			if (inFlight.has(gkey)) return;
+			const controller = new AbortController();
+			inFlight.set(gkey, controller);
+			const pendingEntry = {
+				status: "pending",
+				loadedAt: existing?.loadedAt ?? 0,
+				controller
+			};
+			if (existing?.data !== void 0) pendingEntry.data = existing.data;
+			setEntry(route, key, pendingEntry);
+			options.onChange();
+			const ctx = {
+				params: match.params,
+				search: match.search,
+				location: options.location(),
+				signal: controller.signal
+			};
+			const settle = (settled) => {
+				if (inFlight.get(gkey) === controller) inFlight.delete(gkey);
+				if (getEntry(route, key) !== pendingEntry) return;
+				setEntry(route, key, settled);
+				if (!controller.signal.aborted) options.onChange();
+			};
+			Promise.resolve().then(() => loader(ctx)).then((data) => settle({
+				status: "success",
+				data,
+				loadedAt: now()
+			}), (error) => {
+				const errored = {
+					status: "error",
+					error,
+					loadedAt: now()
+				};
+				if (existing?.data !== void 0) errored.data = existing.data;
+				settle(errored);
+			});
+		};
+		const currentGlobalKeys = (matches) => {
+			const keys = /* @__PURE__ */ new Set();
+			for (const m of matches) if (m.route.loader) keys.add(`${idOf(m.route)}:${innerKey(m.route, m)}`);
+			return keys;
+		};
+		const ensureSafe = (match) => {
+			try {
+				ensure(match);
+			} catch {}
+		};
+		return {
+			sync(matches) {
+				for (const m of matches) ensureSafe(m);
+				const keep = currentGlobalKeys(matches);
+				for (const [gkey, controller] of inFlight) if (!keep.has(gkey)) {
+					controller.abort();
+					inFlight.delete(gkey);
+				}
+			},
+			preload(matches) {
+				for (const m of matches) ensureSafe(m);
+			},
+			read(match) {
+				options.track();
+				const route = match.route;
+				if (!route.loader) return IDLE;
+				const entry = getEntry(route, innerKey(route, match));
+				if (!entry) return IDLE;
+				const out = { status: entry.status };
+				if (entry.data !== void 0) out.data = entry.data;
+				if (entry.error !== void 0) out.error = entry.error;
+				return out;
+			},
+			invalidate(matches) {
+				for (const m of matches) {
+					if (!m.route.loader) continue;
+					const key = innerKey(m.route, m);
+					const entry = getEntry(m.route, key);
+					if (entry) entry.loadedAt = 0;
+					const gkey = `${idOf(m.route)}:${key}`;
+					const controller = inFlight.get(gkey);
+					if (controller) {
+						controller.abort();
+						inFlight.delete(gkey);
+					}
+				}
+				this.sync(matches);
+			},
+			dispose() {
+				disposed = true;
+				for (const controller of inFlight.values()) controller.abort();
+				inFlight.clear();
+				cache = /* @__PURE__ */ new WeakMap();
+			}
+		};
+	}
+
+//#endregion
+//#region ../../../../../packages/router/dist/router.js
+/**
+	* The Quantum router — signals-native routing state with typed, validated
+	* navigation and re-render isolation.
+	*
+	* Router state (location, params, search, matched route) is modeled as the
+	* fine-grained signal graph from `@mindees/core` (Phase 1 `signal`/`computed`,
+	* Phase 2 selector isolation). Consumers read a slice via {@link Router.select}
+	* and re-run **only** when that slice changes — no whole-tree re-render on
+	* navigation, no global-vs-local hook trap (cf. Expo Router). See ADR-0003.
+	*
+	* @module
+	*/
+	const EMPTY_PARAMS = Object.freeze({});
+	const EMPTY_SEARCH = Object.freeze({});
+	const EMPTY_MATCHES = Object.freeze([]);
+	/** Join a parent path and a (relative) child path into a normalized full path. */
+	function joinPaths(parent, child) {
+		const base = parent.endsWith("/") ? parent.slice(0, -1) : parent;
+		const rel = child.startsWith("/") ? child.slice(1) : child;
+		if (rel.length === 0) return base.length === 0 ? "/" : base;
+		return `${base}/${rel}`;
+	}
+	/**
+	* Flatten a (possibly nested) route tree into leaf entries, each carrying its
+	* full path and the root→leaf chain of records. A route with children
+	* contributes only via its children (add an index child — `path: ''` — to match
+	* the parent's own path).
+	*/
+	function flattenRouteTree(routes, parentPath, parentChain) {
+		const out = [];
+		for (const route of routes) {
+			const fullPath = joinPaths(parentPath, route.path);
+			const chain = [...parentChain, route];
+			if (route.children && route.children.length > 0) out.push(...flattenRouteTree(route.children, fullPath, chain));
+			else out.push({
+				fullPath,
+				chain
+			});
+		}
+		return out;
+	}
+	/** Flatten + sort a route tree most-specific first (static > dynamic > catch-all). */
+	function compileRoutes(routes) {
+		return flattenRouteTree(routes, "", []).sort((a, b) => compareSpecificity(a.fullPath, b.fullPath));
+	}
+	/**
+	* Match a location against the compiled route table, returning the matched chain
+	* (root → leaf), or an empty array if nothing matched. Search is validated
+	* against the **leaf** route's schema and shared across the chain.
+	*/
+	function matchLocation(flat, location) {
+		for (const fr of flat) {
+			const params = matchPattern(fr.fullPath, location.pathname);
+			if (params === null) continue;
+			const searchRaw = parseQuery(location.search);
+			let search = searchRaw;
+			let issues;
+			const leaf = fr.chain[fr.chain.length - 1];
+			if (leaf?.searchSchema) try {
+				const result = safeValidateSearch(leaf.searchSchema, searchRaw);
+				if (result.ok) search = result.value;
+				else issues = result.issues;
+			} catch (err) {
+				issues = [{ message: err instanceof Error ? err.message : "search validation failed" }];
+			}
+			return fr.chain.map((route) => {
+				const base = {
+					route,
+					pathname: location.pathname,
+					params,
+					search,
+					searchRaw
+				};
+				return issues ? {
+					...base,
+					issues
+				} : base;
+			});
+		}
+		return EMPTY_MATCHES;
+	}
+	/**
+	* Resolve a (possibly relative) path against a base pathname. Absolute paths
+	* (leading `/`) ignore the base; `.`/`..` segments are applied against it,
+	* treating the base pathname as a directory.
+	*
+	* @example
+	* resolvePath('/a/b', '/x')      // '/a/b'
+	* resolvePath('edit', '/posts/1') // '/posts/1/edit'
+	* resolvePath('../', '/posts/1')  // '/posts'
+	*/
+	function resolvePath(to, from) {
+		const stack = to.startsWith("/") ? [] : from.split("/").filter((s) => s.length > 0);
+		for (const seg of to.split("/")) {
+			if (seg === "" || seg === ".") continue;
+			if (seg === "..") stack.pop();
+			else stack.push(seg);
+		}
+		return `/${stack.join("/")}`;
+	}
+	/** Resolve an href string (which may be relative and carry query/hash) against a location. */
+	function resolveHref(to, from) {
+		const hasPath = to.length > 0 && to[0] !== "?" && to[0] !== "#";
+		let rest = to;
+		let hash = "";
+		const hashIndex = rest.indexOf("#");
+		if (hashIndex !== -1) {
+			hash = rest.slice(hashIndex);
+			rest = rest.slice(0, hashIndex);
+		}
+		let search = "";
+		const queryIndex = rest.indexOf("?");
+		if (queryIndex !== -1) {
+			search = rest.slice(queryIndex);
+			rest = rest.slice(0, queryIndex);
+		}
+		return `${hasPath ? resolvePath(rest, from.pathname) : from.pathname}${!hasPath && queryIndex === -1 ? from.search : search}${hash}`;
+	}
+	/** Build an href from a structured navigation target. */
+	function buildHref(target) {
+		const pathname = buildPath(target.to, target.params ?? {});
+		const query = target.search ? stringifyQuery(target.search) : "";
+		let hash = target.hash ?? "";
+		if (hash.length > 0 && !hash.startsWith("#")) hash = `#${hash}`;
+		return `${pathname}${query ? `?${query}` : ""}${hash}`;
+	}
+	/**
+	* Create a router over a route table. State is reactive (signals); call
+	* {@link Router.dispose} to tear it down.
+	*/
+	function createRouter(options) {
+		const history = options.history ?? createMemoryHistory();
+		let routesSig;
+		let flatMemo;
+		let locationSig;
+		let stateMemo;
+		let loaders;
+		const dispose = createRoot((disposeRoot) => {
+			routesSig = signal(options.routes, { equals: false });
+			flatMemo = computed(() => compileRoutes(routesSig()));
+			locationSig = signal(history.location(), { equals: false });
+			const matchMemo = computed(() => matchLocation(flatMemo(), locationSig()));
+			stateMemo = computed(() => {
+				const location = locationSig();
+				const matches = matchMemo();
+				const leaf = matches.length > 0 ? matches[matches.length - 1] ?? null : null;
+				return {
+					location,
+					matches,
+					match: leaf,
+					pathname: location.pathname,
+					params: leaf ? leaf.params : EMPTY_PARAMS,
+					search: leaf ? leaf.search : EMPTY_SEARCH
+				};
+			});
+			const dataVersion = signal(0, { equals: false });
+			loaders = createLoaderManager({
+				location: () => locationSig(),
+				onChange: () => dataVersion.set(0),
+				track: () => {
+					dataVersion();
+				}
+			});
+			effect(() => loaders.sync(matchMemo()));
+			const unsubscribe = history.subscribe((loc) => locationSig.set(loc));
+			return () => {
+				unsubscribe();
+				loaders.dispose();
+				disposeRoot();
+			};
+		});
+		/** Apply the navigation guard, following redirects (capped). Returns the final href, or null to cancel. */
+		const applyGuard = (href) => {
+			const guard = options.beforeNavigate;
+			if (!guard) return href;
+			let current = href;
+			for (let i = 0; i < 10; i++) {
+				const result = guard(current, createHref(locationSig()));
+				if (result === false) return null;
+				if (typeof result === "string") {
+					const next = resolveHref(result, locationSig());
+					if (next === current) return current;
+					current = next;
+					continue;
+				}
+				return current;
+			}
+			return null;
+		};
+		const navigate = (target, opts) => {
+			const href = applyGuard(typeof target === "string" ? resolveHref(target, locationSig()) : buildHref(target));
+			if (href === null) return;
+			if (opts?.force !== true && href === createHref(locationSig())) return;
+			const commit = () => {
+				if (opts?.replace) history.replace(href);
+				else history.push(href);
+			};
+			if (opts?.viewTransition ?? options.viewTransitions ?? false) startViewTransition(commit);
+			else commit();
+		};
+		const preload = (to) => {
+			const href = resolveHref(to, locationSig());
+			loaders.preload(matchLocation(flatMemo(), parseHref(href)));
+		};
+		return {
+			state: () => stateMemo(),
+			location: () => locationSig(),
+			matches: () => stateMemo().matches,
+			match: () => stateMemo().match,
+			params: () => stateMemo().params,
+			search: () => stateMemo().search,
+			select: (selector, equals = Object.is) => computed(() => selector(stateMemo()), { equals }),
+			navigate,
+			loaderData: (match) => loaders.read(match),
+			invalidate: () => loaders.invalidate(stateMemo().matches),
+			preload,
+			setRoutes: (routes) => routesSig.set(routes),
+			routes: () => routesSig(),
+			history,
+			dispose
+		};
+	}
+	/**
+	* Run `commit` inside `document.startViewTransition` when available (web only),
+	* else run it directly. The signals re-render is synchronous, so it happens
+	* inside the transition. No-op-wrapping outside a DOM (SSR, native, tests).
+	*
+	* View transitions are a progressive enhancement, so this must NEVER throw out of
+	* navigate() or leak an unhandled rejection: (1) a rapid second navigation aborts
+	* the first transition and rejects its eagerly-created `ready`/`updateCallbackDone`
+	* promises — we mark those handled; (2) some browsers throw synchronously (e.g. a
+	* hidden/background document) — we fall back to a plain commit so the navigation
+	* still lands (without committing twice).
+	*/
+	function startViewTransition(commit) {
+		const doc = typeof document === "undefined" ? void 0 : document;
+		if (!doc?.startViewTransition) {
+			commit();
+			return;
+		}
+		let committed = false;
+		const runCommit = () => {
+			committed = true;
+			commit();
+		};
+		try {
+			const transition = doc.startViewTransition(runCommit);
+			transition?.ready?.catch(() => {});
+			transition?.updateCallbackDone?.catch(() => {});
+		} catch {
+			if (!committed) commit();
+		}
+	}
+
+//#endregion
 //#region src/main.ts
 /**
-	* The example app's **real** UI — @mindees/core signals + @mindees/atlas primitives
-	* driven by the @mindees/renderer (Helix) reconciler.
+	* The example app's **real** UI — a multi-screen, TypeScript-only MindeesNative app
+	* with @mindees/* end to end:
 	*
-	* Unlike a hand-written command script, this exercises the genuine pipeline: the
-	* reconciler renders Atlas components against a {@link createNativeCommandBackend},
-	* which emits the serializable {@link NativeCommand} stream the native host
-	* (`MindeesNativeHost` + `AndroidViewRenderer`) materializes into real Android views.
-	* State changes (a signal `set` from a button press) re-run the reconciler
-	* synchronously, producing a minimal `updateText` batch — no full re-render.
+	* - @mindees/core         signals + component model
+	* - @mindees/atlas        UI primitives (View/Text/Button/Column/Row)
+	* - @mindees/router       Quantum router: in-memory history, programmatic navigation
+	* - @mindees/renderer     Helix reconciler → native command stream
 	*
-	* Bundled to a QuickJS-safe IIFE (see ../tsdown.config.ts) and loaded from the
-	* app's assets. Regenerate with `pnpm run build:android-example-js` from the repo root.
+	* The router's `createRouterView` produces a backend-agnostic node; we render it
+	* through `createNativeCommandBackend`, so navigating between routes drives the
+	* native host to swap real Android view subtrees. A signal mutated from a button
+	* re-runs only the affected nodes (fine-grained reactivity). No DOM, no browser
+	* globals — it runs in the embedded QuickJS engine.
+	*
+	* Bundled to a QuickJS-safe IIFE (see ../tsdown.config.ts) and loaded from assets.
+	* Regenerate with `pnpm run build:android-example-js` from the repo root.
 	*
 	* @module
 	*/
@@ -1098,75 +1919,105 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		const batch = backend.flushCommands();
 		if (batch.length > 0) MindeesHost.emit(JSON.stringify(batch));
 	}
-	const count = signal(0);
 	const palette = {
 		screenBg: "#0b1021",
 		cardBg: "#171c33",
 		accent: "#5b8cff",
 		accentText: "#ffffff",
-		resetBg: "#2a3050",
+		slateBg: "#2a3050",
 		heading: "#e8ecff",
-		muted: "#9aa4d2"
+		muted: "#9aa4d2",
+		body: "#c3cbf0"
 	};
-	/** The root component — a centered card with a heading, a live counter, and two buttons. */
-	function App() {
-		return createElement(Column, { style: {
-			padding: 24,
-			gap: 20,
-			alignItems: "center",
-			justifyContent: "center",
-			backgroundColor: palette.screenBg,
-			flexGrow: 1
-		} }, createElement(Column, { style: {
-			backgroundColor: palette.cardBg,
-			padding: 28,
-			gap: 14,
-			borderRadius: 20,
-			alignItems: "center",
-			minWidth: 260
-		} }, createElement(Text, { style: {
-			fontSize: 22,
-			fontWeight: 700,
-			color: palette.heading
-		} }, "MindeesNative"), createElement(Text, { style: {
+	const cardStyle = {
+		backgroundColor: palette.cardBg,
+		padding: 28,
+		gap: 14,
+		borderRadius: 20,
+		alignItems: "center",
+		minWidth: 280
+	};
+	const headingStyle = {
+		fontSize: 24,
+		fontWeight: 800,
+		color: palette.heading
+	};
+	const buttonBase = {
+		color: palette.accentText,
+		paddingTop: 12,
+		paddingBottom: 12,
+		paddingLeft: 20,
+		paddingRight: 20,
+		borderRadius: 12,
+		fontWeight: 600
+	};
+	const accentButton = {
+		...buttonBase,
+		backgroundColor: palette.accent
+	};
+	const slateButton = {
+		...buttonBase,
+		backgroundColor: palette.slateBg
+	};
+	/** App-level state survives navigation (module-scoped signal). */
+	const done = signal(0);
+	/** Home route — a counter + a link to the About route. */
+	function Home() {
+		return createElement(Column, { style: cardStyle }, createElement(Text, { style: headingStyle }, "MindeesNative"), createElement(Text, { style: {
 			fontSize: 15,
 			color: palette.muted
-		} }, "Real Atlas + Helix, rendered native"), createElement(Text, { style: {
-			fontSize: 40,
+		} }, "Multi-screen · native · TypeScript"), createElement(Text, { style: {
+			fontSize: 36,
 			fontWeight: 800,
 			color: palette.accent,
-			paddingTop: 8
-		} }, () => `Count: ${count()}`), createElement(Row, { style: {
+			paddingTop: 6
+		} }, () => `Done today: ${done()}`), createElement(Row, { style: {
 			gap: 12,
 			justifyContent: "center",
 			paddingTop: 8
 		} }, createElement(Button, {
-			title: "Increment",
-			onPress: () => count.set(count() + 1),
-			style: {
-				backgroundColor: palette.accent,
-				color: palette.accentText,
-				paddingTop: 12,
-				paddingBottom: 12,
-				paddingLeft: 20,
-				paddingRight: 20,
-				borderRadius: 12,
-				fontWeight: 600
-			}
+			title: "Mark done",
+			onPress: () => done.set(done() + 1),
+			style: accentButton
 		}), createElement(Button, {
-			title: "Reset",
-			onPress: () => count.set(0),
-			style: {
-				backgroundColor: palette.resetBg,
-				color: palette.accentText,
-				paddingTop: 12,
-				paddingBottom: 12,
-				paddingLeft: 20,
-				paddingRight: 20,
-				borderRadius: 12,
-				fontWeight: 600
-			}
-		}))));
+			title: "About →",
+			onPress: () => router.navigate("/about"),
+			style: slateButton
+		})));
+	}
+	/** About route — descriptive copy + a link back Home, proving real navigation. */
+	function About() {
+		return createElement(Column, { style: cardStyle }, createElement(Text, { style: headingStyle }, "About"), createElement(Text, { style: {
+			fontSize: 15,
+			color: palette.body,
+			textAlign: "center",
+			lineHeight: 22
+		} }, "Real Atlas components, rendered as native Android views and navigated by the Quantum router — all TypeScript, running in an embedded engine."), createElement(Button, {
+			title: "← Home",
+			onPress: () => router.navigate("/"),
+			style: accentButton
+		}));
+	}
+	const router = createRouter({
+		routes: [{
+			path: "/",
+			component: Home
+		}, {
+			path: "/about",
+			component: About
+		}],
+		history: createMemoryHistory({ initialEntries: ["/"] })
+	});
+	/** Full-screen shell: dark background, centers the active route's card. */
+	function App() {
+		return createElement(Column, { style: {
+			flexGrow: 1,
+			width: "100%",
+			padding: 24,
+			alignItems: "center",
+			justifyContent: "center",
+			backgroundColor: palette.screenBg
+		} }, createRouterView(router));
 	}
 	globalThis.MindeesApp = {
 		start() {
