@@ -252,6 +252,8 @@ upgrades).
 - ✅ **Phase 12 (Atlas) — accessible UI primitives + virtualized list**: signals-native `View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button` + layout (`Stack`/`Row`/`Column`/`Spacer`/`ScrollView`), a curated cross-platform `StyleObject` (numbers → `px` on web), `role`/`aria-*` accessibility, real-DOM-event interaction, a structural theme (12A), and a **virtualized recycling `List`** that renders only the visible window and reuses rows as you scroll (12B) — renderer-agnostic trees, web real, native 🔬
 - ⏭️ **Phases 8F / 13** — end-to-end native app (embedded JS engine + JS↔native bridge); then examples, benchmarks, docs site & release
 
+Benchmark evidence for implemented hot paths lives in [`docs/benchmarks.md`](./docs/benchmarks.md).
+
 Full plan: [ROADMAP.md](./ROADMAP.md).
 
 ## 🚀 Quickstart (contributors)
