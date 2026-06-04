@@ -25,6 +25,8 @@ export type Role =
   | 'dialog'
   | 'alert'
   | 'status'
+  | 'separator'
+  | 'progressbar'
   | 'none'
   | 'presentation'
 

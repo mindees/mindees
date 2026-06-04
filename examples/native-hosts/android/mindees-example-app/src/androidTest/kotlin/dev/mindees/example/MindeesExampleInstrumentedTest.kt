@@ -51,6 +51,8 @@ class MindeesExampleInstrumentedTest {
                 requireView(content, TextView::class.java) {
                     it.text.toString().startsWith("File-based routes")
                 }
+                // Atlas components render natively: the Badge's text is present.
+                requireView(content, TextView::class.java) { it.text.toString() == "v0.1.0" }
                 // Home's content is gone (the old route subtree was removed + disposed).
                 assertNull(
                     findView(content, TextView::class.java) { it.text.toString() == "Mark done" },
