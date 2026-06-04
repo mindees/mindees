@@ -275,8 +275,11 @@ describe('server backend — anthropic adapter', () => {
     expect(seenInit?.headers.authorization).toBeUndefined() // not the bearer scheme
   })
 
-  it('stream() parses Anthropic content_block_delta + message_delta', async () => {
+  it('stream() parses Anthropic message_start + content_block_delta + message_delta', async () => {
+    // input_tokens arrives on message_start, output_tokens on message_delta — they are in
+    // separate events, so the finish chunk must carry BOTH (the parser holds input_tokens).
     const sse =
+      'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":7,"output_tokens":0}}}\n\n' +
       'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}\n\n' +
       'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":1}}\n\n'
     const ai = createServerBackend({
@@ -288,7 +291,7 @@ describe('server backend — anthropic adapter', () => {
     const chunks = await collect(ai.stream({ messages: [] }))
     expect(chunks).toEqual([
       { type: 'text-delta', delta: 'Hi' },
-      { type: 'finish', finishReason: 'stop', usage: { outputTokens: 1 } },
+      { type: 'finish', finishReason: 'stop', usage: { inputTokens: 7, outputTokens: 1 } },
     ])
   })
 })

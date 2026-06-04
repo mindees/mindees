@@ -228,6 +228,7 @@ describe('layout primitives', () => {
   it('ScrollView horizontal lays children in a row and scrolls (not a no-op)', () => {
     const node = el(ScrollView({ horizontal: true }))
     const style = node.props.style as Record<string, unknown>
+    expect(style.display).toBe('flex') // without display:flex the flexDirection is inert
     expect(style.flexDirection).toBe('row') // real horizontal layout via the style channel
     expect(style.flexWrap).toBe('nowrap')
     expect(style.overflow).toBe('auto')

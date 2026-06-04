@@ -292,6 +292,11 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
       const st = await readStateOrInit()
       const generation = st.generations[generationId]
       if (!generation) throw new UpdateError('GENERATION_UNKNOWN', `no generation ${generationId}`)
+      // Idempotent re-apply: the requested generation is ALREADY current. Short-circuit
+      // before rewriting state — re-running the flip would reset pendingVerification and
+      // bootAttempts, un-confirming a generation that may have already passed its
+      // readiness handshake (and re-arming crash-loop rollback against a known-good build).
+      if (generationId === st.current && generation.status === 'current') return
       // Never re-activate a generation that previously failed (e.g. crash-looped).
       if (generation.status === 'failed') {
         throw new UpdateError('GENERATION_FAILED', `generation ${generationId} previously failed`)

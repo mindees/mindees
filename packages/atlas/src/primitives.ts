@@ -197,7 +197,9 @@ export const Pressable: Component<PressableProps> = (props) => {
     const isStateFn = typeof style === 'function' && style.length >= 1
     host.style = isStateFn
       ? () => flattenStyle((style as (s: InteractionState) => StyleInput)(state()))
-      : resolveStyle(style)
+      : // Arity ruled the state-fn out, so the remainder is a plain `Reactive<StyleInput>`.
+        // TS can't narrow on `.length`, so assert it (mirrors the state-fn cast above).
+        resolveStyle(style as Reactive<StyleInput>)
   }
   return createElement('view', host, props.children)
 }
@@ -284,7 +286,9 @@ export const ScrollView: Component<ScrollViewProps> = (props) => {
     ...rest,
     style: withBaseStyle(
       horizontal
-        ? { overflow: 'auto', flexDirection: 'row', flexWrap: 'nowrap' }
+        ? // `display: 'flex'` is required for `flexDirection`/`flexWrap` to take effect —
+          // without it the row layout is inert (the element keeps the default block flow).
+          { display: 'flex', overflow: 'auto', flexDirection: 'row', flexWrap: 'nowrap' }
         : { overflow: 'auto' },
       style,
     ),

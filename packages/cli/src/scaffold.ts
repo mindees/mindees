@@ -56,14 +56,16 @@ export function scaffold(fs: FileSystem, options: ScaffoldOptions): ScaffoldResu
     try {
       existing = fs.readDir(targetDir)
     } catch {
-      // targetDir exists but is not a readable directory (e.g. a regular FILE — the
-      // real readDir throws ENOTDIR). Report it cleanly instead of letting the
-      // exception escape (the CLI contract is "never throws for expected failures").
+      // targetDir exists but could not be listed. The common cause is that it is a regular
+      // FILE rather than a directory (readDir throws ENOTDIR), but it could also be a
+      // permission error (EACCES) or another I/O failure — don't assert a specific cause we
+      // didn't verify. Report it cleanly instead of letting the exception escape (the CLI
+      // contract is "never throws for expected failures").
       return {
         ok: false,
         written: [],
         template,
-        error: `Target "${targetDir}" already exists and is not a directory.`,
+        error: `Target "${targetDir}" exists but could not be read (it may be a file or inaccessible).`,
       }
     }
     if (!force && existing.length > 0) {

@@ -369,8 +369,14 @@ describe('update client — trust boundary (download/apply re-enforce the gates)
     await c.download(fx.manifest)
     await c.apply('u1')
     await c.boot()
-    await c.notifyReady() // high-water mark = 5, 'u1' current
+    await c.notifyReady() // high-water mark = 5, 'u1' current + CONFIRMED
     await expect(c.apply('u1')).resolves.toBeUndefined() // same id+version → not a downgrade
+    // The re-apply must be a true no-op: it must NOT reset pendingVerification/bootAttempts
+    // and so un-confirm a generation that already passed its readiness handshake.
+    const st = await c.state()
+    expect(st.current).toBe('u1')
+    expect(st.pendingVerification).toBe(false)
+    expect(st.bootAttempts).toBe(0)
   })
 
   it('apply() refuses to re-activate a generation that previously failed', async () => {

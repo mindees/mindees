@@ -70,7 +70,7 @@ describe('scaffold', () => {
       result = scaffold(fileFs, { appName: 'foo', targetDir: 'foo' })
     }).not.toThrow()
     expect(result.ok).toBe(false)
-    expect(result.error).toMatch(/not a directory/)
+    expect(result.error).toMatch(/could not be read/)
   })
 
   it('produces a package.json depending on the framework packages', () => {
