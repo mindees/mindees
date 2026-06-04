@@ -228,3 +228,95 @@ export function createList<T>(options: ListOptions<T>): MindeesNode {
 export function List<T>(options: ListOptions<T>): MindeesNode {
   return createList(options)
 }
+
+// ---------------------------------------------------------------------------
+// SectionList
+// ---------------------------------------------------------------------------
+
+/** A list section: an optional header + its rows. */
+export interface Section<T> {
+  /** Header title (used by the default header when `renderSectionHeader` is omitted). */
+  readonly title?: string
+  readonly data: readonly T[]
+  /** Stable key for the section (optional). */
+  readonly key?: string
+}
+
+/** A flattened section-list entry: a header or a row. */
+type Entry<T> =
+  | { readonly kind: 'header'; readonly section: Section<T>; readonly sectionIndex: number }
+  | {
+      readonly kind: 'item'
+      readonly section: Section<T>
+      readonly item: T
+      readonly sectionIndex: number
+      readonly itemIndex: number
+    }
+
+/** Flatten sections into a single ordered entry list (header, its rows, next header, …). */
+export function flattenSections<T>(sections: readonly Section<T>[]): Entry<T>[] {
+  const out: Entry<T>[] = []
+  sections.forEach((section, sectionIndex) => {
+    out.push({ kind: 'header', section, sectionIndex })
+    section.data.forEach((item, itemIndex) => {
+      out.push({ kind: 'item', section, item, sectionIndex, itemIndex })
+    })
+  })
+  return out
+}
+
+/** Options for {@link createSectionList}. */
+export interface SectionListOptions<T> {
+  /** The sections, static or reactive. */
+  readonly sections: readonly Section<T>[] | (() => readonly Section<T>[])
+  /** Render one row (same lazy-accessor contract as {@link ListOptions.renderItem}). */
+  readonly renderItem: (item: () => T, index: () => number) => MindeesNode
+  /** Render a section header (defaults to a `text` of `section.title`). */
+  readonly renderSectionHeader?: (section: () => Section<T>) => MindeesNode
+  /** Fixed row height in px (headers and rows share it in v1). */
+  readonly itemHeight: number
+  readonly height: number
+  readonly overscan?: number
+  readonly onEndReached?: () => void
+  readonly style?: Reactive<StyleInput>
+}
+
+/**
+ * A virtualized **section list** built on {@link createList}: sections are flattened to a
+ * single entry stream (header, rows, …) and windowed, so only visible headers/rows render.
+ * Fixed row height in v1 (headers share it) — variable heights track the List's research item.
+ */
+export function createSectionList<T>(options: SectionListOptions<T>): MindeesNode {
+  const sectionsOf: () => readonly Section<T>[] =
+    typeof options.sections === 'function'
+      ? options.sections
+      : () => options.sections as readonly Section<T>[]
+
+  return createList<Entry<T>>({
+    items: () => flattenSections(sectionsOf()),
+    itemHeight: options.itemHeight,
+    height: options.height,
+    ...(options.overscan !== undefined ? { overscan: options.overscan } : {}),
+    ...(options.onEndReached ? { onEndReached: options.onEndReached } : {}),
+    ...(options.style !== undefined ? { style: options.style } : {}),
+    // The branch reads `entry()`, so a recycled slot re-runs this when its entry changes —
+    // correct for mixed header/row content (rows still virtualize: only the visible window renders).
+    renderItem: (entry) => () => {
+      const e = entry()
+      if (e.kind === 'header') {
+        return options.renderSectionHeader
+          ? options.renderSectionHeader(() => entry().section)
+          : createElement('text', null, e.section.title ?? '')
+      }
+      return options.renderItem(
+        () => (entry() as Extract<Entry<T>, { kind: 'item' }>).item,
+        () => (entry() as Extract<Entry<T>, { kind: 'item' }>).itemIndex,
+      )
+    },
+  })
+}
+
+/** Component-style alias for {@link createSectionList}. */
+export function SectionList<T>(options: SectionListOptions<T>): MindeesNode {
+  return createSectionList(options)
+}
