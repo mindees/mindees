@@ -37,14 +37,6 @@
   "dependencies": {
     "@mindees/core": "workspace:*"
   },
-  "peerDependencies": {
-    "@mindees/renderer": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@mindees/renderer": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@mindees/renderer": "workspace:*",
     "happy-dom": "20.9.0"
