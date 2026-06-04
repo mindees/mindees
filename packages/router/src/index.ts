@@ -40,6 +40,8 @@ export type {
 } from './data'
 /** Errors. */
 export { RouterError, type RouterErrorCode } from './errors'
+/** File-based routing: a module map → a router (Expo-style conventions). */
+export { createFileRouter, type RouteModule, routesFromModules } from './file-routes'
 /** History capability. */
 export {
   createBrowserHistory,
@@ -51,6 +53,8 @@ export {
   type RouterHistory,
   type RouterLocation,
 } from './history'
+/** Ergonomic hooks + a bound Link that resolve the active router. */
+export { Link, useParams, usePathname, useRouter, useSearch } from './hooks'
 /** Route patterns + codegen-free typed params. */
 export {
   buildPath,

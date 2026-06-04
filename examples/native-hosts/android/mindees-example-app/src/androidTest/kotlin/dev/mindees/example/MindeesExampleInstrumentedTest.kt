@@ -43,7 +43,7 @@ class MindeesExampleInstrumentedTest {
                 tap(content, "About →")
                 requireView(content, TextView::class.java) { it.text.toString() == "About" }
                 requireView(content, TextView::class.java) {
-                    it.text.toString().startsWith("Real Atlas components")
+                    it.text.toString().startsWith("File-based routes")
                 }
                 // Home's content is gone (the old route subtree was removed + disposed).
                 assertNull(
