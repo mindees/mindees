@@ -11,20 +11,15 @@
 
 import { Column } from '@mindees/atlas'
 import { createFileRouter, createMemoryHistory, createRouterView } from '@mindees/router'
-import * as aboutRoute from './app/about'
-import * as indexRoute from './app/index'
+import { routes } from './routes.gen'
 import { screenStyle } from './theme'
 
-// The file-based route map. A bundler glob (`import.meta.glob('./app/**')`) or a
-// `mindees build` codegen produces this automatically; it's explicit here because the
-// QuickJS bundle has no `import.meta.glob`.
-const router = createFileRouter(
-  {
-    'index.tsx': indexRoute,
-    'about.tsx': aboutRoute,
-  },
-  { history: createMemoryHistory({ initialEntries: ['/'] }) },
-)
+// `routes` is generated from the `app/` directory (scripts/gen-routes.mjs +
+// @mindees/compiler `generateRouteModule`), so adding a file under `app/` adds a route
+// with no edits here. createFileRouter applies the Expo-style conventions.
+const router = createFileRouter(routes, {
+  history: createMemoryHistory({ initialEntries: ['/'] }),
+})
 
 /** Full-screen shell: dark background, centers the active route's card. */
 export function App() {

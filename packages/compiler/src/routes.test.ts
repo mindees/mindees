@@ -1,5 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { buildRouteManifest, chunkName, fileToRoute } from './routes'
+import { buildRouteManifest, chunkName, fileToRoute, generateRouteModule } from './routes'
+
+describe('generateRouteModule', () => {
+  it('emits sorted static imports + a module map keyed by relative path', () => {
+    const src = generateRouteModule(['index.tsx', 'about.tsx', 'blog/[slug].tsx'], {
+      importBase: './app',
+    })
+    expect(src).toContain("import * as _route0 from './app/about'")
+    expect(src).toContain("import * as _route1 from './app/blog/[slug]'")
+    expect(src).toContain("import * as _route2 from './app/index'")
+    expect(src).toContain('export const routes = {')
+    expect(src).toContain('"about.tsx": _route0,')
+    expect(src).toContain('"blog/[slug].tsx": _route1,')
+    expect(src).toContain('"index.tsx": _route2,')
+  })
+
+  it('ignores non-route files and honors a custom export name', () => {
+    const src = generateRouteModule(['index.tsx', 'styles.css', 'README.md'], {
+      exportName: 'appRoutes',
+    })
+    expect(src).toContain('export const appRoutes = {')
+    expect(src).not.toContain('styles.css')
+    expect(src).not.toContain('README.md')
+    expect(src).toContain("'./app/index'") // default importBase
+  })
+
+  it('emits an empty map for no route files', () => {
+    expect(generateRouteModule([])).toContain('export const routes = {\n\n}')
+  })
+})
 
 describe('fileToRoute', () => {
   it('maps index to the parent path', () => {

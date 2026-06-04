@@ -1931,10 +1931,10 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 				module: mod
 			});
 		}
-		return {
+		return notFound ? {
 			root,
 			notFound
-		};
+		} : { root };
 	}
 	/** Convert a directory node into the route records *relative to that node*. */
 	function nodeToRoutes(node) {
@@ -2175,6 +2175,13 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	}
 
 //#endregion
+//#region src/routes.gen.ts
+	const routes = {
+		"about.tsx": about_exports,
+		"index.tsx": app_exports
+	};
+
+//#endregion
 //#region src/App.tsx
 /**
 	* The example app — file-based routing, `@mindees/*` only, plain TSX.
@@ -2186,10 +2193,7 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	*
 	* @module
 	*/
-	const router = createFileRouter({
-		"index.tsx": app_exports,
-		"about.tsx": about_exports
-	}, { history: createMemoryHistory({ initialEntries: ["/"] }) });
+	const router = createFileRouter(routes, { history: createMemoryHistory({ initialEntries: ["/"] }) });
 	/** Full-screen shell: dark background, centers the active route's card. */
 	function App() {
 		return /* @__PURE__ */ jsx(Column, {
