@@ -1,0 +1,13 @@
+# Android build outputs and local caches
+.gradle/
+.kotlin/
+build/
+
+# The Gradle wrapper is bootstrapped in CI (see .github/workflows/native-android.yml)
+# and locally on demand, not committed.
+/gradlew
+/gradlew.bat
+/gradle/wrapper/
+
+# Local SDK pointer
+local.properties

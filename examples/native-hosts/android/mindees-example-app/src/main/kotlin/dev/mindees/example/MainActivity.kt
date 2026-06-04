@@ -1,10 +1,12 @@
 package dev.mindees.example
 
 import android.app.Activity
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import dev.mindees.host.AndroidViewRenderer
 import dev.mindees.host.MindeesNativeHost
@@ -15,9 +17,16 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Fill the window and paint a dark base: the Atlas app controls its own layout and
+        // background edge-to-edge, so the host window should match it (no light gaps showing
+        // through where content hasn't laid out yet).
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            setBackgroundColor(Color.parseColor("#0b1021"))
         }
         val renderer = AndroidViewRenderer(this)
         val mainHandler = Handler(Looper.getMainLooper())
@@ -32,9 +41,15 @@ class MainActivity : Activity() {
             },
         )
 
+        // The real Atlas + Helix app, bundled to a QuickJS-safe IIFE (app-js/, regenerate
+        // with `pnpm run build:android-example-js`). It runs @mindees/core signals +
+        // @mindees/atlas primitives + the @mindees/renderer reconciler inside QuickJS and
+        // emits the native command stream this host materializes — not hand-written commands.
+        val appJs = assets.open(APP_BUNDLE_ASSET).bufferedReader().use { it.readText() }
+
         bridge = MindeesRuntimeBridge(
             host = host,
-            runtime = QuickJsMindeesRuntime(COUNTER_APP_JS),
+            runtime = QuickJsMindeesRuntime(appJs),
             applyOnHostThread = { action ->
                 if (Looper.myLooper() == Looper.getMainLooper()) {
                     action()
@@ -56,70 +71,7 @@ class MainActivity : Activity() {
     private companion object {
         const val HOST_ROOT_ID = "host-root"
 
-        val COUNTER_APP_JS = """
-            const ids = {
-              screen: "counter-screen",
-              label: "counter-label",
-              button: "counter-button"
-            };
-            let count = 0;
-            let mounted = false;
-
-            function emit(commands) {
-              MindeesHost.emit(JSON.stringify(commands));
-            }
-
-            function renderCount() {
-              emit([{ type: "updateText", id: ids.label, text: `Count: ${'$'}{count}` }]);
-            }
-
-            globalThis.MindeesApp = {
-              start() {
-                if (mounted) return;
-                mounted = true;
-                emit([
-                  { type: "createNode", id: ids.screen, tag: "view" },
-                  { type: "createText", id: ids.label, text: "Count: 0" },
-                  { type: "createNode", id: ids.button, tag: "button" },
-                  {
-                    type: "setProp",
-                    id: ids.button,
-                    name: "title",
-                    value: "Increment"
-                  },
-                  {
-                    type: "registerEvent",
-                    id: ids.button,
-                    eventName: "press",
-                    handlerId: "counter.increment"
-                  },
-                  {
-                    type: "insertChild",
-                    parentId: ids.screen,
-                    childId: ids.label,
-                    index: 0
-                  },
-                  {
-                    type: "insertChild",
-                    parentId: ids.screen,
-                    childId: ids.button,
-                    index: 1
-                  },
-                  {
-                    type: "insertChild",
-                    parentId: "$HOST_ROOT_ID",
-                    childId: ids.screen,
-                    index: 0
-                  }
-                ]);
-              },
-
-              dispatchEvent(handlerId) {
-                if (handlerId !== "counter.increment") return;
-                count += 1;
-                renderCount();
-              }
-            };
-        """.trimIndent()
+        /** The bundled real Atlas + Helix app (see app-js/ + tsdown.config.ts). */
+        const val APP_BUNDLE_ASSET = "mindees-app.bundle.js"
     }
 }
