@@ -48,9 +48,15 @@ jobs:
       # So the *merge of a version packages PR* is the single, deliberate trigger
       # for the first (irreversible) publish. `pnpm release` still refuses to publish
       # 0.0.0 (`sync-versions.mjs --assert-released`) and runs the build + exports +
-      # packed-artifact readiness gates before `changeset publish`. Auth is npm OIDC
-      # trusted publishing (id-token: write above; no long-lived NPM_TOKEN), which
-      # also stamps provenance. See RELEASING.md.
+      # packed-artifact readiness gates before `changeset publish`. See RELEASING.md.
+      #
+      # Auth is an automation NPM_TOKEN. We would prefer OIDC trusted publishing
+      # (id-token: write is kept below for provenance + a future switch back), but
+      # `changeset publish` shells out to `pnpm publish`, and pnpm 11's OIDC trusted
+      # publishing is currently broken — it sends no credentials and npm returns a
+      # misleading 404 (pnpm/pnpm#11513; fix PR #11526 is not in a released pnpm yet).
+      # A granular NPM_TOKEN authenticates reliably with pnpm 11. Revisit OIDC once
+      # pnpm ships the fix.
       - name: Version packages PR, or publish when versions are real
         uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
         with:
@@ -60,3 +66,4 @@ jobs:
           title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
