@@ -23,7 +23,7 @@ corepack enable                              # activates the pinned pnpm version
 git clone https://github.com/mindees/mindees.git
 cd mindees
 pnpm install
-pnpm verify                                  # lint + typecheck + build + exports + CLI smoke + test
+pnpm verify                                  # lint + versions + typecheck + build + exports + pack + CLI smoke + test
 ```
 
 If `pnpm verify` is green, you're ready.
@@ -47,13 +47,15 @@ after Corepack has made `pnpm` available on PATH.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm verify` | Runs the full gate: lint, typecheck, build, export validation, CLI smoke, and tests. |
+| `pnpm verify` | Runs the full gate: lint, version sync, typecheck, build, export validation, packed artifact validation, CLI smoke, and tests. |
 | `pnpm build` | Builds all packages. |
 | `pnpm test` | Runs all tests (Vitest). |
 | `pnpm lint` | Lints + checks formatting (Biome). |
 | `pnpm format` | Auto-formats the codebase. |
 | `pnpm typecheck` | Type-checks all packages under `strict`. |
+| `pnpm check:versions` | Verifies every exported source `VERSION` matches its package manifest. |
 | `pnpm check:exports` | Verifies built package export/bin targets and imports each public specifier from its owning package directory. |
+| `pnpm check:pack` | Packs every public package, validates tarball contents/manifests, installs the tarballs into a fixture, imports every public specifier, runs packed bins, and prints size evidence. |
 | `pnpm changeset` | Records a changeset for your change (see Releasing). |
 
 > Exact task wiring lives in `turbo.json` and the root `package.json`.
