@@ -34,7 +34,12 @@ export type QueryValue =
  * parseQuery('?page=2&tag=a&tag=b') // { page: '2', tag: ['a', 'b'] }
  */
 export function parseQuery(search: string): Record<string, string | string[]> {
-  const out: Record<string, string | string[]> = {}
+  // Null-prototype accumulator: a normal `{}` inherits Object.prototype, so a key
+  // like `constructor`/`toString`/`__proto__` would resolve to a builtin on the
+  // `out[key]` existence probe (leaking a function into a bogus array) or hit the
+  // `__proto__` setter (mutating the result's prototype). With no prototype, every
+  // key — including those — is an ordinary absent-then-own data property.
+  const out: Record<string, string | string[]> = Object.create(null)
   const query = search.startsWith('?') ? search.slice(1) : search
   if (query.length === 0) return out
 

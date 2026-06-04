@@ -58,4 +58,39 @@ describe('view transitions', () => {
     expect(router.location().pathname).toBe('/a')
     router.dispose()
   })
+
+  it('falls back to a plain commit when startViewTransition throws synchronously', () => {
+    // Some browsers throw synchronously (e.g. a hidden/background document).
+    vtDoc.startViewTransition = () => {
+      throw new Error('document is hidden')
+    }
+    const router = createRouter({
+      routes: [{ path: '/' }, { path: '/a' }],
+      history: createMemoryHistory(),
+      viewTransitions: true,
+    })
+    expect(() => router.navigate('/a')).not.toThrow() // must not escape navigate()
+    expect(router.location().pathname).toBe('/a') // navigation still landed
+    router.dispose()
+  })
+
+  it('swallows a rejected transition.ready (no unhandled rejection) and still navigates', async () => {
+    // A rapid second navigation aborts the first transition, rejecting its
+    // eagerly-created `ready` promise. It must be handled, not leak.
+    vtDoc.startViewTransition = (cb) => {
+      cb()
+      return { ready: Promise.reject(new Error('aborted by a newer transition')) }
+    }
+    const router = createRouter({
+      routes: [{ path: '/' }, { path: '/a' }],
+      history: createMemoryHistory(),
+      viewTransitions: true,
+    })
+    expect(() => router.navigate('/a')).not.toThrow()
+    expect(router.location().pathname).toBe('/a')
+    // Let the rejection settle; the .catch in startViewTransition handles it, so
+    // vitest's unhandled-rejection guard stays silent.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    router.dispose()
+  })
 })

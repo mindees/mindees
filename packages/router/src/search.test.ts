@@ -28,6 +28,24 @@ describe('parseQuery', () => {
   it('handles a key with no value', () => {
     expect(parseQuery('?flag')).toEqual({ flag: '' })
   })
+
+  it('treats inherited Object.prototype keys as ordinary string params', () => {
+    for (const key of ['constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+      const out = parseQuery(`?${key}=x`)
+      expect(Array.isArray(out[key])).toBe(false) // not a leaked builtin wrapped in an array
+      expect(out[key]).toBe('x')
+    }
+  })
+
+  it('does not leak builtins or mutate the prototype via __proto__ keys', () => {
+    const single = parseQuery('?__proto__=zzz')
+    expect(Object.keys(single)).toContain('__proto__')
+    expect(Object.getOwnPropertyDescriptor(single, '__proto__')?.value).toBe('zzz')
+
+    const repeated = parseQuery('?__proto__=a&__proto__=b')
+    expect(Array.isArray(Object.getPrototypeOf(repeated))).toBe(false) // prototype untouched
+    expect(Object.getOwnPropertyDescriptor(repeated, '__proto__')?.value).toEqual(['a', 'b'])
+  })
 })
 
 describe('stringifyQuery', () => {
