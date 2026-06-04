@@ -87,14 +87,26 @@ export function render<N, P>(
   const container = (isComponentForm ? d : c) as N
 
   let nodes: N[] = []
-  const dispose = createRoot((dispose) => {
-    // Evaluate the component INSIDE the root scope so its effects/memos are
-    // owned here and disposed with us. A non-component node is mounted as-is
-    // (an accessor node becomes a reactive region during mount).
-    const node: MindeesNode = isComponentForm ? (a as Component<P>)(b as P) : (a as MindeesNode)
-    nodes = mountNode(node, backend, container, null)
-    return dispose
-  })
+  // Capture the disposer eagerly — createRoot passes it to the callback
+  // synchronously, BEFORE the body runs. If the component or mountNode throws
+  // part-way, effects/regions created before the throw are already adopted on
+  // this root; createRoot does NOT auto-dispose on a throw, so without this they
+  // would leak (stay subscribed forever) and the caller would get no disposer.
+  // Dispose the partial scope, then rethrow — restoring the "no leaks" guarantee.
+  let dispose!: () => void
+  try {
+    createRoot((d) => {
+      dispose = d
+      // Evaluate the component INSIDE the root scope so its effects/memos are
+      // owned here and disposed with us. A non-component node is mounted as-is
+      // (an accessor node becomes a reactive region during mount).
+      const node: MindeesNode = isComponentForm ? (a as Component<P>)(b as P) : (a as MindeesNode)
+      nodes = mountNode(node, backend, container, null)
+    })
+  } catch (err) {
+    dispose?.()
+    throw err
+  }
 
   return {
     nodes,
@@ -187,6 +199,11 @@ function bindProp<N>(backend: HostBackend<N>, el: N, key: string, value: unknown
   if (key === 'children') return
   if (isEventProp(key)) {
     backend.setProp(el, key, value, undefined)
+    // Symmetric teardown: remove the listener when this scope is disposed (unmount
+    // or an enclosing region re-run), so a backend's addEventListener always has a
+    // matching removal — not left to GC. Passing `undefined` drives the backend's
+    // own listener-removal path (e.g. the DOM backend's removeEventListener).
+    onCleanup(() => backend.setProp(el, key, undefined, value))
     return
   }
   if (typeof value === 'function') {

@@ -1,4 +1,4 @@
-import { computed, createElement as h, signal } from '@mindees/core'
+import { computed, effect, createElement as h, signal } from '@mindees/core'
 import { describe, expect, it, vi } from 'vitest'
 import { createHeadlessBackend, createHeadlessRoot, type HeadlessNode } from './headless'
 import { render } from './render'
@@ -243,5 +243,38 @@ describe('render — disposal', () => {
     m.dispose()
     s.set(2)
     expect(read).toHaveBeenCalledTimes(2) // binding disposed → no further runs (no leak)
+  })
+})
+
+describe('render — leak safety on a render-time throw', () => {
+  it('disposes effects created before a component throws (no orphaned subscription)', () => {
+    const { backend, root } = setup()
+    const s = signal(0)
+    const runs = vi.fn(() => s())
+    const Boom = () => {
+      effect(runs) // adopted on render's root + subscribes to s, runs once
+      throw new Error('render failed')
+    }
+    expect(() => render(Boom, {}, backend, root)).toThrow('render failed')
+
+    // Behavioral leak check: a leaked effect would re-run on the next write; a
+    // disposed one stays silent. (Pre-fix the effect leaked and `runs` re-ran.)
+    runs.mockClear()
+    s.set(1)
+    expect(runs).not.toHaveBeenCalled() // the partial scope was disposed — no leak
+  })
+
+  it('disposes earlier reactive bindings when a later child throws mid-mount', () => {
+    const { backend, root } = setup()
+    const s = signal(0)
+    const read = vi.fn(() => s()) // earlier reactive prop subscribes to s
+    const tree = h('view', { 'data-x': read }, () => {
+      throw new Error('child boom') // a later child region throws on first run
+    })
+    expect(() => render(tree, backend, root)).toThrow('child boom')
+
+    read.mockClear()
+    s.set(1)
+    expect(read).not.toHaveBeenCalled() // the earlier prop effect was torn down
   })
 })
