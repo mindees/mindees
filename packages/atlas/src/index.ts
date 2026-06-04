@@ -30,6 +30,26 @@ export const info: PackageInfo = Object.freeze({ name, version: VERSION, maturit
 
 export { type A11yProps, type A11yState, type Role, toA11yProps } from './a11y'
 export {
+  Avatar,
+  type AvatarProps,
+  Badge,
+  type BadgeProps,
+  Card,
+  type CardProps,
+  Chip,
+  type ChipProps,
+  Divider,
+  type DividerProps,
+  KeyboardAvoidingView,
+  type KeyboardAvoidingViewProps,
+  ProgressBar,
+  type ProgressBarProps,
+  SafeAreaView,
+  type SafeAreaViewProps,
+  Switch,
+  type SwitchProps,
+} from './components'
+export {
   type ColorScheme,
   getEnvironment,
   type KeyboardState,

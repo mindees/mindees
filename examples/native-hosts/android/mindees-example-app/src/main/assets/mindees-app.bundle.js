@@ -631,6 +631,176 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	}, props.children);
 
 //#endregion
+//#region ../../../../../packages/atlas/dist/components.js
+/**
+	* Atlas components — higher-level building blocks composed purely from the primitives
+	* (View/Text/Pressable/Image) + the device hooks. No new host concepts, so every one
+	* renders on web *and* native today, and stays fine-grained: reactive bits are accessor
+	* styles, so only the changed node re-runs (no component re-render).
+	*
+	* Defaults follow the 2026 UI/UX handbook — 8pt spacing, 12–16 radius, WCAG-AA tone
+	* contrast, ≥24/44 targets. Colors are neutral/semantic literals for now; the design-token
+	* layer (next) will make them themeable.
+	*
+	* @module
+	*/
+	/** A neutral hairline that reads on both light and dark surfaces. */
+	const HAIRLINE = "rgba(127, 127, 127, 0.24)";
+	/** Merge a base style with a caller's (possibly reactive) style, staying reactive if either is. */
+	function mergeStyle(base, style) {
+		const baseFn = typeof base === "function" ? base : null;
+		if (baseFn || typeof style === "function") {
+			const styleFn = typeof style === "function" ? style : null;
+			return () => flattenStyle([baseFn ? baseFn() : base, styleFn ? styleFn() : style]);
+		}
+		return flattenStyle([base, style]);
+	}
+	/** Normalize a `Reactive<T>` to an accessor. */
+	function toAccessor(value, fallback) {
+		if (typeof value === "function") return value;
+		return () => value === void 0 ? fallback : value;
+	}
+	const Card = (props) => {
+		const { variant = "elevated", padding = 16, radius = 16, style, children, ...rest } = props;
+		const base = {
+			padding,
+			borderRadius: radius,
+			...variant === "outlined" ? {
+				borderWidth: 1,
+				borderColor: HAIRLINE
+			} : variant === "filled" ? { backgroundColor: "rgba(127, 127, 127, 0.08)" } : {
+				backgroundColor: "rgba(127, 127, 127, 0.06)",
+				borderWidth: 1,
+				borderColor: HAIRLINE
+			}
+		};
+		return createElement(View, {
+			...rest,
+			style: mergeStyle(base, style)
+		}, children);
+	};
+	const Divider = (props) => {
+		const { orientation = "horizontal", thickness = 1, color = HAIRLINE, style, ...rest } = props;
+		const base = orientation === "horizontal" ? {
+			height: thickness,
+			alignSelf: "stretch",
+			backgroundColor: color
+		} : {
+			width: thickness,
+			alignSelf: "stretch",
+			backgroundColor: color
+		};
+		return createElement(View, {
+			...rest,
+			role: rest.role ?? "separator",
+			style: mergeStyle(base, style)
+		});
+	};
+	/** Tone → AA-contrast {bg, fg} (white text on -700 shades, ≥4.5:1 for small text). */
+	const BADGE_TONES = {
+		neutral: {
+			bg: "#475569",
+			fg: "#ffffff"
+		},
+		info: {
+			bg: "#1d4ed8",
+			fg: "#ffffff"
+		},
+		success: {
+			bg: "#15803d",
+			fg: "#ffffff"
+		},
+		warning: {
+			bg: "#b45309",
+			fg: "#ffffff"
+		},
+		danger: {
+			bg: "#b91c1c",
+			fg: "#ffffff"
+		}
+	};
+	const Badge = (props) => {
+		const { tone = "neutral", style, children, ...rest } = props;
+		const { bg, fg } = BADGE_TONES[tone];
+		const base = {
+			display: "flex",
+			alignItems: "center",
+			justifyContent: "center",
+			paddingTop: 2,
+			paddingBottom: 2,
+			paddingLeft: 8,
+			paddingRight: 8,
+			borderRadius: 999,
+			backgroundColor: bg
+		};
+		return createElement(View, {
+			...rest,
+			role: rest.role ?? "status",
+			style: mergeStyle(base, style)
+		}, createElement(Text, { style: {
+			fontSize: 12,
+			fontWeight: 600,
+			color: fg
+		} }, children));
+	};
+	const Switch = (props) => {
+		const { value, onValueChange, disabled, style, ...rest } = props;
+		const isOn = toAccessor(value, false);
+		const track = () => ({
+			display: "flex",
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: isOn() ? "flex-end" : "flex-start",
+			width: 52,
+			height: 32,
+			borderRadius: 999,
+			padding: 3,
+			backgroundColor: isOn() ? "#1d4ed8" : "#64748b",
+			opacity: disabled ? .5 : 1
+		});
+		const knob = createElement(View, { style: {
+			width: 26,
+			height: 26,
+			borderRadius: 13,
+			backgroundColor: "#ffffff"
+		} });
+		const handlePress = onValueChange && !disabled ? () => onValueChange(!isOn()) : void 0;
+		return createElement(Pressable, {
+			...rest,
+			role: rest.role ?? "switch",
+			state: {
+				...rest.state ?? {},
+				checked: isOn()
+			},
+			...disabled ? { disabled: true } : {},
+			...handlePress ? { onPress: handlePress } : {},
+			style: mergeStyle(track, style)
+		}, knob);
+	};
+	const ProgressBar = (props) => {
+		const { value = 0, trackColor = HAIRLINE, color = "#5b8cff", height = 6, style, ...rest } = props;
+		const progress = toAccessor(value, 0);
+		const track = {
+			width: "100%",
+			height,
+			borderRadius: height / 2,
+			overflow: "hidden",
+			backgroundColor: trackColor
+		};
+		const fill = () => ({
+			height,
+			borderRadius: height / 2,
+			backgroundColor: color,
+			width: `${Math.max(0, Math.min(1, progress())) * 100}%`
+		});
+		return createElement(View, {
+			...rest,
+			role: rest.role ?? "progressbar",
+			style: mergeStyle(track, style)
+		}, createElement(View, { style: fill }));
+	};
+
+//#endregion
 //#region ../../../../../packages/renderer/dist/headless.js
 /** Whether a prop key is an event handler (`onClick`, `onPress`, …). */
 	function isEventProp$1(key) {
@@ -2138,29 +2308,63 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 //#endregion
 //#region src/app/about.tsx
 /**
-	* About route — `app/about.tsx` maps to `/about`. Navigates back with `useRouter()`.
+	* About route — `app/about.tsx` maps to `/about`. Showcases Atlas components
+	* (Card, Badge, Divider, Switch, ProgressBar) and navigates back with `useRouter()`.
 	*
 	* @module
 	*/
 	var about_exports = /* @__PURE__ */ __exportAll({ default: () => About });
+	const notifications = signal(true);
 	function About() {
 		const router = useRouter();
-		return /* @__PURE__ */ jsxs(Column, {
-			style: cardStyle,
+		return /* @__PURE__ */ jsxs(Card, {
+			variant: "filled",
+			style: {
+				minWidth: 300,
+				gap: 14,
+				alignItems: "stretch"
+			},
 			children: [
-				/* @__PURE__ */ jsx(Text, {
-					style: headingStyle,
-					children: "About"
+				/* @__PURE__ */ jsxs(Row, {
+					style: {
+						justifyContent: "space-between",
+						alignItems: "center"
+					},
+					children: [/* @__PURE__ */ jsx(Text, {
+						style: headingStyle,
+						children: "About"
+					}), /* @__PURE__ */ jsx(Badge, {
+						tone: "info",
+						children: "v0.1.0"
+					})]
 				}),
+				/* @__PURE__ */ jsx(Divider, {}),
 				/* @__PURE__ */ jsx(Text, {
 					style: {
 						fontSize: 15,
 						color: palette.body,
-						textAlign: "center",
 						lineHeight: 22
 					},
-					children: "File-based routes (app/index.tsx, app/about.tsx) navigated by the Quantum router via the useRouter hook — all TypeScript, running native in an embedded engine."
+					children: "File-based routes navigated by the Quantum router via the useRouter hook — built from Atlas components, all TypeScript, running native in an embedded engine."
 				}),
+				/* @__PURE__ */ jsxs(Row, {
+					style: {
+						justifyContent: "space-between",
+						alignItems: "center"
+					},
+					children: [/* @__PURE__ */ jsx(Text, {
+						style: {
+							fontSize: 15,
+							color: palette.body
+						},
+						children: "Notifications"
+					}), /* @__PURE__ */ jsx(Switch, {
+						value: notifications,
+						onValueChange: (v) => notifications.set(v),
+						label: "Notifications"
+					})]
+				}),
+				/* @__PURE__ */ jsx(ProgressBar, { value: .6 }),
 				/* @__PURE__ */ jsx(Button, {
 					title: "← Home",
 					onPress: () => router.navigate("/"),
