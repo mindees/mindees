@@ -215,6 +215,84 @@ describe('loaders + data', () => {
     expect(router.loaderData(matches[1] as RouteMatch).data).toBe('C')
     router.dispose()
   })
+
+  it('invalidate() forces a reload even while a load is in flight', async () => {
+    let release: (() => void) | undefined
+    let calls = 0
+    const loader = vi.fn(
+      () =>
+        new Promise<number>((resolve) => {
+          release = () => resolve(++calls)
+        }),
+    )
+    const router = createRouter({
+      routes: [{ path: '/', loader, staleTime: 100_000 }],
+      history: createMemoryHistory(),
+    })
+    await flush()
+    expect(loader).toHaveBeenCalledTimes(1) // first load is in flight (pending)
+
+    router.invalidate() // must abort the in-flight load and start a fresh one
+    await flush()
+    expect(loader).toHaveBeenCalledTimes(2) // pre-fix: coalesced away, still 1
+
+    release?.() // resolve the post-invalidate load
+    await flush()
+    expect(router.loaderData(leafOf(router)).status).toBe('success')
+    router.dispose()
+  })
+
+  it('an aborted preload still warms the cache for the next visit', async () => {
+    let release: ((v: string) => void) | undefined
+    const loader = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          release = resolve
+        }),
+    )
+    const router = createRouter({
+      routes: [{ path: '/' }, { path: '/p', loader, staleTime: 100_000 }, { path: '/o' }],
+      history: createMemoryHistory(),
+    })
+    router.preload('/p')
+    await flush()
+    expect(loader).toHaveBeenCalledTimes(1)
+
+    router.navigate('/o') // sync abort loop aborts the in-flight preload
+    await flush()
+    release?.('warm') // the aborted preload settles AFTER being aborted
+    await flush()
+
+    router.navigate('/p')
+    await flush()
+    expect(loader).toHaveBeenCalledTimes(1) // pre-fix: stuck 'pending' forced a reload (2)
+    expect(router.loaderData(leafOf(router))).toMatchObject({ status: 'success', data: 'warm' })
+    router.dispose()
+  })
+
+  it('bounds the per-route loader cache (evicts the oldest entries)', async () => {
+    const seen = new Map<string, number>()
+    const loader = vi.fn((ctx: { params: Record<string, string> }) => {
+      const id = ctx.params.id ?? ''
+      seen.set(id, (seen.get(id) ?? 0) + 1)
+      return id
+    })
+    const router = createRouter({
+      routes: [{ path: '/' }, { path: '/p/:id', loader, staleTime: 100_000 }],
+      history: createMemoryHistory(),
+    })
+    // Visit far more distinct params than the cache bound.
+    for (let i = 0; i < 80; i++) {
+      router.navigate(`/p/${i}`)
+      await flush()
+    }
+    expect(seen.get('79')).toBe(1) // most-recent entry is still cached
+
+    router.navigate('/p/0') // the oldest entry was evicted → it reloads
+    await flush()
+    expect(seen.get('0')).toBe(2) // pre-fix (unbounded): would still be cached at 1
+    router.dispose()
+  })
 })
 
 describe('navigation guards', () => {

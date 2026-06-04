@@ -245,6 +245,31 @@ describe('createRouter — search validation', () => {
     expect(router.match()?.searchRaw).toEqual({ page: 'notnum' })
     router.dispose()
   })
+
+  it('contains an async searchSchema instead of wedging all router state', () => {
+    // An async Standard Schema cannot validate synchronously; safeValidateSearch
+    // throws ASYNC_SCHEMA. That throw must be contained in matchLocation (degrade
+    // to raw search + issues) rather than escaping matchMemo and poisoning every
+    // router-state accessor.
+    const asyncSchema = {
+      '~standard': {
+        version: 1 as const,
+        vendor: 'async-test',
+        validate: () => Promise.resolve({ value: {} }),
+      },
+    }
+    const router = createRouter({
+      // biome-ignore lint/suspicious/noExplicitAny: deliberately feeding an async schema
+      routes: [{ path: '/s', searchSchema: asyncSchema as any }],
+      history: createMemoryHistory({ initialEntries: ['/s?q=hi'] }),
+    })
+    expect(() => router.match()).not.toThrow() // pre-fix: throws and stays wedged
+    expect(router.match()).not.toBeNull()
+    expect(router.match()?.issues?.length).toBeGreaterThan(0)
+    expect(router.match()?.searchRaw).toEqual({ q: 'hi' })
+    expect(() => router.params()).not.toThrow()
+    router.dispose()
+  })
 })
 
 describe('createRouter — disposal', () => {

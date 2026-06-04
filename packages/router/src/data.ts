@@ -89,10 +89,19 @@ export interface LoaderManager {
 /** Create a loader manager. */
 export function createLoaderManager(options: LoaderManagerOptions): LoaderManager {
   const now = options.now ?? Date.now
-  const cache = new WeakMap<RouteRecord, Map<string, CacheEntry>>()
+  // Per-route SWR cache. The outer WeakMap lets a route's entries be reclaimed
+  // when its RouteRecord is dropped; the inner Map is bounded (see setEntry) so a
+  // high-cardinality dynamic route (e.g. `/posts/:id` visited thousands of times)
+  // can't grow it without limit. `let` so dispose() can drop it wholesale.
+  let cache = new WeakMap<RouteRecord, Map<string, CacheEntry>>()
   const inFlight = new Map<string, AbortController>()
   const ids = new WeakMap<RouteRecord, number>()
   let nextId = 0
+  let disposed = false
+
+  // Max distinct (params, loaderDeps) entries retained per route before the oldest
+  // non-pending entries are evicted (LRU by last write). Bounds memory growth.
+  const MAX_ENTRIES_PER_ROUTE = 64
 
   const idOf = (route: RouteRecord): number => {
     let id = ids.get(route)
@@ -126,10 +135,20 @@ export function createLoaderManager(options: LoaderManagerOptions): LoaderManage
       m = new Map()
       cache.set(route, m)
     }
+    // Re-insert so Map iteration order is least-recently-written first.
+    m.delete(key)
     m.set(key, entry)
+    // Bound the cache: evict the oldest entries that aren't currently loading.
+    if (m.size > MAX_ENTRIES_PER_ROUTE) {
+      for (const [k, e] of m) {
+        if (m.size <= MAX_ENTRIES_PER_ROUTE) break
+        if (e.status !== 'pending') m.delete(k)
+      }
+    }
   }
 
   const ensure = (match: RouteMatch): void => {
+    if (disposed) return
     const route = match.route
     const loader = route.loader
     if (!loader) return
@@ -161,22 +180,26 @@ export function createLoaderManager(options: LoaderManagerOptions): LoaderManage
       signal: controller.signal,
     }
 
+    // Settle the load. Even an aborted load (e.g. a preload superseded by a
+    // navigation) still warms the cache for the route's next visit — but only if
+    // our pending entry hasn't already been replaced by a newer load, and we
+    // notify observers only when we weren't aborted. This also guarantees an
+    // aborted preload never leaves a permanently `pending` cache entry.
+    const settle = (settled: CacheEntry): void => {
+      if (inFlight.get(gkey) === controller) inFlight.delete(gkey)
+      if (getEntry(route, key) !== pendingEntry) return // a newer load superseded us
+      setEntry(route, key, settled)
+      if (!controller.signal.aborted) options.onChange()
+    }
+
     Promise.resolve()
       .then(() => loader(ctx))
       .then(
-        (data) => {
-          if (controller.signal.aborted) return
-          inFlight.delete(gkey)
-          setEntry(route, key, { status: 'success', data, loadedAt: now() })
-          options.onChange()
-        },
+        (data) => settle({ status: 'success', data, loadedAt: now() }),
         (error: unknown) => {
-          if (controller.signal.aborted) return
-          inFlight.delete(gkey)
           const errored: CacheEntry = { status: 'error', error, loadedAt: now() }
           if (existing?.data !== undefined) errored.data = existing.data
-          setEntry(route, key, errored)
-          options.onChange()
+          settle(errored)
         },
       )
   }
@@ -228,14 +251,29 @@ export function createLoaderManager(options: LoaderManagerOptions): LoaderManage
     invalidate(matches) {
       for (const m of matches) {
         if (!m.route.loader) continue
-        const entry = getEntry(m.route, innerKey(m.route, m))
+        const key = innerKey(m.route, m)
+        const entry = getEntry(m.route, key)
         if (entry) entry.loadedAt = 0 // force stale
+        // If a load is already in flight for this key, abort it so the sync below
+        // starts a FRESH load — otherwise ensure() bails on the in-flight guard
+        // and the pre-invalidate (possibly stale) result is served, with the
+        // staleness mark silently overwritten when it resolves.
+        const gkey = `${idOf(m.route)}:${key}`
+        const controller = inFlight.get(gkey)
+        if (controller) {
+          controller.abort()
+          inFlight.delete(gkey)
+        }
       }
       this.sync(matches)
     },
     dispose() {
+      disposed = true
       for (const controller of inFlight.values()) controller.abort()
       inFlight.clear()
+      // Drop all cached loader data so a disposed (but still-referenced) manager
+      // doesn't retain payloads; a fresh WeakMap lets the inner Maps be GC'd.
+      cache = new WeakMap()
     },
   }
 }

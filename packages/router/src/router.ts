@@ -329,9 +329,19 @@ function matchLocation(
     if (leaf?.searchSchema) {
       // searchSchema's output is constrained to Record<string, unknown>, so the
       // validated value is already correctly typed — no cast needed.
-      const result = safeValidateSearch(leaf.searchSchema, searchRaw)
-      if (result.ok) search = result.value
-      else issues = result.issues
+      try {
+        const result = safeValidateSearch(leaf.searchSchema, searchRaw)
+        if (result.ok) search = result.value
+        else issues = result.issues
+      } catch (err) {
+        // safeValidateSearch THROWS on an async schema (ASYNC_SCHEMA), and a
+        // schema could throw synchronously too. This runs inside matchMemo
+        // (a computed read by stateMemo AND the loader effect), so an escaping
+        // throw would poison every router-state accessor and wedge navigation.
+        // Contain it: degrade to raw search and surface it via match.issues,
+        // exactly like the invalid-input path.
+        issues = [{ message: err instanceof Error ? err.message : 'search validation failed' }]
+      }
     }
 
     return fr.chain.map((route) => {
@@ -518,16 +528,43 @@ interface ViewTransitionDocument {
   startViewTransition?: (callback: () => void) => unknown
 }
 
+/** The subset of a ViewTransition we touch (its eagerly-created promises). */
+interface ViewTransitionLike {
+  ready?: Promise<unknown>
+  updateCallbackDone?: Promise<unknown>
+}
+
 /**
  * Run `commit` inside `document.startViewTransition` when available (web only),
  * else run it directly. The signals re-render is synchronous, so it happens
  * inside the transition. No-op-wrapping outside a DOM (SSR, native, tests).
+ *
+ * View transitions are a progressive enhancement, so this must NEVER throw out of
+ * navigate() or leak an unhandled rejection: (1) a rapid second navigation aborts
+ * the first transition and rejects its eagerly-created `ready`/`updateCallbackDone`
+ * promises — we mark those handled; (2) some browsers throw synchronously (e.g. a
+ * hidden/background document) — we fall back to a plain commit so the navigation
+ * still lands (without committing twice).
  */
 function startViewTransition(commit: () => void): void {
   const doc =
     typeof document === 'undefined' ? undefined : (document as unknown as ViewTransitionDocument)
-  if (doc?.startViewTransition) doc.startViewTransition(commit)
-  else commit()
+  if (!doc?.startViewTransition) {
+    commit()
+    return
+  }
+  let committed = false
+  const runCommit = (): void => {
+    committed = true
+    commit()
+  }
+  try {
+    const transition = doc.startViewTransition(runCommit) as ViewTransitionLike | undefined
+    void transition?.ready?.catch(() => {})
+    void transition?.updateCallbackDone?.catch(() => {})
+  } catch {
+    if (!committed) commit()
+  }
 }
 
 export { createHref }
