@@ -43,7 +43,8 @@ jobs:
       # real publish is an irreversible, deliberate decision. Once a "version
       # packages" PR is merged (versions are real, not 0.0.0), a maintainer runs
       # `pnpm release` with npm auth — it refuses to publish 0.0.0
-      # (`sync-versions.mjs --assert-released`). To later automate, add a
+      # (`sync-versions.mjs --assert-released`) and runs the packed-artifact
+      # readiness gate before `changeset publish`. To later automate, add a
       # `publish: pnpm release` input here plus `id-token: write` (OIDC provenance)
       # or an `NPM_TOKEN`. See RELEASING.md.
       - name: Create or update the version packages PR

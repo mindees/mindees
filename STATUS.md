@@ -113,7 +113,7 @@ without state reset, and injectable history (memory + browser).
 | Monorepo + workspaces | ✅ done (Phase 0) |
 | Open-source governance (license, CoC, security, contributing, RFCs) | ✅ in place |
 | Verified toolchain (pnpm/turbo/ts/biome/vitest/changesets) | ✅ done (Phase 0) |
-| CI (lint + typecheck + test + build) | ✅ done (Phase 0) |
+| CI (lint + versions + typecheck + build + exports + pack + CLI smoke + test) | ✅ done (Phase 0; gate includes version sync, export, packed artifact, and CLI smoke validation) |
 | Reactivity (signals/computed/effect/batch) | ✅ done (Phase 1) — `@mindees/core` |
 | Component model + selector-isolated context | ✅ done (Phase 2) — `@mindees/core` |
 | Priority scheduler + thread-pool abstraction | ✅ done (Phase 2) — `@mindees/core` (native threads 🔬) |
