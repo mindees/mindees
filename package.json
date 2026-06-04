@@ -25,6 +25,8 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "benchmark": "pnpm run build && node scripts/benchmark.mjs",
+    "benchmark:json": "pnpm run build && node scripts/benchmark.mjs --json",
     "smoke:cli": "node scripts/smoke-cli.mjs",
     "verify": "pnpm run lint && pnpm run check:versions && pnpm run typecheck && pnpm run build && pnpm run check:exports && pnpm run check:pack && pnpm run smoke:cli && pnpm run test",
     "changeset": "changeset",

@@ -56,6 +56,7 @@ after Corepack has made `pnpm` available on PATH.
 | `pnpm check:versions` | Verifies every exported source `VERSION` matches its package manifest. |
 | `pnpm check:exports` | Verifies built package export/bin targets and imports each public specifier from its owning package directory. |
 | `pnpm check:pack` | Packs every public package, validates tarball contents/manifests, installs the tarballs into a fixture, imports every public specifier, runs packed bins, and prints size evidence. |
+| `pnpm benchmark` | Builds packages, then records non-gating benchmark evidence for implemented hot paths. |
 | `pnpm changeset` | Records a changeset for your change (see Releasing). |
 
 > Exact task wiring lives in `turbo.json` and the root `package.json`.
