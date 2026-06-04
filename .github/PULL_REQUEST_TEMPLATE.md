@@ -31,7 +31,7 @@ Example: "Verified turbo X.Y is current; `tasks` key (not `pipeline`). Source: .
 
 ## Checklist
 
-- [ ] `pnpm verify` passes locally (lint + typecheck + build + exports + CLI smoke + test)
+- [ ] `pnpm verify` passes locally (lint + versions + typecheck + build + exports + pack + CLI smoke + test)
 - [ ] Tests added/updated (new behavior has tests; bug fixes have a regression test)
 - [ ] Public symbols have TSDoc
 - [ ] Added a changeset (`pnpm changeset`) if this changes a published package

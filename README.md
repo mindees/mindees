@@ -263,7 +263,7 @@ corepack enable
 git clone https://github.com/mindees/mindees.git
 cd mindees
 pnpm install
-pnpm verify   # lint + typecheck + build + exports + CLI smoke + test
+pnpm verify   # lint + versions + typecheck + build + exports + pack + CLI smoke + test
 ```
 
 If Corepack cannot create `pnpm` shims on Windows, run the same commands through

@@ -59,6 +59,9 @@ jobs:
       - name: Check package exports
         run: pnpm run check:exports
 
+      - name: Check packed artifacts
+        run: pnpm run check:pack
+
       - name: Smoke CLI
         run: pnpm run smoke:cli
 

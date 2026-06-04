@@ -2,7 +2,8 @@
 
 MindeesNative is built **bottom-up**: each phase depends only on the ones before
 it, and each ends with something a person can actually run. A phase is "done"
-only when `pnpm verify` (lint + typecheck + test + build) is green in CI.
+only when `pnpm verify` (lint, version sync, typecheck, build, exports, pack, CLI smoke,
+and tests) is green in CI.
 
 See [STATUS.md](./STATUS.md) for current maturity.
 
