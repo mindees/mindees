@@ -65,19 +65,25 @@ and 10 MiB total. Override them with `PACK_READINESS_MAX_PACKAGE_BYTES` or
   renderer,ai,data,updates,atlas}` and `create-mindees`. (The `@mindees` scope already hosts the
   maintainer's separate RN product packages — `@mindees/ui`, `@mindees/blocks`, `@mindees/icons`,
   `@mindees/tokens` — which are **not** part of this framework.)
-- **Configure npm auth** — the Release workflow uses **OIDC trusted publishing** (it requests
-  `id-token: write` and runs `publish: pnpm release`). Before the first publish, register this
-  repository + workflow as a **trusted publisher** for every public package on npmjs.com (Package
-  settings → Publishing access → Trusted Publisher: GitHub Actions, `mindees/mindees`,
-  `release.yml`). No `NPM_TOKEN` secret is needed; a maintainer can still publish locally with `npm
-  login` as a fallback.
+- **Configure npm auth** — the Release workflow authenticates with an **automation `NPM_TOKEN`**
+  repo secret. Create a *granular* access token on npmjs.com with read+write for the `@mindees`
+  scope and `create-mindees` (bypass-2FA / "automation" so CI can publish unattended), then add it
+  as the `NPM_TOKEN` repository secret (Settings → Secrets and variables → Actions). A maintainer
+  can also publish locally with `npm login` as a fallback.
+  - **Why a token and not OIDC?** OIDC trusted publishing is preferable (no long-lived secret,
+    automatic provenance) and the job still requests `id-token: write` for a future switch back.
+    But `changeset publish` shells out to `pnpm publish`, and **pnpm 11's OIDC trusted publishing
+    is currently broken** — it sends no credentials and npm returns a misleading `404`
+    ([pnpm/pnpm#11513](https://github.com/pnpm/pnpm/issues/11513); fix not yet in a released pnpm).
+    Revisit OIDC (and you can then drop `NPM_TOKEN`) once pnpm ships the fix.
 - **Pick the first version** — likely `0.1.0` (pre-1.0; APIs are 🧪 experimental).
 
 ## Publishing is automated (on the version-PR merge)
 
 Publishing is wired into the [Release workflow](.github/workflows/release.yml): the changesets step
-runs both `version: pnpm version-packages` and `publish: pnpm release`, and the job has
-`id-token: write` for OIDC provenance. When changesets are pending it (re)opens the version PR;
-when none are pending — i.e. right after the version PR is merged — it runs `pnpm release`, which
-publishes only after the same version, export, packed-artifact, and build guards pass. The merge of
-a version PR is therefore the one deliberate action that triggers an (irreversible) publish.
+runs both `version: pnpm version-packages` and `publish: pnpm release`, authenticating with the
+`NPM_TOKEN` secret (see "Configure npm auth" above for the OIDC caveat). When changesets are pending
+it (re)opens the version PR; when none are pending — i.e. right after the version PR is merged — it
+runs `pnpm release`, which publishes only after the same version, export, packed-artifact, and build
+guards pass. The merge of a version PR is therefore the one deliberate action that triggers an
+(irreversible) publish.
