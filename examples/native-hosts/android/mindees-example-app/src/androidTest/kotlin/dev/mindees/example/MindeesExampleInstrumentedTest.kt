@@ -6,58 +6,66 @@ import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * On-device proof that the **real** Atlas + Helix stack — @mindees/core signals,
- * @mindees/atlas primitives, and the @mindees/renderer reconciler, running in QuickJS
- * from the bundled asset — renders into native Android views and reacts to input.
+ * On-device proof that a **real multi-screen MindeesNative app** — @mindees/core signals,
+ * @mindees/atlas primitives, the @mindees/router (Quantum) router, and the
+ * @mindees/renderer (Helix) reconciler, running in QuickJS from the bundled asset —
+ * renders into native Android views, reacts to input, and navigates between routes.
  *
- * Unlike a hand-written command script, the UI here is produced by the genuine
- * pipeline: an Atlas `Button` renders as a clickable `view` wrapping a label, and a
- * press mutates a signal whose fine-grained update patches only the counter's text.
+ * It exercises the whole stack composing: a signal mutation (fine-grained reactive
+ * update), programmatic router navigation (native subtree swap), and state survival
+ * across navigation (a module-scoped signal).
  */
 @RunWith(AndroidJUnit4::class)
 class MindeesExampleInstrumentedTest {
     @Test
-    fun rendersAtlasUiAndReactsThroughEmbeddedRuntime() {
+    fun rendersNavigatesAndReactsThroughEmbeddedRuntime() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
                 val content = activity.findViewById<ViewGroup>(android.R.id.content)
 
-                // The heading proves the real Atlas component tree mounted (not a stub).
+                // --- Home route mounted (real Atlas tree) ---
                 requireView(content, TextView::class.java) { it.text.toString() == "MindeesNative" }
-                val countLabel = requireView(content, TextView::class.java) {
-                    it.text.toString() == "Count: 0"
+                val doneLabel = requireView(content, TextView::class.java) {
+                    it.text.toString() == "Done today: 0"
                 }
 
-                // Atlas Button = Pressable(view, onClick) > Text, so the tappable node is the
-                // label's clickable ancestor view — not a native Button widget.
-                val incrementLabel = requireView(content, TextView::class.java) {
-                    it.text.toString() == "Increment"
+                // Fine-grained reactivity: a press patches only the counter text node.
+                tap(content, "Mark done")
+                assertEquals("Done today: 1", doneLabel.text.toString())
+
+                // --- Navigate Home -> About (router swaps the native subtree) ---
+                tap(content, "About →")
+                requireView(content, TextView::class.java) { it.text.toString() == "About" }
+                requireView(content, TextView::class.java) {
+                    it.text.toString().startsWith("Real Atlas components")
                 }
-                val incrementButton = clickableAncestor(incrementLabel)
-                    ?: throw AssertionError("'Increment' label has no clickable ancestor view")
-                val resetButton = clickableAncestor(
-                    requireView(content, TextView::class.java) { it.text.toString() == "Reset" },
-                ) ?: throw AssertionError("'Reset' label has no clickable ancestor view")
+                // Home's content is gone (the old route subtree was removed + disposed).
+                assertNull(
+                    findView(content, TextView::class.java) { it.text.toString() == "Mark done" },
+                )
 
-                // A press drives QuickJS -> signal.set -> reconciler -> updateText, all native.
-                assertTrue("native click should be handled", incrementButton.performClick())
-                assertEquals("Count: 1", countLabel.text.toString())
-                assertTrue(incrementButton.performClick())
-                assertEquals("Count: 2", countLabel.text.toString())
-
-                // Reset goes through the same reactive path back to zero.
-                assertTrue(resetButton.performClick())
-                assertEquals("Count: 0", countLabel.text.toString())
+                // --- Navigate About -> Home; module-scoped signal state survived ---
+                tap(content, "← Home")
+                requireView(content, TextView::class.java) { it.text.toString() == "MindeesNative" }
+                requireView(content, TextView::class.java) { it.text.toString() == "Done today: 1" }
             }
         }
     }
 
-    /** Nearest ancestor (or self) that is clickable — the node the renderer wired onClick onto. */
+    /** Find the label, click its clickable ancestor (Atlas Button = Pressable view > Text). */
+    private fun tap(root: View, label: String) {
+        val text = requireView(root, TextView::class.java) { it.text.toString() == label }
+        val button = clickableAncestor(text)
+            ?: throw AssertionError("'$label' has no clickable ancestor view")
+        assertTrue("native click on '$label' should be handled", button.performClick())
+    }
+
     private fun clickableAncestor(view: View): View? {
         var current: View? = view
         while (current != null) {
@@ -67,30 +75,19 @@ class MindeesExampleInstrumentedTest {
         return null
     }
 
-    private fun <T : View> requireView(
-        root: View,
-        type: Class<T>,
-        matches: (T) -> Boolean,
-    ): T =
-        findView(root, type, matches)
-            ?: throw AssertionError("Expected ${type.simpleName} not found")
+    private fun <T : View> requireView(root: View, type: Class<T>, matches: (T) -> Boolean): T =
+        findView(root, type, matches) ?: throw AssertionError("Expected ${type.simpleName} not found")
 
-    private fun <T : View> findView(
-        root: View,
-        type: Class<T>,
-        matches: (T) -> Boolean,
-    ): T? {
+    private fun <T : View> findView(root: View, type: Class<T>, matches: (T) -> Boolean): T? {
         if (type.isInstance(root)) {
             val typed = type.cast(root)
             if (typed != null && matches(typed)) return typed
         }
-
         if (root is ViewGroup) {
             for (index in 0 until root.childCount) {
                 findView(root.getChildAt(index), type, matches)?.let { return it }
             }
         }
-
         return null
     }
 }

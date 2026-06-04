@@ -1,13 +1,21 @@
 # mindees-example-app — JS bundle
 
-The **real** UI for the Android example: `@mindees/core` signals + `@mindees/atlas`
-primitives driven by the `@mindees/renderer` (Helix) reconciler. It renders against a
-`createNativeCommandBackend`, which emits the serializable native command stream the
-host (`MindeesNativeHost` + `AndroidViewRenderer`) materializes into real Android views.
+The **real** UI for the Android example: a multi-screen, TypeScript-only MindeesNative
+app with `@mindees/*` end to end —
+
+- `@mindees/core` — signals + component model
+- `@mindees/atlas` — UI primitives (View/Text/Button/Column/Row)
+- `@mindees/router` — the Quantum router (in-memory history, programmatic navigation)
+- `@mindees/renderer` — the Helix reconciler → native command stream
+
+The router's `createRouterView` produces a backend-agnostic node, rendered against a
+`createNativeCommandBackend`; navigating between routes (Home ⇄ About) drives the host
+(`MindeesNativeHost` + `AndroidViewRenderer`) to swap real Android view subtrees.
 
 This is **not** hand-written commands — it exercises the genuine reconciler, including
-fine-grained reactivity (a button press mutates a signal; only the counter's text node
-is patched, via a single `updateText`).
+fine-grained reactivity (a press mutates a signal; only that text node is patched, via a
+single `updateText`) and module-scoped state that survives navigation. No DOM, no browser
+globals — it runs in the embedded QuickJS engine.
 
 ## Build
 
