@@ -9,5 +9,13 @@
   "[json]": { "editor.defaultFormatter": "biomejs.biome" },
   "[jsonc]": { "editor.defaultFormatter": "biomejs.biome" },
   "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  // The "Microsoft Edge Tools" extension bundles webhint, a linter aimed at web
+  // pages. In this TS framework monorepo it only emits false positives: a stale
+  // tsconfig schema that predates `es2023` (flagging our valid target/lib) and a
+  // DOM rule that flags every `createElement(...)` — including our native command
+  // backend's `createElement('view')`. tsc 6 / Biome / Vitest are the real
+  // toolchain and are green, so silence webhint at the source rather than
+  // corrupting build config or domain code to appease it.
+  "vscode-edge-devtools.webhint": false
 }
