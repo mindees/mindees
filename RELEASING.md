@@ -12,9 +12,12 @@ All `@mindees/*` packages (and `create-mindees`) ship as **one locked version li
    `scripts/sync-versions.mjs` — and opens/updates a **“chore: version packages”** PR. That PR
    bumps every `package.json` *and* the matching source `VERSION` constant, and updates the
    versions `create-mindees` pins into scaffolded apps.
-3. **Review + merge the version PR.** Merging it lands the real version (e.g. `0.1.0`) on `main`.
-4. **Publish (manual, maintainer-gated).** Publishing is a deliberate, irreversible action and is
-   **not** wired into CI. With npm auth configured, a maintainer runs:
+3. **Review + merge the version PR.** Merging it lands the real version (e.g. `0.1.0`) on `main` —
+   and is the single, deliberate trigger for publishing (step 4). Until you intend to publish, leave
+   the version PR open.
+4. **Publish (automated on the version-PR merge).** Merging the version PR consumes the pending
+   changesets, so the next Release-workflow run finds none and instead runs `publish` —
+   `pnpm release`:
 
    ```sh
    pnpm release
@@ -23,7 +26,10 @@ All `@mindees/*` packages (and `create-mindees`) ship as **one locked version li
    which is `sync-versions.mjs --check --assert-released && pnpm build && pnpm check:exports &&
    pnpm check:pack && changeset publish`. The guards mean it **refuses to publish `0.0.0`**,
    fails if any source `VERSION` has drifted from its `package.json`, and validates the packed
-   artifacts before anything reaches npm.
+   artifacts before anything reaches npm. Authentication is **npm OIDC trusted publishing**
+   (`id-token: write`; no long-lived `NPM_TOKEN`), which also stamps provenance — so this requires
+   the npm trusted-publisher config (below) to be in place first. A maintainer can still run
+   `pnpm release` locally with npm auth if needed.
 
 ## Version-source sync
 
@@ -59,13 +65,19 @@ and 10 MiB total. Override them with `PACK_READINESS_MAX_PACKAGE_BYTES` or
   renderer,ai,data,updates,atlas}` and `create-mindees`. (The `@mindees` scope already hosts the
   maintainer's separate RN product packages — `@mindees/ui`, `@mindees/blocks`, `@mindees/icons`,
   `@mindees/tokens` — which are **not** part of this framework.)
-- **Configure npm auth** — an automation `NPM_TOKEN`, or (preferred) OIDC trusted publishing with
-  `id-token: write` for provenance. The release workflow does not request `id-token: write` today
-  because it deliberately does not publish.
+- **Configure npm auth** — the Release workflow uses **OIDC trusted publishing** (it requests
+  `id-token: write` and runs `publish: pnpm release`). Before the first publish, register this
+  repository + workflow as a **trusted publisher** for every public package on npmjs.com (Package
+  settings → Publishing access → Trusted Publisher: GitHub Actions, `mindees/mindees`,
+  `release.yml`). No `NPM_TOKEN` secret is needed; a maintainer can still publish locally with `npm
+  login` as a fallback.
 - **Pick the first version** — likely `0.1.0` (pre-1.0; APIs are 🧪 experimental).
 
-## To automate publishing later
+## Publishing is automated (on the version-PR merge)
 
-Add to the Release workflow's changesets step: `publish: pnpm release`, plus `id-token: write`
-permission (OIDC provenance) or an `NPM_TOKEN` env. Then merging a version PR publishes
-automatically after the same version, export, packed-artifact, and build guards pass.
+Publishing is wired into the [Release workflow](.github/workflows/release.yml): the changesets step
+runs both `version: pnpm version-packages` and `publish: pnpm release`, and the job has
+`id-token: write` for OIDC provenance. When changesets are pending it (re)opens the version PR;
+when none are pending — i.e. right after the version PR is merged — it runs `pnpm release`, which
+publishes only after the same version, export, packed-artifact, and build guards pass. The merge of
+a version PR is therefore the one deliberate action that triggers an (irreversible) publish.
