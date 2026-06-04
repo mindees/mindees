@@ -53,6 +53,26 @@ describe('scaffold', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('reports a clean error (never throws) when the target exists but is a FILE', () => {
+    // The real readDir adapter throws ENOTDIR on a file; scaffold must catch it and
+    // return a ScaffoldResult, honoring the CLI's "never throws for expected failures".
+    const base = createMemoryFileSystem()
+    const fileFs = {
+      ...base,
+      exists: (p: string) => p === 'foo' || base.exists(p),
+      readDir: (p: string) => {
+        if (p === 'foo') throw new Error('ENOTDIR: not a directory')
+        return base.readDir(p)
+      },
+    }
+    let result!: ReturnType<typeof scaffold>
+    expect(() => {
+      result = scaffold(fileFs, { appName: 'foo', targetDir: 'foo' })
+    }).not.toThrow()
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/not a directory/)
+  })
+
   it('produces a package.json depending on the framework packages', () => {
     const fs = createMemoryFileSystem()
     scaffold(fs, { appName: 'app', targetDir: 'app' })

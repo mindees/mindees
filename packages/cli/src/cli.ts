@@ -145,7 +145,10 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
   // explicit `--template` always wins; the prompt only resolves a template when
   // the caller didn't choose one (mirrors `create-mindees`'s runCreate so both
   // entrypoints agree on precedence).
-  const explicitTemplate = typeof values.template === 'string' ? values.template : undefined
+  // Treat a present-but-empty `--template ""` as "not chosen" (defer to prompt/default),
+  // matching create-mindees's runCreate so both entrypoints agree on precedence.
+  const explicitTemplate =
+    typeof values.template === 'string' && values.template.length > 0 ? values.template : undefined
   let template = explicitTemplate ?? DEFAULT_TEMPLATE
   if (
     explicitTemplate === undefined &&

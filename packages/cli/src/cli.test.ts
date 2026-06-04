@@ -78,7 +78,7 @@ describe('runCli — create', () => {
     const pkg = JSON.parse(snap['E:/MiND/mindees-create-smoke/package.json'] as string)
     expect(pkg.name).toBe('mindees-create-smoke')
     expect(text()).toMatch(/Created "mindees-create-smoke"/)
-    expect(text()).toMatch(/Next: cd "E:\/MiND\/mindees-create-smoke"/)
+    expect(text()).toMatch(/Next: cd 'E:\/MiND\/mindees-create-smoke'/)
   })
 
   it('resolves a relative parent target before scaffolding', () => {
@@ -101,7 +101,15 @@ describe('runCli — create', () => {
     const snap = (ctx.fs as ReturnType<typeof createMemoryFileSystem>).snapshot()
     const pkg = JSON.parse(snap['My App!/package.json'] as string)
     expect(pkg.name).toBe('my-app')
-    expect(text()).toMatch(/Next: cd "My App!"/)
+    expect(text()).toMatch(/Next: cd 'My App!'/)
+  })
+
+  it('treats an empty --template as "not chosen" (falls back to the default, not an error)', () => {
+    const { ctx } = makeCtx()
+    // Pre-fix this scaffolded template "" → "Unknown template" → exit 1; it must defer
+    // to the default (matching create-mindees's runCreate precedence).
+    const result = runCli(['create', 'app-empty-tpl', '--template', ''], ctx)
+    expect(result.exitCode).toBe(0)
   })
 
   it('requires an app name', () => {

@@ -91,6 +91,29 @@ export function createFlattenTransformer(tsmod: typeof ts): {
     tsmod.forEachChild(node, countElements)
   }
 
+  /** Whether the module already binds `name` at the top level (var/fn/class/import). */
+  const bindsTopLevel = (sf: ts.SourceFile, name: string): boolean =>
+    sf.statements.some((s) => {
+      if (tsmod.isVariableStatement(s)) {
+        return s.declarationList.declarations.some(
+          (d) => tsmod.isIdentifier(d.name) && d.name.text === name,
+        )
+      }
+      if (tsmod.isFunctionDeclaration(s) || tsmod.isClassDeclaration(s)) {
+        return s.name?.text === name
+      }
+      if (tsmod.isImportDeclaration(s) && s.importClause) {
+        const clause = s.importClause
+        if (clause.name?.text === name) return true
+        const named = clause.namedBindings
+        if (named) {
+          if (tsmod.isNamespaceImport(named)) return named.name.text === name
+          return named.elements.some((e) => e.name.text === name)
+        }
+      }
+      return false
+    })
+
   /** `const _static = (node) => node` — the hoisted create-once marker. */
   const makeMarkerDecl = (f: ts.NodeFactory): ts.Statement =>
     f.createVariableStatement(
@@ -130,16 +153,26 @@ export function createFlattenTransformer(tsmod: typeof ts): {
       // Count all elements up front (separately from the wrapping logic), so the
       // total is accurate even though we stop recursion at static roots.
       countElements(sourceFile)
+      // If the module already binds `_static` at the top level, injecting our marker
+      // would redeclare it (a SyntaxError) and our wrap calls would rebind the user's
+      // binding. Skip flattening this module rather than emit broken code.
+      if (bindsTopLevel(sourceFile, STATIC_MARKER)) return sourceFile
       const visited = tsmod.visitNode(sourceFile, visit) as ts.SourceFile
       if (stats.flattenedNodes === 0) return visited
 
-      // Inject the `_static` marker once, after any leading imports, so the
-      // emitted module is self-contained and runnable (no undefined `_static`).
+      // Inject the `_static` marker once, after any leading **directive prologue**
+      // (`"use client"`/`"use server"`/`"use strict"`) AND leading imports, so the
+      // emitted module is self-contained and runnable AND the marker never lands
+      // before a directive (which would demote it to a no-op string expression).
       const statements = visited.statements
       let insertAt = 0
       while (insertAt < statements.length) {
         const stmt = statements[insertAt]
-        if (!stmt || !tsmod.isImportDeclaration(stmt)) break
+        if (!stmt) break
+        const isImport = tsmod.isImportDeclaration(stmt)
+        const isDirective =
+          tsmod.isExpressionStatement(stmt) && tsmod.isStringLiteral(stmt.expression)
+        if (!isImport && !isDirective) break
         insertAt++
       }
       return f.updateSourceFile(visited, [
