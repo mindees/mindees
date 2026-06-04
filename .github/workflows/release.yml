@@ -18,6 +18,7 @@ jobs:
     permissions:
       contents: write # push the version commit/tags
       pull-requests: write # open the "version packages" PR
+      id-token: write # npm OIDC trusted publishing + provenance (no long-lived token)
     steps:
       # Third-party actions are pinned to full commit SHAs (tags are mutable).
       - name: Checkout
@@ -35,22 +36,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # This step ONLY opens/updates a "version packages" PR when changesets are
-      # pending — `version-packages` bumps package.json AND syncs the source VERSION
-      # constants (scripts/sync-versions.mjs). It deliberately does NOT publish to npm.
+      # This step has TWO mutually-exclusive modes, decided by whether changesets
+      # are pending on the pushed commit:
       #
-      # Publishing is intentionally MAINTAINER-GATED, not wired into CI: the first
-      # real publish is an irreversible, deliberate decision. Once a "version
-      # packages" PR is merged (versions are real, not 0.0.0), a maintainer runs
-      # `pnpm release` with npm auth — it refuses to publish 0.0.0
-      # (`sync-versions.mjs --assert-released`) and runs the packed-artifact
-      # readiness gate before `changeset publish`. To later automate, add a
-      # `publish: pnpm release` input here plus `id-token: write` (OIDC provenance)
-      # or an `NPM_TOKEN`. See RELEASING.md.
-      - name: Create or update the version packages PR
+      #  1. Changesets pending → it opens/updates a "version packages" PR.
+      #     `version-packages` bumps package.json AND syncs the source VERSION
+      #     constants (scripts/sync-versions.mjs). Nothing is published.
+      #  2. No changesets pending (the version PR was just merged, consuming them)
+      #     → it runs `publish` (`pnpm run release`) to publish to npm.
+      #
+      # So the *merge of a version packages PR* is the single, deliberate trigger
+      # for the first (irreversible) publish. `pnpm release` still refuses to publish
+      # 0.0.0 (`sync-versions.mjs --assert-released`) and runs the build + exports +
+      # packed-artifact readiness gates before `changeset publish`. Auth is npm OIDC
+      # trusted publishing (id-token: write above; no long-lived NPM_TOKEN), which
+      # also stamps provenance. See RELEASING.md.
+      - name: Version packages PR, or publish when versions are real
         uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
         with:
           version: pnpm run version-packages
+          publish: pnpm run release
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
