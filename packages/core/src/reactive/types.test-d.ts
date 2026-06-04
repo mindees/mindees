@@ -1,5 +1,14 @@
 import { expectTypeOf } from 'expect-type'
-import { computed, effect, type Memo, type Signal, signal, untrack } from './reactive'
+import {
+  computed,
+  effect,
+  getOwner,
+  type Memo,
+  type Owner,
+  type Signal,
+  signal,
+  untrack,
+} from './reactive'
 
 // signal() returns a Signal<T> with the expected shape and inferred T.
 const count = signal(0)
@@ -25,3 +34,9 @@ expectTypeOf(effect(() => {})).toEqualTypeOf<() => void>()
 
 // untrack() preserves the callback's return type.
 expectTypeOf(untrack(() => count())).toEqualTypeOf<number>()
+
+// Owner is an OPAQUE handle: getOwner() returns it, but it must not leak the
+// internal, type-erased Computation graph (no `any`, no internal fields) into the
+// public type surface — its `owned` is `unknown`, not `Computation<any>[]`.
+expectTypeOf(getOwner()).toEqualTypeOf<Owner | null>()
+expectTypeOf<Owner['owned']>().toEqualTypeOf<unknown>()

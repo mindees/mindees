@@ -9,6 +9,15 @@ describe('@mindees/core', () => {
     expect(info).toEqual({ name: '@mindees/core', version: VERSION, maturity: 'experimental' })
   })
 
+  it('info is frozen so its self-reported identity cannot be mutated at runtime', () => {
+    expect(Object.isFrozen(info)).toBe(true)
+    // ESM runs in strict mode, so writing to a frozen property throws.
+    expect(() => {
+      ;(info as { version: string }).version = '9.9.9'
+    }).toThrow()
+    expect(info.version).toBe(VERSION)
+  })
+
   it('NotImplementedError is throwable, typed, and carries metadata', () => {
     const err = new NotImplementedError('core.future', { rfc: 'RFC-0001' })
     expect(err).toBeInstanceOf(Error)

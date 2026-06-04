@@ -101,6 +101,78 @@ describe('createWorkerPool', () => {
   })
 })
 
+describe('createWorkerPool — worker crash handling', () => {
+  it('a crash rejects that worker’s job, not another (healthy) worker’s', async () => {
+    // Each worker replies ok unless the input is 'boom', in which case it crashes.
+    const createWorker = (): WorkerLike => {
+      const w: WorkerLike = {
+        onmessage: null,
+        onerror: null,
+        postMessage(message) {
+          const { id, input } = message as { id: number; input: unknown }
+          if (input === 'boom') queueMicrotask(() => w.onerror?.({ message: 'crashed' }))
+          else queueMicrotask(() => w.onmessage?.({ data: { id, ok: true, result: input } }))
+        },
+        terminate() {},
+      }
+      return w
+    }
+    const pool = createWorkerPool({ size: 2, createWorker })
+    const a = pool.run((x: unknown) => x, 'healthy') // -> worker 0
+    const b = pool.run((x: unknown) => x, 'boom') // -> worker 1 (crashes)
+    await expect(a).resolves.toBe('healthy') // untouched by worker 1's crash
+    await expect(b).rejects.toThrow('crashed') // the crashed worker's own job
+    pool.dispose()
+  })
+
+  it('a crash rejects ALL of the crashed worker’s in-flight jobs (not just one)', async () => {
+    const createWorker = (): WorkerLike => {
+      const w: WorkerLike = {
+        onmessage: null,
+        onerror: null,
+        postMessage(message) {
+          const { input } = message as { input: unknown }
+          // 'boom' crashes the worker; other jobs stay in flight (never reply).
+          if (input === 'boom') queueMicrotask(() => w.onerror?.({ message: 'crashed' }))
+        },
+        terminate() {},
+      }
+      return w
+    }
+    const pool = createWorkerPool({ size: 1, createWorker }) // all jobs share one worker
+    const p0 = pool.run((x: unknown) => x, 'a') // in flight
+    const p1 = pool.run((x: unknown) => x, 'b') // in flight
+    const p2 = pool.run((x: unknown) => x, 'boom') // crashes the worker
+    const settled = await Promise.allSettled([p0, p1, p2])
+    expect(settled.map((s) => s.status)).toEqual(['rejected', 'rejected', 'rejected'])
+    pool.dispose()
+  })
+
+  it('replaces a crashed worker so the pool keeps working', async () => {
+    let generation = 0
+    const createWorker = (): WorkerLike => {
+      const gen = generation++
+      const w: WorkerLike = {
+        onmessage: null,
+        onerror: null,
+        postMessage(message) {
+          const { id, input } = message as { id: number; input: unknown }
+          // The first worker crashes on its first job; its replacement works.
+          if (gen === 0) queueMicrotask(() => w.onerror?.({ message: 'crashed' }))
+          else queueMicrotask(() => w.onmessage?.({ data: { id, ok: true, result: input } }))
+        },
+        terminate() {},
+      }
+      return w
+    }
+    const pool = createWorkerPool({ size: 1, createWorker })
+    await expect(pool.run((x: unknown) => x, 1)).rejects.toThrow('crashed') // gen 0 crashes
+    await expect(pool.run((x: unknown) => x, 2)).resolves.toBe(2) // gen 1 (replacement) works
+    expect(pool.size).toBe(1) // pool stays live, size accurate
+    pool.dispose()
+  })
+})
+
 describe('createNativeThreadPool (research track)', () => {
   it('throws NotImplementedError (honest, not a silent stub)', () => {
     expect(() => createNativeThreadPool()).toThrow(NotImplementedError)

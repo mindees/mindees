@@ -85,6 +85,8 @@ export interface WorkerPoolOptions {
 interface PendingJob {
   resolve: (value: unknown) => void
   reject: (error: unknown) => void
+  /** Index of the worker this job was dispatched to (for crash correlation). */
+  workerIndex: number
 }
 
 /**
@@ -104,7 +106,18 @@ export function createWorkerPool(options: WorkerPoolOptions): ThreadPool {
   let rr = 0
   let disposed = false
 
-  for (let i = 0; i < count; i++) {
+  /** Reject and forget every in-flight job dispatched to a given worker. */
+  function rejectWorkerJobs(workerIndex: number, message: string): void {
+    for (const [id, job] of pending) {
+      if (job.workerIndex === workerIndex) {
+        pending.delete(id)
+        job.reject(new Error(message))
+      }
+    }
+  }
+
+  /** Create a worker at `index`, wire its handlers, and store it in place. */
+  function spawn(index: number): void {
     const w = options.createWorker()
     w.onmessage = (event) => {
       const data = event.data as { id: number; ok: boolean; result?: unknown; error?: string }
@@ -115,27 +128,34 @@ export function createWorkerPool(options: WorkerPoolOptions): ThreadPool {
       else job.reject(new Error(data.error ?? 'worker job failed'))
     }
     w.onerror = (event) => {
-      // A worker-level error fails the oldest in-flight job and is otherwise
-      // surfaced; per-job correlation isn't possible for uncaught worker errors.
-      const first = pending.entries().next().value
-      if (first) {
-        const [id, job] = first
-        pending.delete(id)
-        job.reject(new Error(event.message ?? 'worker error'))
+      if (disposed) return
+      // A worker crash loses EVERY job in flight on it (a worker can carry many
+      // concurrently). Reject all of them — correlated by worker index, so a
+      // healthy worker's jobs are never touched — then replace the dead worker in
+      // place so the pool stays live and `size` keeps reflecting reality.
+      rejectWorkerJobs(index, event.message ?? 'worker error')
+      try {
+        w.terminate()
+      } catch {
+        // The worker is already dead; ignore terminate failures.
       }
+      spawn(index)
     }
-    workers.push(w)
+    workers[index] = w
   }
+
+  for (let i = 0; i < count; i++) spawn(i)
 
   return {
     run<In, Out>(job: (input: In) => Out, input: In): Promise<Out> {
       if (disposed) return Promise.reject(new Error('ThreadPool is disposed'))
-      const id = nextId++
-      const worker = workers[rr % workers.length]
+      const index = rr % workers.length
       rr++
+      const worker = workers[index]
       if (!worker) return Promise.reject(new Error('no worker available'))
+      const id = nextId++
       return new Promise<Out>((resolve, reject) => {
-        pending.set(id, { resolve: resolve as (v: unknown) => void, reject })
+        pending.set(id, { resolve: resolve as (v: unknown) => void, reject, workerIndex: index })
         worker.postMessage({ id, source: job.toString(), input })
       })
     },

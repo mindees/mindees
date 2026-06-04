@@ -138,4 +138,48 @@ describe('scheduler', () => {
     scheduler.flushSync()
     expect(inner).toHaveBeenCalledTimes(1)
   })
+
+  it('a stale handle cancel() does not evict a newer same-key entry (dedup stays intact)', () => {
+    const { scheduler } = manualScheduler()
+    const a = vi.fn()
+    const h1 = scheduler.schedule(a, { key: 'render' })
+    scheduler.flushSync() // runs a; the 'render' key is freed
+    expect(a).toHaveBeenCalledTimes(1)
+
+    const b = vi.fn()
+    scheduler.schedule(b, { key: 'render' }) // new live entry under the same key
+    h1.cancel() // STALE handle for the old entry — must NOT evict b's mapping
+
+    const c = vi.fn()
+    scheduler.schedule(c, { key: 'render' }) // must DEDUP onto b (replace), not enqueue a 2nd
+    expect(scheduler.size).toBe(1)
+    scheduler.flushSync()
+    expect(b).not.toHaveBeenCalled() // replaced by c
+    expect(c).toHaveBeenCalledTimes(1) // exactly one task ran for the key
+  })
+
+  it('a throwing onError hook does not abort the flush or strand the queue', () => {
+    const microtasks: Array<() => void> = []
+    const scheduler = createScheduler({
+      onError: () => {
+        throw new Error('logger failed')
+      },
+      scheduleMicrotask: (cb) => {
+        microtasks.push(cb)
+      },
+    })
+    const after = vi.fn()
+    scheduler.schedule(() => {
+      throw new Error('boom') // triggers onError, which itself throws
+    })
+    scheduler.schedule(after)
+
+    expect(() => scheduler.flushSync()).not.toThrow() // hook error must not escape
+    expect(after).toHaveBeenCalledTimes(1) // task after the thrower is not stranded
+    // the hook error is surfaced asynchronously rather than swallowed
+    expect(microtasks.length).toBeGreaterThan(0)
+    expect(() => {
+      for (const cb of microtasks) cb()
+    }).toThrow('logger failed')
+  })
 })
