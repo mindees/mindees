@@ -66,8 +66,6 @@ export function createServerBackend(options: ServerBackendOptions): AiBackend {
   if (typeof doFetch !== 'function') {
     throw new AiError('NO_TRANSPORT', 'createServerBackend requires a `fetch`')
   }
-  const adapterName: AdapterName | 'custom' =
-    typeof options.adapter === 'string' ? options.adapter : 'custom'
   const mapper: ProviderMapper =
     typeof options.adapter === 'object' ? options.adapter : MAPPERS[options.adapter ?? 'openai']
 
@@ -77,7 +75,9 @@ export function createServerBackend(options: ServerBackendOptions): AiBackend {
       ...options.headers,
     }
     if (options.apiKey) {
-      if (adapterName === 'anthropic') {
+      // Auth scheme follows the MAPPER (not the string-vs-object form the adapter was
+      // supplied in), so `adapter: anthropicMapper` authenticates like `adapter: 'anthropic'`.
+      if (mapper.auth === 'anthropic') {
         headers['x-api-key'] = options.apiKey
         headers['anthropic-version'] = '2023-06-01'
       } else {
@@ -106,7 +106,12 @@ export function createServerBackend(options: ServerBackendOptions): AiBackend {
   return {
     async generate(request): Promise<AiResult> {
       const res = await send(request, false)
-      return mapper.parseResponse(await res.json())
+      const json = await res.json()
+      // Re-check after the round-trip: an abort during the fetch/parse must surface,
+      // matching stream()'s and runTools' polling model (an injected fetch may ignore
+      // the forwarded signal).
+      if (request.signal?.aborted) throw new AiError('ABORTED', 'request aborted')
+      return mapper.parseResponse(json)
     },
 
     async *stream(request): AsyncIterable<AiChunk> {
@@ -114,16 +119,17 @@ export function createServerBackend(options: ServerBackendOptions): AiBackend {
       if (!res.body) throw new AiError('STREAM_PARSE', 'streaming response has no body')
       const parseChunk = mapper.createStreamParser()
       for await (const message of parseSse(decodeChunks(res.body))) {
-        if (request.signal?.aborted) throw new AiError('ABORTED', 'request aborted')
+        // Terminal sentinel first: a completed stream must resolve normally even if the
+        // signal flips on this exact iteration (no spurious ABORTED on a done stream).
         if (message.data.trim() === '[DONE]') return
+        if (request.signal?.aborted) throw new AiError('ABORTED', 'request aborted')
         let parsed: unknown
         try {
           parsed = JSON.parse(message.data)
         } catch {
           throw new AiError('STREAM_PARSE', `malformed SSE data: ${message.data.slice(0, 80)}`)
         }
-        const chunk = parseChunk(parsed)
-        if (chunk) yield chunk
+        for (const chunk of parseChunk(parsed)) yield chunk
       }
     },
   }

@@ -1,4 +1,4 @@
-import { createElement, isElement, type MindeesElement } from '@mindees/core'
+import { createElement, effect, isElement, type MindeesElement, signal } from '@mindees/core'
 import { renderToString } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -55,6 +55,12 @@ describe('Image', () => {
     const node = el(Image({ src: '/a.png', decorative: true }))
     expect(node.props.alt).toBe('')
     expect(node.props['aria-hidden']).toBe('true')
+  })
+
+  it('decorative drops a contradictory aria-label even when `label` is also passed', () => {
+    const node = el(Image({ src: '/a.png', decorative: true, label: 'A cat' }))
+    expect(node.props['aria-hidden']).toBe('true')
+    expect(node.props['aria-label']).toBeUndefined() // no accessible name on a hidden image
   })
 })
 
@@ -115,6 +121,26 @@ describe('Pressable', () => {
     const node = el(Pressable({ style: (s) => ({ opacity: s.pressed ? 0.5 : 1 }) }))
     expect(typeof node.props.style).toBe('function')
     expect((node.props.style as () => unknown)()).toEqual({ opacity: 1 })
+  })
+
+  it('a plain reactive (0-arg) style accessor is NOT subscribed to interaction state', () => {
+    const color = signal('red')
+    const node = el(Pressable({ style: () => ({ backgroundColor: color() }) }))
+    const styleAccessor = node.props.style as () => unknown
+    let runs = 0
+    const stop = effect(() => {
+      runs++
+      styleAccessor()
+    })
+    expect(runs).toBe(1)
+    // Toggling hover/press must NOT re-run a style that only depends on `color`.
+    ;(node.props.onPointerEnter as (e: unknown) => void)(null)
+    ;(node.props.onPointerDown as (e: unknown) => void)(null)
+    expect(runs).toBe(1) // pre-fix: re-ran because the wrapper read state()
+    color.set('blue') // ...but it still reacts to its own dependency
+    expect(runs).toBe(2)
+    expect(styleAccessor()).toEqual({ backgroundColor: 'blue' })
+    stop()
   })
 
   it('calls preventDefault on Space activation (so a div[role=button] does not scroll)', () => {
@@ -197,5 +223,15 @@ describe('layout primitives', () => {
     expect(node.type).toBe('scrollview')
     expect((node.props.style as Record<string, unknown>).overflow).toBe('auto')
     expect(node.props.onScroll).toBe(onScroll)
+  })
+
+  it('ScrollView horizontal lays children in a row and scrolls (not a no-op)', () => {
+    const node = el(ScrollView({ horizontal: true }))
+    const style = node.props.style as Record<string, unknown>
+    expect(style.flexDirection).toBe('row') // real horizontal layout via the style channel
+    expect(style.flexWrap).toBe('nowrap')
+    expect(style.overflow).toBe('auto')
+    const vertical = el(ScrollView({})).props.style as Record<string, unknown>
+    expect(vertical.flexDirection).toBeUndefined() // vertical default unchanged
   })
 })

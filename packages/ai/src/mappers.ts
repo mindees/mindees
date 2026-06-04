@@ -20,8 +20,14 @@ import {
   type Usage,
 } from './contract'
 
-/** Parse one SSE `data` JSON into a chunk, or `null` to skip (non-content events). */
-export type StreamParser = (data: unknown) => AiChunk | null
+/**
+ * Parse one SSE `data` JSON into zero or more {@link AiChunk}s. Returns an array (empty
+ * to skip a non-content event) because a single event can legitimately carry more than
+ * one logical chunk — e.g. an OpenAI-compatible server that puts a content delta AND the
+ * terminal `finish_reason`/`usage` in the same event (a 1-chunk-per-event parser would
+ * drop the finish/usage).
+ */
+export type StreamParser = (data: unknown) => readonly AiChunk[]
 
 /**
  * A provider wire mapper. A custom mapper whose `buildRequest` cannot express
@@ -29,6 +35,13 @@ export type StreamParser = (data: unknown) => AiChunk | null
  * mappers serialize them; the on-device backend throws).
  */
 export interface ProviderMapper {
+  /**
+   * How `apiKey` is sent. `'anthropic'` → `x-api-key` + `anthropic-version`; `'bearer'`
+   * (the default when omitted) → `Authorization: Bearer`. Declared on the mapper so auth
+   * follows the chosen provider whether it is selected by name or by object — and so a
+   * custom Anthropic-compatible mapper can opt into `x-api-key` auth.
+   */
+  readonly auth?: 'bearer' | 'anthropic'
   /** Build the HTTP path + JSON body for a request. */
   buildRequest(
     request: GenerateRequest,
@@ -181,6 +194,7 @@ const ANTHROPIC_FINISH: Record<string, FinishReason> = Object.assign(Object.crea
 
 /** OpenAI-compatible `/chat/completions` mapper (also fits many local/compatible servers). */
 export const openaiMapper: ProviderMapper = {
+  auth: 'bearer',
   buildRequest(request, model, stream) {
     const body: Record<string, unknown> = {
       model,
@@ -237,27 +251,31 @@ export const openaiMapper: ProviderMapper = {
     return (data) => {
       const root = asRecord(data)
       const choice = asRecord((root?.choices as unknown[] | undefined)?.[0])
+      const out: AiChunk[] = []
       const delta = asString(asRecord(choice?.delta)?.content)
-      if (delta) return { type: 'text-delta', delta }
+      if (delta) out.push({ type: 'text-delta', delta })
       const finish = asString(choice?.finish_reason)
       if (finish) lastReason = OPENAI_FINISH[finish] ?? 'stop'
       const usage = asRecord(root?.usage)
       // Emit a finish for a finish_reason chunk OR the trailing usage-only chunk, so
-      // streamed usage isn't lost — both carry the last-seen reason.
+      // streamed usage isn't lost — both carry the last-seen reason. Emitted IN ADDITION
+      // to any content delta in the same event (servers that bundle them are common), so
+      // the terminal finish/usage is never dropped.
       if (finish || usage) {
-        return {
+        out.push({
           type: 'finish',
           finishReason: lastReason,
           usage: usageOf(asNumber(usage?.prompt_tokens), asNumber(usage?.completion_tokens)),
-        }
+        })
       }
-      return null
+      return out
     }
   },
 }
 
 /** Anthropic `/v1/messages` mapper. */
 export const anthropicMapper: ProviderMapper = {
+  auth: 'anthropic',
   buildRequest(request, model, stream) {
     const system = request.messages
       .filter((m) => m.role === 'system')
@@ -319,18 +337,20 @@ export const anthropicMapper: ProviderMapper = {
       const type = asString(root?.type)
       if (type === 'content_block_delta') {
         const delta = asString(asRecord(root?.delta)?.text)
-        return delta ? { type: 'text-delta', delta } : null
+        return delta ? [{ type: 'text-delta', delta }] : []
       }
       if (type === 'message_delta') {
         const stop = asString(asRecord(root?.delta)?.stop_reason)
         const usage = asRecord(root?.usage)
-        return {
-          type: 'finish',
-          finishReason: ANTHROPIC_FINISH[stop ?? ''] ?? 'stop',
-          usage: usageOf(undefined, asNumber(usage?.output_tokens)),
-        }
+        return [
+          {
+            type: 'finish',
+            finishReason: ANTHROPIC_FINISH[stop ?? ''] ?? 'stop',
+            usage: usageOf(undefined, asNumber(usage?.output_tokens)),
+          },
+        ]
       }
-      return null
+      return []
     }
   },
 }
