@@ -11,7 +11,7 @@ By participating you agree to our [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## Prerequisites
 
-- **Node.js** — current Active LTS (see [`.nvmrc`](./.nvmrc)).
+- **Node.js** — `>=22.18.0` (CI tests Node 22 and 24; [`.nvmrc`](./.nvmrc) pins 24 for development).
 - **pnpm** — managed via Corepack (bundled with Node). You do **not** need to
   install pnpm globally.
 - **git**.
@@ -165,11 +165,13 @@ pnpm changeset            # describe the change + bump type (in your PR)
 On merge to `main`, the Release workflow opens/updates a **"version packages"
 PR** — `pnpm version-packages` applies the bumps + changelogs **and** syncs each
 package's source `VERSION` (and the versions `create-mindees` pins) via
-`scripts/sync-versions.mjs`. Publishing is **intentionally maintainer-gated and
-not automated in CI**: once the version PR is merged (versions are real, not
-`0.0.0`), a maintainer runs `pnpm release` with npm auth — it refuses to publish
-`0.0.0` or with drifted sources. See [RELEASING.md](./RELEASING.md) for the full
-process.
+`scripts/sync-versions.mjs`. **Merging that version PR publishes automatically**:
+the Release workflow runs `pnpm release` (authenticated with the `NPM_TOKEN`
+secret), which still refuses to publish `0.0.0` or with drifted sources and runs
+the build, export, and packed-artifact gates first. A maintainer can also run
+`pnpm release` locally as a fallback. So the deliberate action that triggers a
+publish is **merging the version PR**. See [RELEASING.md](./RELEASING.md) for the
+full process (incl. the npm-auth note).
 
 ## Good first issues
 

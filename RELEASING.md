@@ -26,10 +26,9 @@ All `@mindees/*` packages (and `create-mindees`) ship as **one locked version li
    which is `sync-versions.mjs --check --assert-released && pnpm build && pnpm check:exports &&
    pnpm check:pack && changeset publish`. The guards mean it **refuses to publish `0.0.0`**,
    fails if any source `VERSION` has drifted from its `package.json`, and validates the packed
-   artifacts before anything reaches npm. Authentication is **npm OIDC trusted publishing**
-   (`id-token: write`; no long-lived `NPM_TOKEN`), which also stamps provenance — so this requires
-   the npm trusted-publisher config (below) to be in place first. A maintainer can still run
-   `pnpm release` locally with npm auth if needed.
+   artifacts before anything reaches npm. Authentication uses the **`NPM_TOKEN`** repo secret (an
+   npm *Automation* token — see "Configure npm auth" below for the OIDC caveat). A maintainer can
+   also run `pnpm release` locally with `npm login` if needed.
 
 ## Version-source sync
 

@@ -14,6 +14,12 @@ attribute/text/region — no virtual-DOM diffing.
 > direct `createNativeBackend()` and `createCanvasBackend()` seams throw
 > `NotImplementedError`. APIs may change before `1.0`.
 
+## Install
+
+```bash
+pnpm add @mindees/renderer
+```
+
 ## Why Helix
 
 - **Fine-grained updates** — built on `@mindees/core` signals: updates are

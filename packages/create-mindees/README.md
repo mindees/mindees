@@ -19,7 +19,7 @@ create-mindees <app-name-or-path> [--template blank|counter] [--prompt "..."] [-
 
 - `--template` — pick a starter (`blank` or `counter`). Default `blank`.
 - `--prompt "a reactive counter"` — offline keyword mapping to a template
-  (real natural-language app generation arrives with `@mindees/ai` in Phase 10).
+  (real natural-language app generation arrives with `@mindees/ai` in Phase 11).
 - `--force` — overwrite a non-empty target directory.
 - The positional can be a simple app name, a relative path, or an absolute
   Windows/POSIX path; the generated package name is derived safely from the

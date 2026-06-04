@@ -1,13 +1,16 @@
-# examples/ — Runnable example apps (placeholder)
+# examples/ — Runnable example apps
 
-This directory will hold **runnable** example apps that exercise the framework.
-The **web target is the first-class reference platform**, so examples run and
-are end-to-end tested in CI.
+This directory holds **runnable** examples that exercise the framework.
 
-**Status: planned.** No example app exists yet — the packages they depend on are
-still being built. The flagship example (a podcast app with offline downloads,
-demonstrating routing + offline data + a live signed OTA update) is delivered in
-Phase 12 (see [`ROADMAP.md`](../ROADMAP.md)).
+**Status: partial.** Several runnable, CI-tested examples already exist:
 
-Adding a tiny example here is a great [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
-once the core packages land.
+- [`pulse-server`](./pulse-server/) — a reference Pulse OTA update server (`node:http`).
+- [`data-sync-server`](./data-sync-server/) — a reference Continuum sync server (`node:http`).
+- [`native-hosts/`](./native-hosts/) — the iOS (JavaScriptCore) and Android (QuickJS) reference
+  hosts, including a runnable Android example app exercised on an emulator in CI.
+
+Still **planned**: a cross-platform flagship app (e.g. a podcast app with offline downloads,
+demonstrating routing + offline data + a live signed OTA update) and a first-class runnable **web**
+example (deferred under Phase 13 — see [`ROADMAP.md`](../ROADMAP.md)).
+
+Adding a tiny example here is a great [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue).

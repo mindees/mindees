@@ -7,7 +7,15 @@ third-party dependencies (built on `node:util` `parseArgs`).
 > **Status: 🧪 Experimental (Phase 5).** `create`, `build`, `doctor`, `info`,
 > and the dev **rebuild orchestrator** are implemented and tested. The live
 > dev-server **HTTP/HMR transport** is a developer preview. On-device NL→app
-> generation is Phase 10 — today `--prompt` maps to a template deterministically.
+> generation is Phase 11 (Synapse) — today `--prompt` maps to a template deterministically.
+
+## Install
+
+```bash
+pnpm add -g @mindees/cli   # provides the `mindees` command
+# or scaffold without a global install:
+npm create mindees@latest
+```
 
 ## Commands
 
