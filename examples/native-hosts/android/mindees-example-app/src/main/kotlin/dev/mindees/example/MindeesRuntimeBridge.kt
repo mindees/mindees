@@ -23,8 +23,17 @@ class MindeesRuntimeBridge<V>(
 
     fun start() {
         check(!started) { "Mindees runtime bridge already started" }
-        started = true
-        runtime.start(this)
+        try {
+            runtime.start(this)
+            started = true
+        } catch (t: Throwable) {
+            try {
+                runtime.close()
+            } catch (closeError: Throwable) {
+                t.addSuppressed(closeError)
+            }
+            throw t
+        }
     }
 
     override fun applyBatch(json: String) {
@@ -63,21 +72,25 @@ class QuickJsMindeesRuntime(private val source: String) : MindeesScriptRuntime {
         check(engine == null) { "QuickJS runtime already started" }
 
         val quickJs = QuickJs.create()
-        quickJs.set(
-            "MindeesHost",
-            MindeesHostApi::class.java,
-            object : MindeesHostApi {
-                override fun emit(json: String) {
-                    sink.applyBatch(json)
-                }
-            },
-        )
-        quickJs.evaluate(source, "mindees-example.js")
-        val mindeesApp = quickJs.get("MindeesApp", MindeesAppApi::class.java)
-
-        engine = quickJs
-        app = mindeesApp
-        mindeesApp.start()
+        try {
+            quickJs.set(
+                "MindeesHost",
+                MindeesHostApi::class.java,
+                object : MindeesHostApi {
+                    override fun emit(json: String) {
+                        sink.applyBatch(json)
+                    }
+                },
+            )
+            quickJs.evaluate(source, "mindees-example.js")
+            val mindeesApp = quickJs.get("MindeesApp", MindeesAppApi::class.java)
+            mindeesApp.start()
+            engine = quickJs
+            app = mindeesApp
+        } catch (t: Throwable) {
+            quickJs.close()
+            throw t
+        }
     }
 
     override fun dispatchEvent(handlerId: String) {
