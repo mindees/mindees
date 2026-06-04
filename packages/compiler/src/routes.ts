@@ -118,6 +118,10 @@ export function buildRouteManifest(files: readonly string[]): RouteManifest {
   let notFound: string | undefined
   // Detect collisions (e.g. `index.tsx` and `(app)/index.tsx` both map to `/`).
   const byPath = new Map<string, string>()
+  // Distinct routes must also get distinct chunk names — `chunkName` is lossy
+  // (e.g. `blog/[slug]` and `blog/slug` both strip to `route_blog_slug`), so a
+  // collision here would silently make two routes share one split bundle.
+  const byChunk = new Map<string, string>()
 
   for (const file of [...files].sort()) {
     if (!ROUTE_FILE.test(file)) continue
@@ -138,7 +142,16 @@ export function buildRouteManifest(files: readonly string[]): RouteManifest {
       )
     }
     byPath.set(routePath, file)
-    routes.push({ routePath, file, chunk: chunkName(file), params, catchAll })
+    const chunk = chunkName(file)
+    const priorChunk = byChunk.get(chunk)
+    if (priorChunk !== undefined) {
+      throw new Error(
+        `Duplicate chunk name "${chunk}": both "${priorChunk}" and "${file}" produce it; ` +
+          'rename one route file so their split bundles do not collide.',
+      )
+    }
+    byChunk.set(chunk, file)
+    routes.push({ routePath, file, chunk, params, catchAll })
   }
 
   const manifest: RouteManifest = { routes }

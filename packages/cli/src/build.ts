@@ -2,7 +2,7 @@
  * `buildProject` — compile a project's sources with the Mindees Compiler.
  *
  * Walks `src/**` via an injected {@link FileSystem}, runs each TS/TSX module
- * through `@mindees/compiler`'s `compileChecked` (the type-check gate + emit),
+ * through `@mindees/compiler`'s `typecheck` gate and then `compile` (emit),
  * writes the JS (and source map) to `dist/`, and — if a `src/routes/` dir
  * exists — emits a per-route manifest. Returns structured results so the CLI can
  * report diagnostics and fail the build on type errors.
@@ -16,14 +16,19 @@ import type { FileSystem } from './fs'
 /**
  * Diagnostic codes that are artifacts of type-checking a module **in isolation**
  * (without the project's dependency graph or ambient JSX types), not real app
- * errors. `buildProject` reports these as warnings instead of failing the build:
+ * errors. If any ever reaches the build it is **downgraded to a warning** rather
+ * than failing the build:
  *
  * - `TS2307` — "Cannot find module '…'": imports aren't resolved in single-module mode.
  * - `TS7026` — "no interface 'JSX.IntrinsicElements'": the framework's JSX env
  *   types aren't loaded in isolation.
  *
- * Genuine type errors (e.g. `TS2322` not-assignable) are untouched and still
- * fail the build. A full project-graph type-check is future work (see ROADMAP).
+ * In practice the compiler's single-module gate already **filters** these upstream
+ * (it drops unresolved-import codes and injects ambient JSX types), so they
+ * normally don't appear here at all — this set is a defensive backstop in case a
+ * future gate surfaces them. Genuine type errors (e.g. `TS2322` not-assignable)
+ * are untouched and still fail the build. A full project-graph type-check is
+ * future work (see ROADMAP).
  */
 const ISOLATION_NOISE = new Set(['TS2307', 'TS7026'])
 

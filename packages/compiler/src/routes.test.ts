@@ -62,6 +62,12 @@ describe('buildRouteManifest', () => {
     expect(() => buildRouteManifest(['index.tsx', '(app)/index.tsx'])).toThrow(/Duplicate/)
   })
 
+  it('rejects two DISTINCT routes that collapse to the same chunk name', () => {
+    // `/blog/:slug` and `/blog/slug` are different routes but both strip to
+    // `route_blog_slug`; without a chunk-collision guard they'd share one bundle.
+    expect(() => buildRouteManifest(['blog/slug.tsx', 'blog/[slug].tsx'])).toThrow(/chunk name/)
+  })
+
   it('builds a manifest from a file tree (deterministic order)', () => {
     const m = buildRouteManifest([
       'index.tsx',

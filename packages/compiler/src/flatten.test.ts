@@ -75,6 +75,21 @@ describe('tree-flattening', () => {
     expect(stats.flattenedNodes).toBe(0)
   })
 
+  it('preserves a leading directive prologue ("use client") above the injected marker', () => {
+    const { code } = flat('"use client"\nexport const a = <view>x</view>')
+    expect(code).toContain('const _static =') // flattening happened
+    // The directive must stay the first statement; the marker goes AFTER it, else
+    // `"use client"` is demoted to a no-op string expression.
+    expect(code.indexOf('"use client"')).toBeLessThan(code.indexOf('const _static ='))
+  })
+
+  it('does not flatten (or duplicate-declare) a module that already binds `_static`', () => {
+    const { code, stats } = flat('const _static = (x) => x\nexport const a = <view>x</view>')
+    // Exactly one `const _static` — injecting a second would be a SyntaxError; we bail.
+    expect(code.match(/const _static\b/g)?.length).toBe(1)
+    expect(stats.flattenedNodes).toBe(0)
+  })
+
   it('partially flattens: static subtree inside a dynamic parent', () => {
     // Outer <view> has a dynamic child {n}, so it is NOT static; the inner
     // <footer> static subtree is also a child of the dynamic region, so the

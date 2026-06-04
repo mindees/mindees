@@ -83,9 +83,15 @@ function sanitizePackageName(rawName: string): string {
     .replace(/-+$/g, '')
 }
 
-/** Quote a path for the `cd "<path>" && ...` command hints printed by create commands. */
+/**
+ * Quote a path for the `cd <path> && ...` command hints printed by create commands.
+ * Uses POSIX **single quotes**: everything inside is literal, so a directory name
+ * containing `$(...)`, backticks, `$VAR`, or `\` cannot be expanded/executed when the
+ * hint is pasted into a shell (double quotes would still expand those). An embedded
+ * single quote is closed, escaped, and reopened (`'\''`).
+ */
 export function quoteShellPath(path: string): string {
-  return `"${path.replace(/"/g, '\\"')}"`
+  return `'${path.replace(/'/g, "'\\''")}'`
 }
 
 /**
@@ -97,6 +103,15 @@ export function resolveCreateTarget(input: string, cwd = '.'): CreateTargetResul
   const trimmed = input.trim()
   if (!trimmed) {
     return { ok: false, error: 'create: missing app name or target path.' }
+  }
+
+  // Reject UNC paths (\\server\share) up front: normalizeLogicalPath would collapse
+  // the `//` root to a single `/`, silently retargeting to the wrong location.
+  if (toPosixPath(trimmed).startsWith('//')) {
+    return {
+      ok: false,
+      error: `UNC paths are not supported: "${input}". Use a drive-letter or relative path.`,
+    }
   }
 
   const basename = pathBasename(trimmed)

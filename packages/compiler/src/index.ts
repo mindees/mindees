@@ -42,8 +42,12 @@ export const VERSION = '0.0.0'
  */
 export const maturity: Maturity = 'experimental'
 
-/** Static identity + maturity metadata for this package. */
-export const info: PackageInfo = { name, version: VERSION, maturity }
+/**
+ * Static identity + maturity metadata for this package. Frozen so the
+ * self-reported identity tooling introspects cannot be mutated at runtime,
+ * matching the `readonly` fields of {@link PackageInfo}.
+ */
+export const info: PackageInfo = Object.freeze({ name, version: VERSION, maturity })
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }

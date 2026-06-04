@@ -24,10 +24,12 @@ export interface CreateArgs {
  * `npm create mindees` and `mindees create` behave identically.
  */
 export function runCreate(fs: FileSystem, args: CreateArgs): ScaffoldResult {
-  // An explicit `--template` always wins; the prompt only resolves a template
-  // when the caller didn't choose one.
-  let template = args.template ?? DEFAULT_TEMPLATE
-  if (!args.template && args.prompt && args.prompt.length > 0) {
+  // A non-empty explicit `--template` always wins; an empty or absent one defers to
+  // the prompt, else the default. (Treating empty as "not chosen" keeps this in lock-
+  // step with `mindees create` — both normalize `--template ""` the same way.)
+  const explicit = args.template && args.template.length > 0 ? args.template : undefined
+  let template = explicit ?? DEFAULT_TEMPLATE
+  if (!explicit && args.prompt && args.prompt.length > 0) {
     template = naturalLanguageToTemplate(args.prompt).template
   }
   const options: Parameters<typeof scaffold>[1] = {
@@ -50,8 +52,12 @@ export const VERSION = '0.0.0'
 /** Current maturity. The scaffolder delegates to `@mindees/cli`'s tested core. */
 export const maturity: Maturity = 'experimental'
 
-/** Static identity + maturity metadata for this package. */
-export const info: PackageInfo = { name, version: VERSION, maturity }
+/**
+ * Static identity + maturity metadata for this package. Frozen so the
+ * self-reported identity tooling introspects cannot be mutated at runtime,
+ * matching the `readonly` fields of {@link PackageInfo}.
+ */
+export const info: PackageInfo = Object.freeze({ name, version: VERSION, maturity })
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }

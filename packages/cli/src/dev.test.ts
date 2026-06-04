@@ -73,6 +73,26 @@ describe('startDev', () => {
     expect(session.buildCount).toBe(1) // unchanged after stop
   })
 
+  it('survives a rebuild that throws (e.g. a file removed mid-watch) instead of crashing', () => {
+    // A FileSystem whose readDir throws simulates a file vanishing between enumeration
+    // and read. startDev must turn the throw into a failed result, not propagate it.
+    const base = createMemoryFileSystem({ 'src/App.tsx': 'export const a = 1' })
+    const throwingFs = {
+      ...base,
+      readDir: () => {
+        throw new Error('ENOENT: vanished mid-watch')
+      },
+    }
+    let session!: ReturnType<typeof startDev>
+    expect(() => {
+      session = startDev(throwingFs, fakeWatcher())
+    }).not.toThrow()
+    expect(session.buildCount).toBe(1)
+    expect(session.lastResult.ok).toBe(false)
+    expect(session.lastResult.diagnostics.some((d) => d.code === 'MDC_DEV')).toBe(true)
+    session.stop()
+  })
+
   it('reflects new build results after edits', () => {
     const fs = createMemoryFileSystem({
       'src/App.tsx':

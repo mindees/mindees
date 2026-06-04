@@ -51,12 +51,28 @@ export function scaffold(fs: FileSystem, options: ScaffoldOptions): ScaffoldResu
     }
   }
 
-  if (!force && fs.exists(targetDir) && fs.readDir(targetDir).length > 0) {
-    return {
-      ok: false,
-      written: [],
-      template,
-      error: `Target directory "${targetDir}" is not empty. Use --force to overwrite.`,
+  if (fs.exists(targetDir)) {
+    let existing: string[]
+    try {
+      existing = fs.readDir(targetDir)
+    } catch {
+      // targetDir exists but is not a readable directory (e.g. a regular FILE — the
+      // real readDir throws ENOTDIR). Report it cleanly instead of letting the
+      // exception escape (the CLI contract is "never throws for expected failures").
+      return {
+        ok: false,
+        written: [],
+        template,
+        error: `Target "${targetDir}" already exists and is not a directory.`,
+      }
+    }
+    if (!force && existing.length > 0) {
+      return {
+        ok: false,
+        written: [],
+        template,
+        error: `Target directory "${targetDir}" is not empty. Use --force to overwrite.`,
+      }
     }
   }
 

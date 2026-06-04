@@ -50,7 +50,27 @@ export function startDev(fs: FileSystem, watcher: Watcher, options: DevOptions =
   let lastResult: BuildResult
 
   const rebuild = (changedPath: string | null): void => {
-    lastResult = buildProject(fs, buildOptions)
+    try {
+      lastResult = buildProject(fs, buildOptions)
+    } catch (e) {
+      // A rebuild must never kill the session: in a long-running watch a file can
+      // be removed between readDir() and readFile() (a real FS race), making the
+      // build throw. Turn an unexpected throw into a failed result and keep
+      // watching — mirroring how `mindees build` reports expected failures as
+      // diagnostics rather than throwing.
+      lastResult = {
+        ok: false,
+        compiled: [],
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'MDC_DEV',
+            message: e instanceof Error ? e.message : String(e),
+          },
+        ],
+        stats: { flattenedNodes: 0, totalElements: 0 },
+      }
+    }
     buildCount++
     onRebuild?.(lastResult, changedPath)
   }

@@ -124,7 +124,7 @@ function smokeMindeesBin() {
   expectIncludes(
     'mindees create relative path with spaces',
     result.stdout,
-    'Next: cd "My App!" && pnpm install && mindees dev',
+    "Next: cd 'My App!' && pnpm install && mindees dev",
   )
   const generated = readJson(join(tempRoot, 'My App!', 'package.json'))
   assert(
@@ -156,7 +156,7 @@ function smokeCreateMindeesBin() {
     result.stdout,
     'Created "from-create-mindees"',
   )
-  expectIncludes('create-mindees absolute path with spaces', result.stdout, 'Next: cd "')
+  expectIncludes('create-mindees absolute path with spaces', result.stdout, "Next: cd '")
   const generated = readJson(join(target, 'package.json'))
   assert(
     generated.name === 'from-create-mindees',
