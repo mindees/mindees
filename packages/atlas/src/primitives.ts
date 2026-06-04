@@ -70,6 +70,10 @@ export const Image: Component<ImageProps> = (props) => {
   if (props.decorative) {
     host.alt = ''
     host['aria-hidden'] = 'true'
+    // A decorative image must expose NO accessible name; drop any label lowered by
+    // toHostProps so we don't emit a contradictory aria-label on a hidden element.
+    delete host['aria-label']
+    delete host['aria-labelledby']
   } else {
     if (props.label === undefined) {
       warnDev('Image without a `label` (alt text); pass `label` or set `decorative`.')
@@ -186,10 +190,14 @@ export const Pressable: Component<PressableProps> = (props) => {
   if (props.disabled) host['aria-disabled'] = 'true'
   else host.tabindex = 0
   if (style !== undefined) {
-    host.style =
-      typeof style === 'function'
-        ? () => flattenStyle((style as (s: InteractionState) => StyleInput)(state()))
-        : resolveStyle(style)
+    // Distinguish a state-fn `(state) => StyleInput` from a plain reactive style accessor
+    // `() => StyleInput` by ARITY: both are functions, but only the state-fn declares a
+    // parameter. Treating every function as a state-fn would subscribe an ordinary
+    // reactive style to hover/press/focus, re-running it on every interaction.
+    const isStateFn = typeof style === 'function' && style.length >= 1
+    host.style = isStateFn
+      ? () => flattenStyle((style as (s: InteractionState) => StyleInput)(state()))
+      : resolveStyle(style)
   }
   return createElement('view', host, props.children)
 }
@@ -268,8 +276,20 @@ export interface ScrollViewProps extends ViewProps {
 }
 export const ScrollView: Component<ScrollViewProps> = (props) => {
   const { horizontal, onScroll, style, children, ...rest } = props
-  const host = toHostProps({ ...rest, style: withBaseStyle({ overflow: 'auto' }, style) })
+  // A horizontal scroller lays its children out in a row and scrolls along x; a vertical
+  // one stacks and scrolls along y. Drive real layout through the curated cross-platform
+  // style subset (flexDirection + overflow), not an inert `data-orientation` attribute that
+  // no backend reads.
+  const host = toHostProps({
+    ...rest,
+    style: withBaseStyle(
+      horizontal
+        ? { overflow: 'auto', flexDirection: 'row', flexWrap: 'nowrap' }
+        : { overflow: 'auto' },
+      style,
+    ),
+  })
   if (onScroll) host.onScroll = onScroll
-  if (horizontal) host['data-orientation'] = 'horizontal'
+  if (horizontal) host['data-orientation'] = 'horizontal' // extra hint for native hosts
   return createElement('scrollview', host, children)
 }

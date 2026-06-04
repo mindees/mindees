@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AiChunk } from './contract'
 import { AiError } from './errors'
 import {
+  anthropicMapper,
   createServerBackend,
   type FetchLike,
   type RequestInitLike,
@@ -148,6 +149,59 @@ describe('server backend — openai streamed usage + done robustness', () => {
     expect(chunks).toContainEqual({ type: 'text-delta', delta: 'ok' }) // no STREAM_PARSE on the sentinel
   })
 
+  it('emits BOTH text-delta and finish/usage when one event carries content + finish + usage', async () => {
+    // Common in OpenAI-compatible local servers (llama.cpp, some vLLM/LM Studio configs).
+    const sse =
+      'data: {"choices":[{"delta":{"content":"Hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":1}}\n\n' +
+      'data: [DONE]\n\n'
+    const ai = createServerBackend({
+      fetch: fakeFetch({ body: bodyOf(sse) }),
+      baseUrl: 'x',
+      model: 'm',
+    })
+    const chunks = await collect(ai.stream({ messages: [] }))
+    expect(chunks).toContainEqual({ type: 'text-delta', delta: 'Hello' })
+    expect(chunks).toContainEqual({
+      type: 'finish',
+      finishReason: 'stop',
+      usage: { inputTokens: 4, outputTokens: 1 }, // pre-fix: the finish/usage was dropped
+    })
+  })
+
+  it('completes normally when the abort signal flips exactly on the [DONE] event', async () => {
+    const signal = { aborted: false }
+    const sse = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n'
+    const ai = createServerBackend({
+      fetch: fakeFetch({ body: bodyOf(sse) }),
+      baseUrl: 'x',
+      model: 'm',
+    })
+    const out: AiChunk[] = []
+    // Abort right after the content chunk; the already-complete stream must NOT throw.
+    for await (const c of ai.stream({ messages: [], signal })) {
+      out.push(c)
+      signal.aborted = true
+    }
+    expect(out).toContainEqual({ type: 'text-delta', delta: 'hi' })
+  })
+
+  it('generate() rejects if the signal flips during the fetch round-trip', async () => {
+    const signal = { aborted: false }
+    const fetch: FetchLike = () => {
+      signal.aborted = true // becomes aborted in-flight (an injected fetch may ignore the signal)
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ choices: [{ message: { content: 'hi' }, finish_reason: 'stop' }] }),
+        text: () => Promise.resolve(''),
+        body: null,
+      })
+    }
+    const ai = createServerBackend({ fetch, baseUrl: 'x', model: 'm' })
+    await expect(ai.generate({ messages: [], signal })).rejects.toBeInstanceOf(AiError)
+  })
+
   it('honors mid-stream abort', async () => {
     const signal = { aborted: false }
     async function* body(): AsyncIterable<Uint8Array> {
@@ -195,6 +249,30 @@ describe('server backend — anthropic adapter', () => {
     expect(result.finishReason).toBe('stop')
     expect(seenInit?.headers['x-api-key']).toBe('k')
     expect(seenInit?.headers['anthropic-version']).toBe('2023-06-01')
+  })
+
+  it('uses x-api-key auth when the anthropic mapper is passed as an OBJECT', async () => {
+    let seenInit: RequestInitLike | undefined
+    const fetch = fakeFetch(
+      {
+        json: () =>
+          Promise.resolve({ content: [{ type: 'text', text: 'hi' }], stop_reason: 'end_turn' }),
+      },
+      (_url, init) => {
+        seenInit = init
+      },
+    )
+    const ai = createServerBackend({
+      fetch,
+      baseUrl: 'https://api.anthropic.com',
+      model: 'claude-x',
+      apiKey: 'k',
+      adapter: anthropicMapper, // object form must authenticate like adapter: 'anthropic'
+    })
+    await ai.generate({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(seenInit?.headers['x-api-key']).toBe('k')
+    expect(seenInit?.headers['anthropic-version']).toBe('2023-06-01')
+    expect(seenInit?.headers.authorization).toBeUndefined() // not the bearer scheme
   })
 
   it('stream() parses Anthropic content_block_delta + message_delta', async () => {
