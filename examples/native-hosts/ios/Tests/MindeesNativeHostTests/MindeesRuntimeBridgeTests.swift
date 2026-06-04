@@ -50,6 +50,16 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
         XCTAssertEqual(runtime.closeCount, 1)
     }
 
+    func testStartFailureDiscardsBufferedRuntimeBatches() {
+        let runtime = EmittingThenFailingRuntime()
+        let (bridge, root) = makeBridge(runtime: runtime)
+
+        XCTAssertThrowsError(try bridge.start())
+        XCTAssertFalse(bridge.isStarted)
+        XCTAssertEqual(runtime.closeCount, 1)
+        XCTAssertEqual(inner(root), "")
+    }
+
     func testCloseMarksBridgeStopped() throws {
         let runtime = RecordingRuntime()
         let (bridge, _) = makeBridge(runtime: runtime)
@@ -246,6 +256,26 @@ private final class FailingRuntime: MindeesScriptRuntime {
     var closeCount = 0
 
     func start(sink: NativeCommandSink) throws {
+        throw TestRuntimeError.startFailed
+    }
+
+    func dispatchEvent(handlerId: String) throws {}
+
+    func close() {
+        closeCount += 1
+    }
+}
+
+private final class EmittingThenFailingRuntime: MindeesScriptRuntime {
+    var closeCount = 0
+
+    func start(sink: NativeCommandSink) throws {
+        try sink.applyBatch("""
+        [
+          {"type":"createText","id":"leaked-label","text":"Leaked"},
+          {"type":"insertChild","parentId":"host-root","childId":"leaked-label","index":0}
+        ]
+        """)
         throw TestRuntimeError.startFailed
     }
 

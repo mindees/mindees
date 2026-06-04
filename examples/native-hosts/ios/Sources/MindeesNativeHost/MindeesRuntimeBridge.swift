@@ -33,6 +33,8 @@ public final class MindeesRuntimeBridge<R: HostRenderer>: NativeCommandSink {
     private let runtime: MindeesScriptRuntime
     private let applyOnHostThread: (@escaping () throws -> Void) throws -> Void
     private var started = false
+    private var starting = false
+    private var startupBatches: [[NativeCommand]] = []
 
     public init(
         host: MindeesNativeHost<R>,
@@ -47,11 +49,22 @@ public final class MindeesRuntimeBridge<R: HostRenderer>: NativeCommandSink {
     public var isStarted: Bool { started }
 
     public func start() throws {
-        guard !started else { throw MindeesRuntimeBridgeError.alreadyStarted }
+        guard !started, !starting else { throw MindeesRuntimeBridgeError.alreadyStarted }
+        starting = true
+        startupBatches.removeAll()
         do {
             try runtime.start(sink: self)
             started = true
+            starting = false
+            let batches = startupBatches
+            startupBatches.removeAll()
+            for commands in batches {
+                try applyCommands(commands)
+            }
         } catch {
+            started = false
+            starting = false
+            startupBatches.removeAll()
             runtime.close()
             throw error
         }
@@ -60,6 +73,15 @@ public final class MindeesRuntimeBridge<R: HostRenderer>: NativeCommandSink {
     public func applyBatch(_ json: String) throws {
         let data = Data(json.utf8)
         let commands = try JSONDecoder().decode([NativeCommand].self, from: data)
+        if starting {
+            startupBatches.append(commands)
+            return
+        }
+        guard started else { throw MindeesRuntimeBridgeError.notStarted }
+        try applyCommands(commands)
+    }
+
+    private func applyCommands(_ commands: [NativeCommand]) throws {
         try applyOnHostThread {
             try self.host.apply(commands)
         }
