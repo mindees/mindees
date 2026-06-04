@@ -5,7 +5,7 @@ import {
   render,
 } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
-import { computeWindow, createList } from './list'
+import { computeWindow, createList, createSectionList, flattenSections } from './list'
 import { Text } from './primitives'
 
 describe('computeWindow', () => {
@@ -225,5 +225,47 @@ describe('createList — scroll + recycling', () => {
     mounted.dispose()
     scroll({ target: { scrollTop: 60 } }) // would reach the end — but the effect is disposed
     expect(onEndReached).not.toHaveBeenCalled() // no leaked observer firing after unmount
+  })
+})
+
+describe('flattenSections', () => {
+  it('interleaves headers and rows with section/item indices', () => {
+    const entries = flattenSections([
+      { title: 'A', data: ['a1', 'a2'] },
+      { title: 'B', data: ['b1'] },
+    ])
+    expect(entries.map((e) => e.kind)).toEqual(['header', 'item', 'item', 'header', 'item'])
+    expect(entries[1]).toMatchObject({ kind: 'item', item: 'a1', sectionIndex: 0, itemIndex: 0 })
+    expect(entries[3]).toMatchObject({ kind: 'header', sectionIndex: 1 })
+    expect(entries[4]).toMatchObject({ kind: 'item', item: 'b1', sectionIndex: 1, itemIndex: 0 })
+  })
+})
+
+describe('createSectionList', () => {
+  it('renders the visible headers + rows (virtualized over the flattened stream)', () => {
+    const list = createSectionList<string>({
+      sections: [
+        { title: 'Fruits', data: ['Apple', 'Banana'] },
+        { title: 'Veggies', data: ['Carrot'] },
+      ],
+      itemHeight: 40,
+      height: 1000, // fits every entry
+      renderItem: (item) => Text({ children: () => item() }),
+      renderSectionHeader: (section) => Text({ children: () => section().title ?? '' }),
+    })
+    const out = mount(list).html()
+    for (const text of ['Fruits', 'Apple', 'Banana', 'Veggies', 'Carrot']) {
+      expect(out).toContain(text)
+    }
+  })
+
+  it('defaults the header to the section title', () => {
+    const list = createSectionList<string>({
+      sections: [{ title: 'Only', data: ['x'] }],
+      itemHeight: 40,
+      height: 1000,
+      renderItem: (item) => Text({ children: () => item() }),
+    })
+    expect(mount(list).html()).toContain('Only')
   })
 })
