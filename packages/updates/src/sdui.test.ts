@@ -215,6 +215,14 @@ describe('applyMergePatch (RFC 7396)', () => {
     expect(({} as Record<string, unknown>).x).toBeUndefined()
   })
 
+  it('rejects a prototype-pollution key on the BASE side (not just the patch)', () => {
+    // The prior OTA doc (base), parsed from the wire, carries an OWN "__proto__"
+    // key. A patch that does not redefine it must still be rejected — otherwise the
+    // base-copy loop would hit the __proto__ setter and corrupt the result.
+    const base = JSON.parse('{"__proto__":{"isAdmin":true},"tag":"view"}')
+    expect(() => applyMergePatch(base, { tag: 'text' })).toThrow(/forbidden/)
+  })
+
   it('fails closed (SduiError, not RangeError) on a pathologically deep patch', () => {
     let deep: SduiJson = 0
     for (let i = 0; i < 1100; i++) deep = { x: deep }

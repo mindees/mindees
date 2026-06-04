@@ -345,6 +345,34 @@ describe('update client — trust boundary (download/apply re-enforce the gates)
     ) // VERSION_NOT_NEWER
   })
 
+  it('apply() refuses a DIFFERENT same-version bundle over a confirmed-good one', async () => {
+    const storage = createMemoryStorage()
+    const good = fixture({ id: 'good', version: 5, assets: { 'index.js': 'GOOD' } })
+    const evil = fixture({ id: 'evil', version: 5, assets: { 'index.js': 'EVIL' } })
+    const cg = client(good, {}, storage)
+    const ce = client(evil, {}, storage)
+    // Stage both at v5 (download never raises the high-water mark), confirm the good one.
+    await cg.download(good.manifest)
+    await ce.download(evil.manifest)
+    await cg.apply('good')
+    await cg.boot()
+    await cg.notifyReady() // high-water mark = 5, 'good' confirmed-current
+    // Activating the other v5 bundle must be refused (== high-water mark, different id).
+    await expect(ce.apply('evil')).rejects.toBeInstanceOf(UpdateError) // VERSION_NOT_NEWER
+    expect((await ce.state()).current).toBe('good') // unchanged
+  })
+
+  it('apply() stays idempotent — re-applying the already-current same-version generation is allowed', async () => {
+    const storage = createMemoryStorage()
+    const fx = fixture({ id: 'u1', version: 5 })
+    const c = client(fx, {}, storage)
+    await c.download(fx.manifest)
+    await c.apply('u1')
+    await c.boot()
+    await c.notifyReady() // high-water mark = 5, 'u1' current
+    await expect(c.apply('u1')).resolves.toBeUndefined() // same id+version → not a downgrade
+  })
+
   it('apply() refuses to re-activate a generation that previously failed', async () => {
     const storage = createMemoryStorage()
     const fx = fixture({ id: 'u1', version: 2 })
