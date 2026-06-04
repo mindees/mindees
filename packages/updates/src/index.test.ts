@@ -16,6 +16,14 @@ describe('@mindees/updates metadata', () => {
     expect(info).toEqual({ name: '@mindees/updates', version: VERSION, maturity: 'experimental' })
   })
 
+  it('info is frozen so its self-reported identity cannot be mutated at runtime', () => {
+    expect(Object.isFrozen(info)).toBe(true)
+    expect(() => {
+      ;(info as { version: string }).version = '9.9.9'
+    }).toThrow()
+    expect(info.version).toBe(VERSION)
+  })
+
   it('the WASM module runtime is a research track that throws (not a silent stub)', () => {
     expect(() => createWasmModuleRuntime()).toThrow(NotImplementedError)
   })

@@ -301,6 +301,11 @@ function mergePatch(target: SduiJson | undefined, patch: SduiJson, depth: number
   const base = isPlainObject(target) ? target : {}
   const out: Record<string, SduiJson> = {}
   for (const k of Object.keys(base)) {
+    // Reject prototype-pollution keys on the BASE side too (not just the patch).
+    // An own `__proto__` key (e.g. from JSON.parse of the prior OTA doc) would
+    // otherwise hit the Object.prototype setter via `out[k] = ...` and corrupt the
+    // returned object's prototype — mirroring the guard in the patch loop below.
+    if (FORBIDDEN_KEYS.has(k)) throw err('SDUI_FORBIDDEN_KEY', `forbidden key "${k}"`)
     if (!Object.hasOwn(patch, k)) out[k] = cloneJson(base[k] as SduiJson, depth + 1)
   }
   for (const k of Object.keys(patch)) {

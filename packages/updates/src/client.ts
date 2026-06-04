@@ -296,12 +296,19 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
       if (generation.status === 'failed') {
         throw new UpdateError('GENERATION_FAILED', `generation ${generationId} previously failed`)
       }
-      // Never activate something older than the high-water mark (anti-downgrade), even
-      // if it was downloaded while it was still the newest.
-      if (generation.version < st.highestVersion) {
+      // Never activate something that is not strictly newer than the high-water mark
+      // (anti-downgrade). download()/check()/the server all enforce a `<=` floor;
+      // apply() is the final gate before code goes live, so it must too — otherwise a
+      // DIFFERENT bundle signed at the SAME version could laterally replace a
+      // confirmed-good current generation. Re-applying the already-current generation
+      // stays idempotent (allowed).
+      if (
+        generation.version < st.highestVersion ||
+        (generation.version === st.highestVersion && generationId !== st.current)
+      ) {
         throw new UpdateError(
           'VERSION_NOT_NEWER',
-          `generation ${generationId} version ${generation.version} is older than ${st.highestVersion}`,
+          `generation ${generationId} version ${generation.version} is not newer than ${st.highestVersion}`,
         )
       }
       // All assets must be present before we make it current.
