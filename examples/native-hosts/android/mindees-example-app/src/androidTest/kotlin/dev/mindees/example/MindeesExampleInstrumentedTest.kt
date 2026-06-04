@@ -35,6 +35,12 @@ class MindeesExampleInstrumentedTest {
                     it.text.toString() == "Done today: 0"
                 }
 
+                // Device hooks (useWindowDimensions/useColorScheme) read real values the
+                // host injected: a non-zero screen width proves the environment reached JS.
+                requireView(content, TextView::class.java) {
+                    Regex("""^Screen [1-9]\d*×\d+ · (light|dark)$""").matches(it.text.toString())
+                }
+
                 // Fine-grained reactivity: a press patches only the counter text node.
                 tap(content, "Mark done")
                 assertEquals("Done today: 1", doneLabel.text.toString())

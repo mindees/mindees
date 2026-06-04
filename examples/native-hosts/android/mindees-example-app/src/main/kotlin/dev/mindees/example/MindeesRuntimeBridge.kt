@@ -62,12 +62,21 @@ interface MindeesHostApi {
     fun emit(json: String)
 }
 
+/** Supplies the platform environment (window size, color scheme, …) to the bundle. */
+interface MindeesEnvApi {
+    fun get(): String
+}
+
 interface MindeesAppApi {
     fun start()
     fun dispatchEvent(handlerId: String)
 }
 
-class QuickJsMindeesRuntime(private val source: String) : MindeesScriptRuntime {
+class QuickJsMindeesRuntime(
+    private val source: String,
+    /** JSON for `setEnvironment` (window dimensions, color scheme, …). Default: empty. */
+    private val environmentJson: String = "{}",
+) : MindeesScriptRuntime {
     private var engine: QuickJs? = null
     private var app: MindeesAppApi? = null
 
@@ -83,6 +92,15 @@ class QuickJsMindeesRuntime(private val source: String) : MindeesScriptRuntime {
                     override fun emit(json: String) {
                         sink.applyBatch(json)
                     }
+                },
+            )
+            // Injected before evaluate so the bundle's entry can read it and call
+            // setEnvironment() before the first render.
+            quickJs.set(
+                "MindeesEnv",
+                MindeesEnvApi::class.java,
+                object : MindeesEnvApi {
+                    override fun get(): String = environmentJson
                 },
             )
             quickJs.evaluate(source, "mindees-example.js")
