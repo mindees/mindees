@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { SerializableBackend } from './backend'
+import type { SerializableBackend, SerializeOptions } from './backend'
 
 /** A headless host node: an element (with tag/props/children) or a text node. */
 export interface HeadlessNode {
@@ -42,6 +42,41 @@ function serializeAttrValue(value: unknown): string {
       .join(';')
   }
   return String(value)
+}
+
+/**
+ * Whether `key` is a safe HTML attribute name. Attribute NAMES are interpolated
+ * into markup unescaped, so a name containing `>`, whitespace, quotes, `=`, `/`,
+ * etc. could break out of the tag and inject markup (stored XSS when props are
+ * built from user/server data). We emit only names that match the HTML name
+ * grammar — matching what the DOM's `setAttribute` would accept — and drop the
+ * rest, exactly as an invalid name would never reach the DOM either.
+ */
+function isValidAttrName(key: string): boolean {
+  return /^[A-Za-z_:][\w:.-]*$/.test(key)
+}
+
+/**
+ * Serialize a headless node (and subtree) to HTML. A standalone function, not an
+ * object method: the public {@link SerializableBackend.serialize} is typed as a
+ * plain function member, so a consumer may legally detach it
+ * (`const { serialize } = backend`). Recursing through this lexical helper rather
+ * than `this.serialize` keeps it binding-independent.
+ */
+function serializeHeadless(node: HeadlessNode, options?: SerializeOptions): string {
+  if (node.type === TEXT) return escapeText(node.text)
+  const mapTag = options?.mapTag ?? ((t: string) => t)
+  const tag = mapTag(node.type)
+  const attrs = Object.entries(node.props)
+    .filter(([key]) => !isEventProp(key) && isValidAttrName(key))
+    .map(([key, value]) =>
+      // Boolean `true` → a valueless attribute (`disabled=""`), matching the DOM
+      // backend (dom.ts) so SSR markup equals hydrated markup.
+      value === true ? ` ${key}=""` : ` ${key}="${escapeAttr(serializeAttrValue(value))}"`,
+    )
+    .join('')
+  const inner = node.children.map((c) => serializeHeadless(c, options)).join('')
+  return `<${tag}${attrs}>${inner}</${tag}>`
 }
 
 /** Create a {@link SerializableBackend} backed by an in-memory tree. */
@@ -106,17 +141,7 @@ export function createHeadlessBackend(): SerializableBackend<HeadlessNode> {
       return node.type === TEXT
     },
 
-    serialize(node, options): string {
-      if (node.type === TEXT) return escapeText(node.text)
-      const mapTag = options?.mapTag ?? ((t: string) => t)
-      const tag = mapTag(node.type)
-      const attrs = Object.entries(node.props)
-        .filter(([key]) => !isEventProp(key))
-        .map(([key, value]) => ` ${key}="${escapeAttr(serializeAttrValue(value))}"`)
-        .join('')
-      const inner = node.children.map((c) => this.serialize(c, options)).join('')
-      return `<${tag}${attrs}>${inner}</${tag}>`
-    },
+    serialize: serializeHeadless,
   }
 }
 

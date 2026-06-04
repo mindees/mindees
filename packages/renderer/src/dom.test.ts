@@ -80,6 +80,22 @@ describe('DOM backend (happy-dom)', () => {
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 
+  it('removes event listeners on dispose (no listener leak)', () => {
+    const container = document.createElement('div')
+    const backend = createDomBackend(document as never)
+    const onClick = vi.fn()
+    const m = render(h('button', { onClick }, 'Tap'), backend, container as never)
+    const btn = container.firstElementChild as HTMLElement
+    btn.dispatchEvent(new Event('click'))
+    expect(onClick).toHaveBeenCalledTimes(1) // live while mounted
+
+    m.dispose()
+    // The app still holds `btn` (a ref / cached node); the listener must be gone,
+    // not merely detached — otherwise its handler (and its closure) leaks.
+    btn.dispatchEvent(new Event('click'))
+    expect(onClick).toHaveBeenCalledTimes(1) // listener removed on unmount
+  })
+
   it('applies a style object', () => {
     const container = document.createElement('div')
     const backend = createDomBackend(document as never)

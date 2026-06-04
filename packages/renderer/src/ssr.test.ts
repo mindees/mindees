@@ -33,6 +33,19 @@ describe('renderToString (SSR)', () => {
     const html = renderToString(h('view', { title: 'a"b' }, '<script>'))
     expect(html).toBe('<div title="a&quot;b">&lt;script&gt;</div>')
   })
+
+  it('drops attribute names that could break out of the tag (no XSS via prop key)', () => {
+    const evilKey = 'x><script>alert(document.cookie)</script><div data-y'
+    const html = renderToString(h('view', { [evilKey]: 'y', id: 'ok' }, 'hi'))
+    expect(html).not.toContain('<script>') // the malicious name cannot inject markup
+    expect(html).toBe('<div id="ok">hi</div>') // unsafe name dropped, safe attrs kept
+  })
+
+  it('serializes a boolean-true attribute as valueless, matching the DOM backend', () => {
+    // SSR markup must equal hydrated markup; the DOM backend writes `disabled=""`.
+    const html = renderToString(h('button', { disabled: true }, 'x'))
+    expect(html).toBe('<button disabled="">x</button>')
+  })
 })
 
 describe('hydrate', () => {
