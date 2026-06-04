@@ -1,11 +1,11 @@
 /**
  * `@mindees/updates` (Pulse) — signed OTA updates.
  *
- * The signed-update core: a versioned, hash-addressed {@link UpdateManifest},
- * Ed25519 {@link signManifest signing}/{@link verifySignedManifest verification}
- * (threshold + key rotation), a content-addressed {@link UpdateStorage store}, and
- * an {@link createUpdateClient update client} with atomic generations + crash-loop
- * rollback. Differential bundle diffing, a reference server, and SDUI build on this.
+ * Pulse ships a versioned, hash-addressed {@link UpdateManifest}, Ed25519
+ * {@link signManifest signing}/{@link verifySignedManifest verification} (threshold +
+ * key rotation), a content-addressed {@link UpdateStorage store}, an
+ * {@link createUpdateClient update client} with atomic generations + crash-loop
+ * rollback, differential bundle diffing, a reference update server, and SDUI.
  *
  * @module
  */

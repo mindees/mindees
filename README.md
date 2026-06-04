@@ -33,9 +33,9 @@ OTA updates. Built in the open.
 > tested** — see the live examples below. The **native rendering strand** is real:
 > the command backend, a strict conformance contract, and **iOS + Android host
 > projects that render the command stream into correct native view trees** are all
-> verified in CI (Phases 8A–8E). The **signed OTA core** (Pulse — manifest, Ed25519
-> signing, content-addressed store, atomic rollback) landed in Phase 9A. Still
-> missing: native iOS/Android apps **do not run end-to-end yet** — an embedded JS
+> verified in CI (Phases 8A–8E). Pulse OTA, Continuum data, Synapse AI, and Atlas UI
+> are implemented in their documented experimental scope. Still missing: native
+> iOS/Android apps **do not run end-to-end yet** — an embedded JS
 > engine + JS↔native bridge (Phase 8F) is what makes a full on-device app real.
 >
 > ⭐ **Star the repo** to follow along, and check the
@@ -129,8 +129,11 @@ hydrate(document.getElementById('app'), Counter, {})
 
 One renderer, swappable **host backends**: a web/DOM backend, a headless backend,
 and a **native command backend** (compiles the tree + reactive updates into a
-serializable native command stream — Phase 8A) ship today; the real iOS/Android
-hosts that render that stream, and a GPU canvas, are on the roadmap.
+serializable native command stream — Phase 8A) ship today. The iOS/Android host
+projects and platform-runtime render verification are in
+[`examples/native-hosts/`](./examples/native-hosts/) and CI; the remaining native
+gap is the end-to-end app bridge/embedded JS engine (Phase 8F). GPU canvas remains
+a research track.
 
 ### ⚙️ A compiler that won't let type errors ship (Phase 4)
 
@@ -216,10 +219,10 @@ upgrades).
 | [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest | 🧪 Experimental |
 | [`@mindees/cli`](./packages/cli) | Forge | `mindees` CLI: create / build / doctor / info / dev | 🧪 Experimental |
 | [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state + nested rendering | 🧪 Experimental |
-| [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend (real iOS/Android hosts + GPU canvas 🔬) | 🧪 Experimental |
+| [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend + CI-verified iOS/Android host projects; full app bridge + GPU canvas 🔬 | 🧪 Experimental |
 | [`@mindees/atlas`](./packages/atlas) | Atlas | Accessible, signals-native UI primitives (View/Text/Image/TextInput/Pressable/Button/Stack/Row/Column/Spacer/ScrollView) + cross-platform `StyleObject`, `role`/`aria-*` a11y, real-DOM-event interaction, a structural theme, and a virtualized recycling `List`; native 🔬 | 🧪 Experimental |
 | [`@mindees/ai`](./packages/ai) | Synapse | Provider-agnostic AI: pure-TS contract + mock & inject-`fetch` server backends, `AsyncIterable` streaming, Standard-Schema structured output (`generateObject`/`streamObject`), bounded tool calling (`runTools`), and a dev-time error explainer; on-device runtime 🔬 | 🧪 Experimental |
-| [`@mindees/data`](./packages/data) | Continuum | Local-first: signals-native `createCollection` + HLC causality + CRDT merge (LWW + OR-Set) + a delta-sync engine where two peers converge offline | 🧪 Experimental |
+| [`@mindees/data`](./packages/data) | Continuum | Local-first: signals-native `createCollection` + HLC causality + CRDT merge (LWW + OR-Set) + delta sync + reference sync server + persistence export/restore | 🧪 Experimental |
 | [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** + **server-driven UI (SDUI)** | 🧪 Experimental |
 | [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
 
@@ -247,7 +250,7 @@ upgrades).
 - ✅ **Phase 9B** — Pulse **differential downloads**: a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`) so a changed asset ships as just its delta against a stored base, verified by the existing SHA-256 gate with a full-fetch fallback
 - ✅ **Phase 9C** — Pulse **reference update server**: a pure, capability-injected `createUpdateServer` (channel selection, staged rollout, anti-downgrade, freeze, rollback directives, content-addressed asset serving; never signs) + a runnable `node:http` adapter example
 - ✅ **Phase 9D** — Pulse **server-driven UI (SDUI)**: `compileSdui` turns an allowlisted JSON tree into a reactive `MindeesNode` (named actions + `$bind` bindings, no `eval`, prototype-pollution-safe) + RFC 7396 / safe RFC 6902 patches — **Phase 9 (Pulse) complete**
-- ✅ **Phase 10 (core)** — Continuum **local-first data**: signals-native `createCollection` (10A) + Hybrid Logical Clock causality (10B) + CRDT conflict resolution — per-field LWW + add-wins OR-Set (10C) + a **delta-sync engine where two peers converge offline** (10D)
+- ✅ **Phase 10 (Continuum)** — **local-first data**: signals-native `createCollection` (10A) + Hybrid Logical Clock causality (10B) + CRDT conflict resolution — per-field LWW + add-wins OR-Set (10C) + a **delta-sync engine where two peers converge offline** (10D) + reference sync server and persistence export/restore (10E/10F)
 - ✅ **Phase 11 (Synapse) — provider-agnostic AI**: a pure-TS `AiBackend` (`createAi`) with a deterministic mock + an inject-`fetch` server backend (openai/anthropic), `AsyncIterable` streaming (11A/11B); Standard-Schema **structured output** (`generateObject`/`streamObject`, no `eval`, sanitize-before-validate) + a bounded **tool-calling loop** (`runTools`) (11C); and a dev-time **error explainer** (`mindees ai explain`) (11D) — on-device LLM inference is a labeled 🔬 research track
 - ✅ **Phase 12 (Atlas) — accessible UI primitives + virtualized list**: signals-native `View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button` + layout (`Stack`/`Row`/`Column`/`Spacer`/`ScrollView`), a curated cross-platform `StyleObject` (numbers → `px` on web), `role`/`aria-*` accessibility, real-DOM-event interaction, a structural theme (12A), and a **virtualized recycling `List`** that renders only the visible window and reuses rows as you scroll (12B) — renderer-agnostic trees, web real, native 🔬
 - ⏭️ **Phases 8F / 13** — end-to-end native app (embedded JS engine + JS↔native bridge); then examples, benchmarks, docs site & release
@@ -309,12 +312,13 @@ Android and web, and get fine-grained reactivity and native UI.
 100% TypeScript. No new language to learn.
 
 **Can I build mobile apps with it today?**
-Not yet — it's pre-alpha. The reactive core, **web** renderer (with SSR), the
-compiler, the CLI, and the typed router all work now, and the **native rendering
-foundation** (a platform-neutral command backend) has landed (Phase 8A). But a
-real **native (iOS/Android) host** that draws those commands to the screen — and
-the Atlas UI library — land in upcoming phases, so native apps don't run
-end-to-end yet. ⭐ Star and watch the repo to follow progress.
+Not yet — it's pre-alpha. The reactive core, **web** renderer (with SSR), compiler,
+CLI, typed router, Pulse OTA, Continuum data, Synapse AI, and Atlas UI work in
+their documented experimental scope. The native rendering foundation is more than
+a stub: the command backend, reference host, iOS/Android host projects, and
+platform-runtime render verification are CI-verified. A full native app still does
+not run end-to-end because the embedded JS engine + JS↔native bridge (Phase 8F) is
+not implemented. ⭐ Star and watch the repo to follow progress.
 
 **Is it open source?**
 Yes — dual-licensed **MIT OR Apache-2.0**, built fully in the open.

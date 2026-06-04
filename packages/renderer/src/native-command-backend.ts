@@ -4,14 +4,15 @@
  * build and update a native view tree.
  *
  * This is the bridge between Helix (the reconciler + fine-grained reactivity) and
- * a future native host: render an app against this backend and you get a
- * deterministic, serializable command stream a SwiftUI/UIKit or Jetpack
- * Compose/View host can replay. It depends only on `@mindees/core` reactivity
+ * a native host: render an app against this backend and you get a deterministic,
+ * serializable command stream a UIKit or Android View host can replay. It depends
+ * only on `@mindees/core` reactivity
  * (via the reconciler) — no DOM, no browser globals — so it runs in Node tests.
  *
- * It is **not** an iOS/Android renderer. It produces the protocol a real host
- * will consume; the hosts themselves are reference stubs today (see
- * `examples/native-hosts/`) and remain a research track ({@link createNativeBackend}).
+ * It is **not** an end-to-end native app bridge. It produces the protocol that the
+ * verified host projects in `examples/native-hosts/` replay/render in CI; the direct
+ * runtime backend and embedded JS engine remain research tracks
+ * ({@link createNativeBackend}).
  *
  * @module
  */

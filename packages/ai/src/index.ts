@@ -1,14 +1,15 @@
 /**
  * `@mindees/ai` (Synapse) — provider-agnostic AI + dev-time intelligence.
  *
- * Phase 11A ships the **contract** ({@link createAi}, {@link AiBackend}, messages,
+ * Phase 11 ships the **contract** ({@link createAi}, {@link AiBackend}, messages,
  * {@link GenerateRequest}/{@link AiResult}/{@link AiChunk}, {@link AiError}) with
  * streaming as `AsyncIterable` only (Node/browser/Hermes-safe), a deterministic
- * {@link createMockBackend mock backend} (the working, offline, no-keys fallback), and
- * a research-track {@link createOnDeviceBackend on-device seam} that throws. An
- * inject-`fetch` server backend (11B), Standard-Schema structured output + tool calling
- * (11C), and a dev-time error explainer (11D) build on this. On-device LLM inference is
- * inherently native and stays a 🔬 research track.
+ * {@link createMockBackend mock backend} (the working, offline, no-keys fallback),
+ * Standard-Schema structured output, bounded tool calling, an inject-`fetch` server
+ * backend on the `@mindees/ai/server` subpath, and a dev-time error explainer on the
+ * `@mindees/ai/devtools` subpath. The {@link createOnDeviceBackend on-device seam}
+ * throws because on-device LLM inference is inherently native and stays a 🔬 research
+ * track.
  *
  * @module
  */

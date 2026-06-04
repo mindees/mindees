@@ -1,13 +1,15 @@
 /**
  * `@mindees/data` (Continuum) — local-first reactive store + sync.
  *
- * Phase 10A ships the **reactive document store**: {@link createCollection}, a
+ * Phase 10 ships the **reactive document store**: {@link createCollection}, a
  * signals-native, in-memory collection with fine-grained reactive reads
  * (`get`/`has`/`all`/`where`/`size`), atomic mutations (`insert`/`upsert`/`update`/
  * `delete`/`clear`/`tx`), and {@link Collection.optimistic optimistic} changes that can
- * be rolled back. Built on `@mindees/core` signals only. Hybrid-logical-clock causality
- * (10B), CRDT conflict resolution (10C), and the local-first sync engine (10D) build on
- * this. On-device native persistence + a production sync server are research tracks.
+ * be rolled back. Built on `@mindees/core` signals only. Hybrid-logical-clock causality,
+ * CRDT conflict resolution, the local-first sync engine, a reference sync server on the
+ * `@mindees/data/server` subpath, and a persistence contract/export/restore path build
+ * on this. Native durable adapters, production sync hardening, and CRDT-library/rich-text
+ * interop remain research tracks.
  *
  * @module
  */

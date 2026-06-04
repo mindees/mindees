@@ -6,16 +6,16 @@
  * tree, **strictly validating** the stream as it goes: it throws
  * {@link NativeHostError} on any malformed sequence (unknown/duplicate id,
  * `removeChild` of a non-child, double `disposeNode`, out-of-range insert index,
- * …). This makes it the executable **conformance spec** for a native host: a real
- * iOS (SwiftUI/UIKit) or Android (Jetpack Compose/View) host implements exactly
- * these semantics but builds platform views instead of these model nodes.
+ * …). This makes it the executable **conformance spec** for a native host: the
+ * verified iOS/UIKit and Android View hosts implement these semantics but build
+ * platform views instead of these model nodes.
  *
  * Piping the command backend's output through this host is a powerful end-to-end
  * check: it proves the backend never emits an invalid or leaking stream (a lenient
  * host would silently hide a double-free; this one fails loudly).
  *
  * This is **not** a renderer — it draws nothing. It is the host-side contract,
- * verifiable in Node, that the (toolchain-gated) compiled native hosts must satisfy.
+ * verifiable in Node, that the compiled native hosts satisfy in CI.
  *
  * @module
  */

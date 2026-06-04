@@ -6,12 +6,13 @@ reactive bindings**: a changing signal patches exactly the affected
 attribute/text/region — no virtual-DOM diffing.
 
 > **Status: 🧪 Experimental.** Implemented and tested: the reconciler, the
-> **web/DOM backend**, **SSR + hydration**, a **headless** test backend, and — new
-> in **Phase 8A** — a **native command backend** (`createNativeCommandBackend()`)
-> that compiles the element tree + reactive updates into a serializable native
-> command stream. A real iOS/Android host that _renders_ that stream, and the GPU
-> canvas, are **research tracks** that throw `NotImplementedError`. APIs may change
-> before `1.0`.
+> **web/DOM backend**, **SSR + hydration**, a **headless** test backend, a
+> **native command backend** (`createNativeCommandBackend()`), a strict reference
+> host (`createReferenceHost()`), and iOS/Android host projects that compile and
+> render the command stream into native view trees in CI. A full end-to-end native
+> app bridge/embedded JS engine and GPU canvas remain **research tracks**; the
+> direct `createNativeBackend()` and `createCanvasBackend()` seams throw
+> `NotImplementedError`. APIs may change before `1.0`.
 
 ## Why Helix
 
@@ -22,7 +23,8 @@ attribute/text/region — no virtual-DOM diffing.
   `text`→`span`, …), unlike canvas-based web renderers. `hydrate` attaches
   reactivity on the client.
 - **Backend-agnostic** — the reconciler speaks only the `HostBackend` contract,
-  so a new platform is "implement `HostBackend<N>`." DOM + headless ship today.
+  so a new platform is "implement `HostBackend<N>`." DOM, headless, native command
+  stream, and reference-host validation ship today.
 
 ## Quick start
 
@@ -56,8 +58,8 @@ The same reconciler can target a native host. `createNativeCommandBackend()`
 implements the `HostBackend` contract but, instead of touching a DOM, records a
 stream of serializable [`NativeCommand`](./src/native-protocol.ts)s
 (`createNode`, `insertChild`, `setProp`, `updateText`, `disposeNode`, …) that a
-native host (SwiftUI/UIKit, Jetpack Compose/View, …) can replay. It runs in Node
-— no DOM — so the whole native path is testable.
+native host (UIKit and Android View today; other surfaces later) can replay. It
+runs in Node — no DOM — so the whole native path is testable.
 
 ```ts
 import { createNativeCommandBackend, render } from '@mindees/renderer'
@@ -70,10 +72,11 @@ const commands = backend.flushCommands() // ship this batch to a native host
 ```
 
 > This is the **foundation** for native rendering — it produces the command
-> stream, it does **not** draw pixels. A compiled iOS/Android host is Phase 8C/8D
-> (toolchain-gated); see the reference host stubs in
-> [`examples/native-hosts/`](https://github.com/mindees/mindees/tree/main/examples/native-hosts).
-> You cannot build a native mobile app end-to-end yet.
+> stream, and the host projects in
+> [`examples/native-hosts/`](https://github.com/mindees/mindees/tree/main/examples/native-hosts)
+> replay/render that stream in CI. You cannot build a native mobile app
+> end-to-end yet because Phase 8F still needs an embedded JS engine plus a
+> JS↔native bridge running the reactive app on-device.
 
 ### Reference host + conformance contract (Phase 8B)
 
@@ -108,7 +111,7 @@ host.liveNodeCount()  // 0 after app.dispose() — no orphaned/leaked nodes
 | `createNativeCommandBackend(opts?)` | fn | Native `HostBackend` that emits a serializable `NativeCommand` stream (Phase 8A). |
 | `createReferenceHost(rootId?)` | fn | Strict reference host: replays + validates a `NativeCommand` stream (Phase 8B). |
 | `NativeCommand` + `isNativeCommand` / `isNativePropValue` / `normalizeNativeProp` / `createNativeNodeIdFactory` | type/fn | The native command protocol + helpers. |
-| `createNativeBackend` / `createCanvasBackend` | fn | 🔬 research tracks (real platform hosts) — throw `NotImplementedError`. |
+| `createNativeBackend` / `createCanvasBackend` | fn | 🔬 research tracks (direct runtime native backend + GPU canvas) — throw `NotImplementedError`. |
 
 ### Reactive bindings
 

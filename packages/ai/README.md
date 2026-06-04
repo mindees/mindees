@@ -2,14 +2,14 @@
 
 **Synapse** — provider-agnostic AI + dev-time intelligence for MindeesNative.
 
-> Status: 🧪 **Experimental** (Phase 11A — the AI contract). A small, hand-rolled,
-> pure-TS contract with a deterministic **mock backend** is implemented and tested. A
-> server/HTTP backend (11B), Standard-Schema structured output + tool calling (11C), and
-> a dev-time error explainer (11D) build on it. **On-device LLM inference is inherently
-> native** (Apple Foundation Models, Android AICore/Gemini Nano, ExecuTorch, llama.rn) or
-> web-only (WebGPU/WASM), so it is a 🔬 **research track** — `createOnDeviceBackend()`
-> throws `NotImplementedError`; the mock/server backends are the working fallback. See
-> the repository [STATUS.md](../../STATUS.md).
+> Status: 🧪 **Experimental** — Phase 11 (Synapse) is complete in its current scope.
+> Implemented and tested: the provider-agnostic AI contract, deterministic mock backend,
+> injected-`fetch` server/HTTP backend, Standard-Schema structured output, bounded tool
+> calling, and dev-time error explainer. **On-device LLM inference is inherently native**
+> (Apple Foundation Models, Android AICore/Gemini Nano, ExecuTorch, llama.rn) or web-only
+> (WebGPU/WASM), so it is a 🔬 **research track** — `createOnDeviceBackend()` throws
+> `NotImplementedError`; the mock/server backends are the working fallback. See the
+> repository [STATUS.md](../../STATUS.md).
 
 ## What works today
 
@@ -24,6 +24,15 @@ third-party deps):
 - **`createOnDeviceBackend()`** — the research-track seam (same interface, throws).
 - Stable `AiError` codes; `Message`/`Part` types whose `tool-call`/`tool-result` parts
   back the (11C) tool loop.
+- **`@mindees/ai/server`** — `createServerBackend({ fetch, baseUrl, model, ... })`
+  with OpenAI/Anthropic mappers and a pure-TS SSE parser, tested with fixture fetches
+  and no real network.
+- **Structured output** — `generateObject` / `streamObject` validate model JSON against
+  any Standard Schema, with bounded repair and sanitize-before-validate guards.
+- **Tool calling** — `runTools` validates args before execution, deduplicates identical
+  calls, supports parallel execution, and preserves an immutable transcript.
+- **`@mindees/ai/devtools`** — `explainError` and terminal formatting for build/dev tools;
+  surfaced by the CLI as `mindees ai explain <error>`.
 
 ```ts
 import { createAi, createMockBackend } from '@mindees/ai'
@@ -37,7 +46,11 @@ for await (const chunk of ai.stream({ messages: [{ role: 'user', content: 'hi' }
 }
 ```
 
-Design rationale: [ADR-0017](../../docs/adr/0017-synapse-ai-contract.md).
+Design rationale: [ADR-0017](../../docs/adr/0017-synapse-ai-contract.md),
+[ADR-0018](../../docs/adr/0018-synapse-server-backend.md),
+[ADR-0019](../../docs/adr/0019-synapse-structured-output.md),
+[ADR-0020](../../docs/adr/0020-synapse-tool-calling.md), and
+[ADR-0021](../../docs/adr/0021-synapse-devtools.md).
 
 ## License
 

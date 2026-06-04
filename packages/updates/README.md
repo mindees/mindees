@@ -3,11 +3,10 @@
 **Pulse** — signed over-the-air (OTA) updates: ship new JavaScript + assets to
 installed apps without an app-store release, safely.
 
-> Status: 🧪 **Experimental** (Phase 9A — the signed OTA core). The verify →
-> download → atomic apply → crash-loop rollback flow is implemented and tested.
-> Differential bundle diffing, a reference update server, and SDUI are the Phase 9B
-> delivery follow-up. The WASM module runtime is a 🔬 research track
-> (`createWasmModuleRuntime()` throws `NotImplementedError`). See the repository
+> Status: 🧪 **Experimental** — Phase 9 (Pulse) is complete in its current scope.
+> Implemented and tested: signed OTA core, differential bundle diffing, the reference
+> update server, and server-driven UI (SDUI). The WASM module runtime is a 🔬 research
+> track (`createWasmModuleRuntime()` throws `NotImplementedError`). See the repository
 > [STATUS.md](../../STATUS.md).
 
 ## What works today

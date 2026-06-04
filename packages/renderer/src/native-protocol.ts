@@ -6,8 +6,8 @@
  * {@link import('./backend').HostBackend}; the
  * {@link import('./native-command-backend').NativeCommandBackend} implements that
  * contract by emitting a stream of {@link NativeCommand}s instead of touching the
- * DOM. A native host (SwiftUI/UIKit on iOS, Jetpack Compose/View on Android, or a
- * future desktop surface) consumes the stream and materializes real views.
+ * DOM. A native host (UIKit on iOS, Android View on Android, or another future
+ * surface) consumes the stream and materializes real views.
  *
  * The protocol is deliberately platform-neutral and JSON-serializable: it carries
  * **no functions**. Event handlers are represented as stable handler-id

@@ -8,17 +8,19 @@
  *   fine-grained reactive updates into a serializable {@link NativeCommand}
  *   stream that a native host can replay. This is the Phase 8A foundation for
  *   native rendering; it does not itself draw to the screen.
- * - 🔬 **Real platform host backends** ({@link createNativeBackend},
+ * - 🔬 **Direct runtime backends** ({@link createNativeBackend},
  *   {@link createCanvasBackend}) — **research tracks**. They define the contracts
  *   so the Helix architecture is real and the public API is honest, but they are
  *   **not implemented**: the constructors throw {@link NotImplementedError}.
  *
- * The web/DOM backend ({@link createDomBackend}) and the headless backend are the
- * fully working render targets today.
+ * The web/DOM backend ({@link createDomBackend}), the headless backend, the native
+ * command backend, and the strict reference host are the fully working render targets
+ * and protocol validation path today. The iOS/UIKit and Android View host projects in
+ * `examples/native-hosts/` compile and render the command stream in CI.
  *
- * - **Native strand** (`NativeBackend`): real UIKit/SwiftUI (iOS) and Jetpack
- *   Compose (Android) host nodes. A real host will consume the native command
- *   stream; reference host stubs live in `examples/native-hosts/`.
+ * - **Native strand** (`NativeBackend`): a direct runtime backend that will connect
+ *   a running JS app to real platform views. The command protocol and reference host
+ *   projects exist today; the full app bridge/embedded JS engine remains future work.
  * - **GPU canvas strand** (`CanvasBackend`): a wgpu/WebGPU surface with
  *   build-time-precompiled shaders, for pixel-perfect custom UI composited next
  *   to native nodes.
@@ -52,12 +54,12 @@ export interface CanvasBackend<N> extends HostBackend<N> {
 }
 
 /**
- * 🔬 Research track — a real iOS/Android host backend that draws platform views.
+ * 🔬 Research track — a direct iOS/Android runtime backend that draws platform views.
  * **Not implemented**: throws {@link NotImplementedError}.
  *
  * Today, drive {@link createNativeCommandBackend} to produce the native command
- * stream a host will consume (see `examples/native-hosts/` for reference SwiftUI
- * and Jetpack Compose host stubs), or {@link createDomBackend} for the web.
+ * stream consumed by the verified host projects in `examples/native-hosts/`, or
+ * {@link createDomBackend} for the web.
  *
  * @experimental
  */
