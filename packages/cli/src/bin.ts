@@ -22,6 +22,7 @@ import { dirname, join, relative, sep } from 'node:path'
 import process from 'node:process'
 import type { AiBackend } from '@mindees/ai'
 import { type AdapterName, createServerBackend, type FetchLike } from '@mindees/ai/server'
+import { detectImageSupport, itermImage, renderBanner } from './banner'
 import { type CliContext, runCliAsync } from './cli'
 import { startDev } from './dev'
 import { createDevServer, createNodeWatcher, renderDevPage } from './dev-server'
@@ -133,6 +134,26 @@ function runDevServer(ctx: CliContext): void {
   })
 }
 
+/**
+ * Build the welcome banner for an interactive (TTY) session: the ANSI wordmark always, plus the
+ * actual logo PNG inline on image-capable terminals (iTerm2 / WezTerm). Returns `undefined` when
+ * stdout is piped (scripts get clean, parseable output).
+ */
+function buildBanner(): string | undefined {
+  if (!process.stdout.isTTY) return undefined
+  const color = !process.env.NO_COLOR
+  let image: string | null = null
+  if (detectImageSupport(process.env)) {
+    try {
+      const bytes = readFileSync(new URL('../assets/logo.png', import.meta.url))
+      image = itermImage(bytes.toString('base64'), { width: 14 })
+    } catch {
+      image = null // asset missing → wordmark only
+    }
+  }
+  return renderBanner({ color, image, version: VERSION })
+}
+
 async function main(): Promise<void> {
   const cwd = process.cwd()
   const write = (line: OutputLine): void => {
@@ -140,6 +161,7 @@ async function main(): Promise<void> {
     stream.write(`${line.text}\n`)
   }
   const backend = aiBackendFromEnv()
+  const banner = buildBanner()
   const ctx: CliContext = {
     fs: nodeFileSystem(),
     env: probeEnv(cwd),
@@ -147,6 +169,7 @@ async function main(): Promise<void> {
     version: VERSION,
     write,
     ...(backend ? { aiBackend: backend } : {}),
+    ...(banner ? { banner } : {}),
   }
   // `dev` is a long-running transport (not a one-shot command), so it's wired here in the I/O entry
   // rather than the synchronous CLI dispatch. Everything else goes through the tested core.

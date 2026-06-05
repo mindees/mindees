@@ -33,6 +33,8 @@ export interface CliContext {
   write: Writer
   /** AI backend for `ai` commands (wired from `MINDEES_AI_*` env in `bin`). */
   aiBackend?: AiBackend
+  /** Pre-rendered welcome banner (the MindeesNative logo). Shown on `help` + `create` success; injected by `bin` for TTYs. */
+  banner?: string
 }
 
 const HELP = `mindees — the MindeesNative CLI (Forge)
@@ -61,6 +63,10 @@ Options:
 function out(write: Writer, text: string): void {
   write({ stream: 'out', text })
 }
+/** Print the welcome banner (the logo), if one was injected (TTY sessions). */
+function printBanner(ctx: CliContext): void {
+  if (ctx.banner) out(ctx.write, ctx.banner)
+}
 function err(write: Writer, text: string): void {
   write({ stream: 'err', text })
 }
@@ -73,6 +79,7 @@ export function runCli(argv: readonly string[], ctx: CliContext): CommandResult 
   const [command, ...rest] = argv
 
   if (!command || command === 'help' || command === '--help' || command === '-h') {
+    printBanner(ctx)
     out(ctx.write, HELP)
     return { exitCode: 0 }
   }
@@ -178,6 +185,7 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
     return { exitCode: 1 }
   }
 
+  printBanner(ctx)
   out(
     ctx.write,
     `Created "${target.packageName}" from the ${result.template} template (${result.written.length} files).`,
