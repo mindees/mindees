@@ -15,7 +15,7 @@ import { createFlattenTransformer } from './flatten'
 import { hasErrors, typecheck } from './typecheck'
 import type { CompileOptions, CompileResult, CompileStats } from './types'
 
-/** Compiler options for emit (JSX classic → createElement/Fragment). */
+/** Compiler options for emit (JSX → `createElement`/`Fragment`, which the optimizer matches). */
 function emitOptions(sourceMap: boolean): ts.CompilerOptions {
   return {
     jsx: ts.JsxEmit.React,
@@ -24,6 +24,63 @@ function emitOptions(sourceMap: boolean): ts.CompilerOptions {
     target: ts.ScriptTarget.ES2023,
     module: ts.ModuleKind.ESNext,
     sourceMap,
+  }
+}
+
+/** Runtime names the JSX desugar references; injected from `@mindees/core` if unbound. */
+const RUNTIME_NAMES = ['createElement', 'Fragment'] as const
+
+/**
+ * Ensure the JSX runtime is in scope. Idiomatic components use **automatic JSX** and import
+ * nothing, but we emit classic `createElement(...)`/`Fragment` (so the tree-flatten optimizer
+ * can match them) — which would be unbound at runtime. This transformer prepends
+ * `import { createElement, Fragment } from '@mindees/core'` for any runtime name that is
+ * referenced but not already imported, so emitted modules run. Runs LAST (after flatten/plugins),
+ * so names the optimizer removed don't get a needless import.
+ */
+function createRuntimeImportTransformer(tsmod: typeof ts): ts.TransformerFactory<ts.SourceFile> {
+  return (context) => (sourceFile) => {
+    const imported = new Set<string>()
+    for (const stmt of sourceFile.statements) {
+      if (
+        tsmod.isImportDeclaration(stmt) &&
+        tsmod.isStringLiteral(stmt.moduleSpecifier) &&
+        stmt.moduleSpecifier.text === '@mindees/core'
+      ) {
+        const named = stmt.importClause?.namedBindings
+        if (named && tsmod.isNamedImports(named)) {
+          for (const el of named.elements) imported.add((el.propertyName ?? el.name).text)
+        }
+      }
+    }
+    const referenced = new Set<string>()
+    const visit = (node: ts.Node): void => {
+      if (tsmod.isIdentifier(node) && (RUNTIME_NAMES as readonly string[]).includes(node.text)) {
+        referenced.add(node.text)
+      }
+      tsmod.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+    const missing = RUNTIME_NAMES.filter((n) => referenced.has(n) && !imported.has(n))
+    if (missing.length === 0) return sourceFile
+    const importDecl = tsmod.factory.createImportDeclaration(
+      undefined,
+      tsmod.factory.createImportClause(
+        false,
+        undefined,
+        tsmod.factory.createNamedImports(
+          missing.map((n) =>
+            tsmod.factory.createImportSpecifier(
+              false,
+              undefined,
+              tsmod.factory.createIdentifier(n),
+            ),
+          ),
+        ),
+      ),
+      tsmod.factory.createStringLiteral('@mindees/core'),
+    )
+    return context.factory.updateSourceFile(sourceFile, [importDecl, ...sourceFile.statements])
   }
 }
 
@@ -54,6 +111,9 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
   for (const plugin of plugins) {
     after.push(plugin.transformer(ts) as ts.TransformerFactory<ts.SourceFile>)
   }
+
+  // LAST: bind the JSX runtime (automatic-JSX components import nothing) so output runs.
+  after.push(createRuntimeImportTransformer(ts))
 
   const output = ts.transpileModule(source, {
     compilerOptions: emitOptions(sourceMap),
