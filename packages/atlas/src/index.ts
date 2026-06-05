@@ -64,6 +64,7 @@ export {
   useWindowDimensions,
   type WindowDimensions,
 } from './environment'
+export { type AttachableGesture, GestureView, type GestureViewProps } from './gesture'
 export { type BaseProps, type Reactive, resolveStyle, toHostProps } from './host'
 export { animateTo, motion } from './motion'
 export {
