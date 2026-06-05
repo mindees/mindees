@@ -1,7 +1,35 @@
-import { createElement as h, signal } from '@mindees/core'
-import { describe, expect, it, vi } from 'vitest'
-import { createNativeApp } from './native-app'
+import {
+  _resetAnimation,
+  animate,
+  deferred,
+  createElement as h,
+  linear,
+  setReactiveScheduler,
+  signal,
+  timing,
+} from '@mindees/core'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { _resetNativeAppEngines, createNativeApp } from './native-app'
 import type { NativeCommand } from './native-protocol'
+
+/** A spy `MindeesHostFrame` so the frame source installs + we can assert the battery signal. */
+function installFrameSpy(): { setFrameLoopActive: ReturnType<typeof vi.fn> } {
+  const spy = { setFrameLoopActive: vi.fn() }
+  ;(globalThis as Record<string, unknown>).MindeesHostFrame = spy
+  return spy
+}
+
+afterEach(() => {
+  // The reactive scheduler + animation frame source are process singletons; reset between tests that
+  // wire the engines so they don't leak across cases.
+  _resetAnimation()
+  setReactiveScheduler(null)
+  _resetNativeAppEngines()
+  const g = globalThis as Record<string, unknown>
+  delete g.MindeesApp
+  delete g.MindeesHost
+  delete g.MindeesHostFrame
+})
 
 /** A tiny counter component: a button whose press increments a reactive label. */
 function makeCounter() {
@@ -90,5 +118,141 @@ describe('createNativeApp', () => {
     app.start()
     expect(emit).toHaveBeenCalledTimes(1)
     delete g.MindeesHost
+  })
+})
+
+describe('createNativeApp — on-device engines (P2: smooth by default)', () => {
+  /** A view whose `data-x` prop tracks an animated value (so each frame emits a setProp). */
+  function makeAnimatedApp() {
+    const App = () => {
+      const x = animate(0)
+      timing(x, { to: 100, duration: 100, easing: linear })
+      return h('view', { 'data-x': () => Math.round(x()) })
+    }
+    return App
+  }
+  const dataX = (cmds: NativeCommand[]): number[] =>
+    cmds
+      .filter(
+        (c): c is Extract<NativeCommand, { type: 'setProp' }> =>
+          c.type === 'setProp' && c.name === 'data-x',
+      )
+      .map((c) => c.value as number)
+
+  it('frameTick advances an animation frame-by-frame and flushes each frame', () => {
+    installFrameSpy() // a driver must be present for the frame source to arm
+    const emitted: string[] = []
+    const app = createNativeApp(h(makeAnimatedApp(), null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+      wireEngines: true,
+    })
+    app.start()
+    emitted.length = 0
+    app.frameTick(0) // baseline frame (dt=0, no movement)
+    app.frameTick(50) // halfway
+    const mid = dataX(commandsFrom(emitted))
+    app.frameTick(100) // settle
+    const all = dataX(commandsFrom(emitted))
+    expect(mid.some((v) => v > 0 && v < 100)).toBe(true) // a real intermediate (not a jump)
+    expect(all.some((v) => v === 100)).toBe(true) // reached the target
+  })
+
+  it('arms the frame loop only while animating (battery): setFrameLoopActive true on start, false on settle', () => {
+    const spy = installFrameSpy()
+    const app = createNativeApp(h(makeAnimatedApp(), null), {
+      emit: () => {},
+      expose: false,
+      wireEngines: true,
+    })
+    app.start() // mounts → timing() arms the loop
+    expect(spy.setFrameLoopActive).toHaveBeenCalledWith(true)
+    expect(spy.setFrameLoopActive).toHaveBeenCalledTimes(1)
+    for (let t = 0; t <= 200; t += 16) app.frameTick(t) // run to settle
+    expect(spy.setFrameLoopActive).toHaveBeenLastCalledWith(false)
+    expect(spy.setFrameLoopActive).toHaveBeenCalledTimes(2) // exactly one START + one STOP
+  })
+
+  it('does NOT arm a frame loop when no driver (MindeesHostFrame) is present — jumps to final instead of freezing', () => {
+    // wireEngines forced true, but no MindeesHostFrame → no frame source → jump-to-final (safe).
+    const emitted: string[] = []
+    const app = createNativeApp(h(makeAnimatedApp(), null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+      wireEngines: true,
+    })
+    app.start()
+    expect(dataX(commandsFrom(emitted)).some((v) => v === 100)).toBe(true) // final, not frozen at 0
+    app.frameTick(16) // no-op
+  })
+
+  it('a late frameTick after the loop stops is a harmless no-op', () => {
+    installFrameSpy()
+    const emitted: string[] = []
+    const app = createNativeApp(h(makeAnimatedApp(), null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+      wireEngines: true,
+    })
+    app.start()
+    for (let t = 0; t <= 200; t += 16) app.frameTick(t) // settle (loop stops)
+    emitted.length = 0
+    expect(() => app.frameTick(9_999)).not.toThrow()
+    expect(emitted).toHaveLength(0)
+  })
+
+  it('throws loudly if a second app tries to re-wire the process-global engines', () => {
+    installFrameSpy()
+    createNativeApp(h(makeAnimatedApp(), null), {
+      emit: () => {},
+      expose: false,
+      wireEngines: true,
+    })
+    expect(() =>
+      createNativeApp(h(makeAnimatedApp(), null), {
+        emit: () => {},
+        expose: false,
+        wireEngines: true,
+      }),
+    ).toThrow(/already wired/)
+  })
+
+  it('with no host installs no frame source — the animation jumps to its final value', () => {
+    const emitted: string[] = []
+    // expose:false + no MindeesHost → wireEngines defaults false → no frame source.
+    const app = createNativeApp(h(makeAnimatedApp(), null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+    })
+    app.start()
+    expect(dataX(commandsFrom(emitted)).some((v) => v === 100)).toBe(true) // final, synchronously
+    emitted.length = 0
+    app.frameTick(16) // no frame source → no-op
+    expect(emitted).toHaveLength(0)
+  })
+
+  it('emits a deferred/normal-lane update via the coalesced trailing flush', async () => {
+    const emitted: string[] = []
+    let bump!: (n: number) => void
+    const App = () => {
+      const src = signal(0)
+      bump = (n) => src.set(n)
+      const d = deferred(() => src())
+      return h('view', { 'data-d': () => d() })
+    }
+    const app = createNativeApp(h(App, null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+      wireEngines: true,
+    })
+    app.start()
+    emitted.length = 0
+    bump(7) // schedules the deferred (normal-lane) effect on a microtask — not emitted synchronously
+    expect(emitted).toHaveLength(0)
+    for (let i = 0; i < 6; i++) await Promise.resolve() // drain microtasks
+    const cmds = commandsFrom(emitted)
+    expect(cmds.some((c) => c.type === 'setProp' && c.name === 'data-d' && c.value === 7)).toBe(
+      true,
+    ) // reached the host, one tick late (not dropped)
   })
 })
