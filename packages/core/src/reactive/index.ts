@@ -12,6 +12,7 @@ export {
   batch,
   computed,
   createRoot,
+  deferred,
   effect,
   getOwner,
   memo,
@@ -19,5 +20,6 @@ export {
   runWithOwner,
   setReactiveScheduler,
   signal,
+  startTransition,
   untrack,
 } from './reactive'

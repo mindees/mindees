@@ -42,6 +42,7 @@ export {
   type ComputedOptions,
   computed,
   createRoot,
+  deferred,
   type EffectOptions,
   type EqualsFn,
   effect,
@@ -55,6 +56,7 @@ export {
   type SignalOptions,
   setReactiveScheduler,
   signal,
+  startTransition,
   untrack,
 } from './reactive'
 /**
