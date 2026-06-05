@@ -1,5 +1,11 @@
 import { createElement, isElement, type MindeesElement, signal } from '@mindees/core'
-import { renderToString } from '@mindees/renderer'
+import {
+  createHeadlessBackend,
+  createHeadlessRoot,
+  type HeadlessNode,
+  render,
+  renderToString,
+} from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ActivityIndicator,
@@ -138,5 +144,48 @@ describe('ActivityIndicator', () => {
   it('defaults the color to the theme primary', () => {
     setEnvironment({ colorScheme: 'light' })
     expect(styleOf(el(ActivityIndicator({}))).color).toBe('#2563eb') // blue-600 (light primary)
+  })
+})
+
+describe('a11y reactivity', () => {
+  const mount = (node: unknown) => {
+    const backend = createHeadlessBackend()
+    const root = createHeadlessRoot()
+    render(node as MindeesElement, backend, root)
+    return root
+  }
+  const findByRole = (n: HeadlessNode, role: string): HeadlessNode | undefined => {
+    if ((n.props as Record<string, unknown> | undefined)?.role === role) return n
+    for (const c of n.children) {
+      const f = findByRole(c, role)
+      if (f) return f
+    }
+    return undefined
+  }
+
+  it('Switch aria-checked tracks the value reactively', () => {
+    const value = signal(false)
+    const host = findByRole(mount(Switch({ value, onValueChange: (v) => value.set(v) })), 'switch')
+    expect(host?.props['aria-checked']).toBe('false')
+    value.set(true)
+    expect(host?.props['aria-checked']).toBe('true')
+  })
+
+  it('ProgressBar exposes a reactive aria-valuenow within min/max', () => {
+    const value = signal(0.25)
+    const host = findByRole(mount(ProgressBar({ value })), 'progressbar')
+    expect(host?.props['aria-valuemin']).toBe('0')
+    expect(host?.props['aria-valuemax']).toBe('1')
+    expect(host?.props['aria-valuenow']).toBe('0.25')
+    value.set(0.9)
+    expect(host?.props['aria-valuenow']).toBe('0.9')
+  })
+
+  it('Chip aria-pressed tracks selection reactively', () => {
+    const selected = signal(false)
+    const host = findByRole(mount(Chip({ label: 'F', selected })), 'button')
+    expect(host?.props['aria-pressed']).toBe('false')
+    selected.set(true)
+    expect(host?.props['aria-pressed']).toBe('true')
   })
 })
