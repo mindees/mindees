@@ -10,7 +10,7 @@ import {
   setFrameSource,
   spring,
   timing,
-} from './animation'
+} from './index'
 
 afterEach(() => _resetAnimation())
 
