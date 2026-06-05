@@ -8,7 +8,10 @@ import {
 import { createMemoryOpLog, createSyncServer } from './server'
 import { createSyncEngine, type SyncSnapshot } from './sync'
 
-const tick = () => new Promise((r) => setTimeout(r, 0))
+// Flush the serialized save chain (a couple of microtasks deep) without any host globals.
+const tick = async (): Promise<void> => {
+  for (let i = 0; i < 5; i++) await Promise.resolve()
+}
 
 interface Note {
   text: string
