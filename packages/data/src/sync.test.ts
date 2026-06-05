@@ -274,3 +274,72 @@ describe('sync — per-field LWW', () => {
     expect(b.get('u2')).toEqual({ name: 'B' }) // pre-fix: dropped by the early-return coalesce
   })
 })
+
+describe('sync — convergence + migration hardening', () => {
+  const hlc2 = (wallMs: number, nodeId = 'a') => ({ wallMs, counter: 0, nodeId })
+  const setOp = (
+    seq: number,
+    w: number,
+    recordId: string,
+    value: object,
+  ): Op<Record<string, unknown>> => ({
+    id: `a:${seq}`,
+    actor: 'a',
+    seq,
+    collection: 'u',
+    recordId,
+    hlc: hlc2(w),
+    kind: 'set',
+    value,
+  })
+
+  it('dump() is byte-identical across op orderings (canonical)', () => {
+    const a = createMutationLog<Record<string, unknown>>()
+    a.apply(setOp(1, 1, 'r1', { name: 'x' }))
+    a.apply(setOp(2, 2, 'r1', { age: 1 }))
+    a.apply(setOp(3, 1, 'r2', { name: 'y' }))
+    const b = createMutationLog<Record<string, unknown>>()
+    b.apply(setOp(3, 1, 'r2', { name: 'y' })) // r2 first
+    b.apply(setOp(2, 2, 'r1', { age: 1 })) // r1 fields reversed
+    b.apply(setOp(1, 1, 'r1', { name: 'x' }))
+    expect(JSON.stringify(a.dump())).toBe(JSON.stringify(b.dump()))
+  })
+
+  it('preserves a legacy array / primitive record through migration', () => {
+    const legacy = [
+      ['r1', { stamp: hlc2(5), op: 'set', value: [1, 2, 3] }],
+      ['r2', { stamp: hlc2(5), op: 'set', value: 'hello' }],
+    ]
+    const log = createMutationLog<unknown>(legacy as never)
+    expect(log.get('r1')).toEqual([1, 2, 3])
+    expect(log.get('r2')).toBe('hello')
+  })
+
+  it('treats a field named __proto__ as data (no prototype pollution)', () => {
+    const log = createMutationLog<Record<string, unknown>>()
+    log.apply(setOp(1, 1, 'r1', { ['__proto__']: { polluted: true } }))
+    const v = log.get('r1') as Record<string, unknown>
+    expect(Object.hasOwn(v, '__proto__')).toBe(true)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined() // global prototype untouched
+  })
+
+  it('clears acked ops from the outbox even when aborted right after push', async () => {
+    const hub = createMemoryHub<User>()
+    const signal = { aborted: false }
+    const a = createSyncEngine<User>({
+      nodeId: 'a',
+      transport: {
+        push: async (ops) => {
+          const r = await hub.push(ops)
+          signal.aborted = true // abort lands between push-resolve and the outbox splice
+          return r
+        },
+        pull: (c) => hub.pull(c),
+      },
+      now: () => 1,
+    })
+    a.set('users', 'u1', { name: 'A' })
+    await a.sync(signal)
+    expect(a.pending()).toHaveLength(0)
+  })
+})
