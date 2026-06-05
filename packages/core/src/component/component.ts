@@ -34,6 +34,11 @@ export type Component<P = Record<string, unknown>> = (props: P) => MindeesNode
  */
 export type MindeesNode =
   | MindeesElement
+  // A node may hold a keyed region of ANY item type. KeyedRegion is invariant in T (its
+  // mapFn/key take T), so `KeyedRegion<unknown>` would reject `KeyedRegion<Row>`; `any` is
+  // the correct "some item type" here.
+  // biome-ignore lint/suspicious/noExplicitAny: see above — invariant T at a node boundary.
+  | KeyedRegion<any>
   | string
   | number
   | boolean
@@ -59,6 +64,61 @@ export const ELEMENT_TYPE: unique symbol = Symbol.for('mindees.element')
 
 /** Marker tag for a fragment (children with no wrapper host node). */
 export const Fragment: unique symbol = Symbol.for('mindees.fragment')
+
+/** Brand identifying a keyed list region (reconciled by key, not full-rebuilt). */
+export const KEYED_REGION: unique symbol = Symbol.for('mindees.keyed-region')
+
+/**
+ * A keyed list region: a reactive item list + a per-item render function, reconciled by key
+ * so rows keep their identity (host node, focus, caret, scroll) across reorders instead of
+ * being torn down and rebuilt. This is a serializable *description* (no rendering logic); the
+ * renderer materializes it (`bindKeyedChild`). Build one with {@link keyedRegion}.
+ */
+export interface KeyedRegion<T = unknown> {
+  readonly $$keyed: typeof KEYED_REGION
+  /** The items, as a reactive accessor. */
+  readonly each: () => readonly T[]
+  /** Render one row from reactive `item`/`index` accessors (consume them lazily to patch in place). */
+  readonly mapFn: (item: () => T, index: () => number) => MindeesNode
+  /** Stable key per item (when omitted, the row is keyed by item identity). */
+  readonly key: ((item: T, index: number) => unknown) | undefined
+  /** Rendered when the list is empty. */
+  readonly fallback: (() => MindeesNode) | undefined
+}
+
+/** Options for {@link keyedRegion}. */
+export interface KeyedRegionOptions<T> {
+  /** The items, static or reactive. */
+  readonly each: readonly T[] | (() => readonly T[])
+  /** Render one row from reactive `item`/`index` accessors. */
+  readonly children: (item: () => T, index: () => number) => MindeesNode
+  /** Stable key per item (defaults to item identity). */
+  readonly key?: (item: T, index: number) => unknown
+  /** Rendered when the list is empty. */
+  readonly fallback?: () => MindeesNode
+}
+
+/** Build a {@link KeyedRegion} — a keyed, identity-preserving list node. */
+export function keyedRegion<T>(options: KeyedRegionOptions<T>): KeyedRegion<T> {
+  const each: () => readonly T[] =
+    typeof options.each === 'function' ? options.each : () => options.each as readonly T[]
+  return {
+    $$keyed: KEYED_REGION,
+    each,
+    mapFn: options.children,
+    key: options.key,
+    fallback: options.fallback,
+  }
+}
+
+/** Type guard: is `value` a {@link KeyedRegion}? */
+export function isKeyedRegion(value: unknown): value is KeyedRegion {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { $$keyed?: unknown }).$$keyed === KEYED_REGION
+  )
+}
 
 interface PropsWithKey {
   key?: string | number | null

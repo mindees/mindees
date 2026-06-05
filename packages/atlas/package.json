@@ -20,6 +20,10 @@
     "./list": {
       "types": "./dist/list.d.ts",
       "import": "./dist/list.js"
+    },
+    "./for": {
+      "types": "./dist/for.d.ts",
+      "import": "./dist/for.js"
     }
   },
   "publishConfig": {

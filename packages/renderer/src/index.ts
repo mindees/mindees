@@ -16,6 +16,8 @@ export {
   type DomText,
   domTagFor,
 } from './dom'
+/** Keyed list reconciliation (the renderer side of core's KeyedRegion). */
+export { bindKeyedChild } from './for'
 /** Headless (in-memory) backend — the reference/test target. */
 export {
   createHeadlessBackend,
@@ -75,7 +77,7 @@ export {
   type UpdateTextCommand,
 } from './native-protocol'
 /** The fine-grained reactive reconciler. */
-export { type Mounted, render } from './render'
+export { type Mounted, mountNode, render } from './render'
 /** Server-side rendering + hydration (web). */
 export { hydrate, renderToString } from './ssr'
 
