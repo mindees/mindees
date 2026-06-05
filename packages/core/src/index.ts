@@ -42,6 +42,7 @@ export {
   type ComputedOptions,
   computed,
   createRoot,
+  type EffectOptions,
   type EqualsFn,
   effect,
   getOwner,
@@ -52,6 +53,7 @@ export {
   runWithOwner,
   type Signal,
   type SignalOptions,
+  setReactiveScheduler,
   signal,
   untrack,
 } from './reactive'

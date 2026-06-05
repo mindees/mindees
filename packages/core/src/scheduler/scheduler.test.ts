@@ -183,3 +183,18 @@ describe('scheduler', () => {
     }).toThrow('logger failed')
   })
 })
+
+describe('flushSync — runaway loop guard', () => {
+  it('aborts a task that perpetually re-schedules instead of hanging', () => {
+    const errors: unknown[] = []
+    const sched = createScheduler({ scheduleMicrotask: () => {}, onError: (e) => errors.push(e) })
+    const loop = (): void => {
+      sched.schedule(loop) // re-schedules itself forever
+    }
+    sched.schedule(loop)
+    sched.flushSync() // must terminate (cap), not hang
+    expect(errors).toHaveLength(1)
+    expect(String(errors[0])).toMatch(/infinite scheduler loop/i)
+    expect(sched.size).toBe(0) // both lanes cleared
+  })
+})

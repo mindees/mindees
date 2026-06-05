@@ -18,6 +18,8 @@
  * @module
  */
 
+import type { Priority, ScheduledTask, Scheduler } from '../scheduler'
+
 // ---------------------------------------------------------------------------
 // Ownership
 // ---------------------------------------------------------------------------
@@ -102,6 +104,24 @@ let flushing = false
 /** Safety valve against accidental infinite reactive loops. */
 const MAX_FLUSH_ITERATIONS = 100_000
 
+/**
+ * The scheduler that `'normal'`-lane effects defer through. `null` by default — and while it is null
+ * EVERY effect (including `priority: 'normal'`) flushes synchronously, so the sync default is
+ * unchanged for all of SSR + tests until a host opts in. Set once at app bootstrap.
+ */
+let reactiveScheduler: Scheduler | null = null
+/** Monotonic counter for default `'normal'`-lane dedup keys. */
+let effectKeySeq = 0
+
+/**
+ * Inject (or clear) the {@link Scheduler} that `effect(fn, { priority: 'normal' })` defers through.
+ * With no scheduler (the default), `'normal'`-lane effects flush synchronously — so behavior is
+ * identical to today until a host wires one in. Pass `null` to detach.
+ */
+export function setReactiveScheduler(scheduler: Scheduler | null): void {
+  reactiveScheduler = scheduler
+}
+
 /** @internal Test-only handle to a node behind an accessor. Not public API. */
 export const NODE: unique symbol = Symbol('mindees.reactive.node')
 
@@ -123,6 +143,17 @@ class Computation<T> implements OwnerNode {
   cleanups: Array<() => void> | null = null
   equals: EqualsFn<T> | false
   readonly isEffect: boolean
+  /**
+   * Flush lane. `'sync'` (the default for every signal/computed and every plain `effect`) flushes
+   * inline exactly as before. Only `effect(fn, { priority: 'normal' })` sets `'normal'`, and even
+   * then it only defers when a scheduler is injected via {@link setReactiveScheduler} — otherwise it
+   * falls back to synchronous flush. This keeps the synchronous default provably untouched.
+   */
+  lane: Priority = 'sync'
+  /** A pending scheduled flush for a `'normal'`-lane effect (cancelled on disposal). */
+  pendingTask: ScheduledTask | null = null
+  /** Scheduler dedup key for a `'normal'`-lane effect (so rapid re-stales coalesce). */
+  schedKey: string | undefined
   /**
    * Whether {@link value} holds a real computed result yet. Derivations start
    * uninitialized (their initial `value` is a placeholder); the first
@@ -373,6 +404,12 @@ function disposeComputation(node: AnyComputation): void {
     unlinkSources(node)
     node.observers = null
     node.state = DISPOSED
+    // Cancel a pending deferred flush so a torn-down effect never runs against a dead graph.
+    // (Always null on the synchronous default path — zero behavior change there.)
+    if (node.pendingTask) {
+      node.pendingTask.cancel()
+      node.pendingTask = null
+    }
   }
 }
 
@@ -406,10 +443,29 @@ function flushEffects(): void {
       const e = effectQueue[i]
       i++
       if (e && e.state !== CLEAN && e.state !== DISPOSED) {
-        try {
-          e.updateIfNecessary()
-        } catch (err) {
-          errors.push(err)
+        if (e.lane === 'normal' && reactiveScheduler) {
+          // Deferred lane: hand the flush to the scheduler under a stable key, so rapid re-stales
+          // coalesce (latest wins) and the body runs later — reading the LATEST values at run time
+          // (updateIfNecessary recomputes sources in order), so glitch-freedom is preserved.
+          const node = e
+          const sched = reactiveScheduler
+          node.pendingTask = sched.schedule(
+            () => {
+              node.pendingTask = null
+              if (node.state !== CLEAN && node.state !== DISPOSED) node.updateIfNecessary()
+            },
+            node.schedKey !== undefined
+              ? { priority: 'normal', key: node.schedKey }
+              : { priority: 'normal' },
+          )
+        } else {
+          // Synchronous lane — byte-identical to the pre-scheduler behavior (and the path every
+          // existing test + SSR takes, since `lane` is 'sync' and/or no scheduler is injected).
+          try {
+            e.updateIfNecessary()
+          } catch (err) {
+            errors.push(err)
+          }
         }
       }
     }
@@ -526,7 +582,17 @@ export const memo = computed
  *   return () => clearInterval(id) // cleanup
  * })
  */
-export function effect(fn: () => void): () => void {
+/** Options for {@link effect}. */
+export interface EffectOptions {
+  /**
+   * `'sync'` (default) flushes the effect inline on every change — the synchronous, glitch-free
+   * behavior. `'normal'` defers the effect through the injected {@link setReactiveScheduler scheduler}
+   * (interaction priority / deferred heavy work); with no scheduler it falls back to synchronous.
+   */
+  priority?: Priority
+}
+
+export function effect(fn: () => void, options?: EffectOptions): () => void {
   const node = new Computation<void>(
     undefined,
     () => {
@@ -536,8 +602,16 @@ export function effect(fn: () => void): () => void {
     false,
     true,
   )
+  // Opt into the deferred lane. `effect(fn)` and `effect(fn, { priority: 'sync' })` are identical to
+  // before (synchronous flush). `'normal'` only defers once a scheduler is injected.
+  if (options?.priority === 'normal') {
+    node.lane = 'normal'
+    // ALWAYS a unique per-node key: this coalesces THIS effect's own rapid re-stales (latest wins)
+    // without ever sharing a scheduler entry with another effect (which would cross-cancel them).
+    node.schedKey = `mindees:effect:${effectKeySeq++}`
+  }
   adopt(node)
-  node.updateIfNecessary()
+  node.updateIfNecessary() // first run is ALWAYS synchronous (establishes deps + initial paint)
   return () => disposeComputation(node)
 }
 
