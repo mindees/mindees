@@ -97,3 +97,20 @@ describe('effect priority + scheduler wiring', () => {
     expect(onError).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('deferred effects are independent (no shared-key cross-cancel)', () => {
+  afterEach(() => setReactiveScheduler(null))
+  it('two distinct normal effects both run after a drain', () => {
+    const sched = manualScheduler()
+    setReactiveScheduler(sched)
+    const s = signal(0)
+    const a: number[] = []
+    const b: number[] = []
+    effect(() => a.push(s()), { priority: 'normal' })
+    effect(() => b.push(s()), { priority: 'normal' })
+    s.set(1)
+    sched.flushSync()
+    expect(a).toEqual([0, 1])
+    expect(b).toEqual([0, 1]) // BOTH ran — unique per-node keys, no cross-cancel
+  })
+})

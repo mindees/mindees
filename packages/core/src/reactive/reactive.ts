@@ -590,8 +590,6 @@ export interface EffectOptions {
    * (interaction priority / deferred heavy work); with no scheduler it falls back to synchronous.
    */
   priority?: Priority
-  /** Scheduler dedup key (defaults to a unique per-effect key); same key coalesces rapid re-stales. */
-  key?: string
 }
 
 export function effect(fn: () => void, options?: EffectOptions): () => void {
@@ -608,7 +606,9 @@ export function effect(fn: () => void, options?: EffectOptions): () => void {
   // before (synchronous flush). `'normal'` only defers once a scheduler is injected.
   if (options?.priority === 'normal') {
     node.lane = 'normal'
-    node.schedKey = options.key ?? `mindees:effect:${effectKeySeq++}`
+    // ALWAYS a unique per-node key: this coalesces THIS effect's own rapid re-stales (latest wins)
+    // without ever sharing a scheduler entry with another effect (which would cross-cancel them).
+    node.schedKey = `mindees:effect:${effectKeySeq++}`
   }
   adopt(node)
   node.updateIfNecessary() // first run is ALWAYS synchronous (establishes deps + initial paint)

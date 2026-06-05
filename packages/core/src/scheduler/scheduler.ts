@@ -33,6 +33,10 @@ export interface ScheduleOptions {
   key?: string
 }
 
+/** Safety valve: a single {@link Scheduler.flushSync} that drains more than this many tasks is
+ *  treated as a runaway re-scheduling loop and aborted (mirrors the reactive flush guard). */
+const MAX_DRAIN_ITERATIONS = 100_000
+
 /** A handle to a scheduled task. */
 export interface ScheduledTask {
   /** Remove the task if it hasn't run yet. Idempotent. */
@@ -111,7 +115,22 @@ export class Scheduler {
     try {
       // Drain in priority order. Re-check each loop so tasks scheduled by tasks
       // (e.g. a sync task that queues normal work) are handled in this flush.
+      let iterations = 0
       while (this.sync.length > 0 || this.normal.length > 0) {
+        // Safety valve: a task that perpetually re-schedules (e.g. two deferred reactive effects
+        // writing each other's deps) would drain forever. Cap it, clear both lanes, and surface
+        // an error — mirroring the reactive loop guard so a deferred cycle fails loudly, not hangs.
+        if (++iterations > MAX_DRAIN_ITERATIONS) {
+          this.sync.length = 0
+          this.normal.length = 0
+          this.keyed.clear()
+          this.run(() => {
+            throw new Error(
+              'MindeesNative: potential infinite scheduler loop — a task kept re-scheduling itself.',
+            )
+          })
+          return
+        }
         const entry = this.sync.length > 0 ? this.sync.shift() : this.normal.shift()
         if (!entry) continue
         this.clearKey(entry)
