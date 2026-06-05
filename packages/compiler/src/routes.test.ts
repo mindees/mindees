@@ -28,6 +28,13 @@ describe('generateRouteModule', () => {
   it('emits an empty map for no route files', () => {
     expect(generateRouteModule([])).toContain('export const routes = {\n\n}')
   })
+
+  it('normalizes Windows backslash paths in import specifiers and map keys', () => {
+    const src = generateRouteModule(['blog\\[slug].tsx'], { importBase: './app' })
+    expect(src).toContain("import * as _route0 from './app/blog/[slug]'") // POSIX specifier
+    expect(src).toContain('"blog/[slug].tsx": _route0,') // POSIX map key
+    expect(src).not.toContain('\\') // no backslashes leak into generated code
+  })
 })
 
 describe('fileToRoute', () => {
@@ -38,6 +45,15 @@ describe('fileToRoute', () => {
       params: [],
       catchAll: false,
     })
+  })
+
+  it('normalizes Windows backslash separators (path.join output)', () => {
+    expect(fileToRoute('blog\\[slug].tsx')).toEqual({
+      routePath: '/blog/:slug',
+      params: ['slug'],
+      catchAll: false,
+    })
+    expect(fileToRoute('settings\\profile.tsx').routePath).toBe('/settings/profile')
   })
 
   it('rejects a catch-all that is not the last segment', () => {
@@ -132,5 +148,12 @@ describe('buildRouteManifest', () => {
       params: ['slug'],
       catchAll: false,
     })
+  })
+
+  it('normalizes Windows backslash paths to POSIX in routePath and the import specifier', () => {
+    const m = buildRouteManifest(['blog\\[slug].tsx', 'settings\\profile.tsx'])
+    const byPath = Object.fromEntries(m.routes.map((r) => [r.routePath, r]))
+    expect(byPath['/blog/:slug']?.file).toBe('blog/[slug].tsx') // POSIX import() specifier
+    expect(byPath['/settings/profile']?.file).toBe('settings/profile.tsx')
   })
 })

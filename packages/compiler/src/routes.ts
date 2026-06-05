@@ -55,7 +55,9 @@ export function fileToRoute(file: string): {
   const params: string[] = []
   let catchAll = false
 
-  const segments = stripExt(file)
+  // Normalize Windows separators: a backslash path (what `path.join` yields on Windows) would
+  // otherwise never split into segments, collapsing the whole route to one literal segment.
+  const segments = stripExt(file.replace(/\\/g, '/'))
     .split('/')
     .filter((s) => s.length > 0)
     // Drop layout groups like `(marketing)`.
@@ -123,7 +125,10 @@ export function buildRouteManifest(files: readonly string[]): RouteManifest {
   // collision here would silently make two routes share one split bundle.
   const byChunk = new Map<string, string>()
 
-  for (const file of [...files].sort()) {
+  // Normalize separators up front so the manifest's `file` (an `import()` specifier — backslashes
+  // are invalid there), chunk names, and route paths are all POSIX, regardless of the host OS.
+  const normalized = files.map((f) => f.replace(/\\/g, '/'))
+  for (const file of [...normalized].sort()) {
     if (!ROUTE_FILE.test(file)) continue
     const baseName = stripExt(file).split('/').pop() ?? ''
     if (baseName === '+not-found') {
@@ -190,7 +195,12 @@ export function generateRouteModule(
 ): string {
   const importBase = (options.importBase ?? './app').replace(/\/+$/, '')
   const exportName = options.exportName ?? 'routes'
-  const routeFiles = [...files].filter((f) => ROUTE_FILE.test(f)).sort()
+  // Normalize separators: backslashes are invalid in import specifiers, and the map keys must be
+  // the POSIX paths `routesFromModules` matches against.
+  const routeFiles = [...files]
+    .map((f) => f.replace(/\\/g, '/'))
+    .filter((f) => ROUTE_FILE.test(f))
+    .sort()
   const imports = routeFiles.map(
     (file, i) => `import * as _route${i} from '${importBase}/${stripExt(file)}'`,
   )
