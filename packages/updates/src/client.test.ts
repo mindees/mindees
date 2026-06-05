@@ -557,3 +557,42 @@ describe('update client — differential download (delta patch)', () => {
     expect(counts.full).toBe(1) // then fell back to a full fetch
   })
 })
+
+describe('update client — download re-reads fresh state (no stale clobber)', () => {
+  it('merges into state written concurrently during the asset transfer', async () => {
+    const fx = fixture({ id: 'u2', version: 2 })
+    const storage = createMemoryStorage()
+    let injected = false
+    const c = client(
+      fx,
+      {
+        // Simulate a concurrent apply()/boot() writing state DURING download's transfer.
+        fetchAsset: async (asset) => {
+          if (!injected) {
+            injected = true
+            await storage.writeState({
+              current: null,
+              previous: null,
+              highestVersion: 0,
+              pendingVerification: false,
+              bootAttempts: 0,
+              generations: {
+                concurrent: { id: 'concurrent', version: 1, manifest: '{}', status: 'pending' },
+              },
+            })
+          }
+          return fx.blobs.get(asset.path) ?? new Uint8Array()
+        },
+      },
+      storage,
+    )
+    const check = await c.check()
+    if (!check.available) throw new Error('expected an available update')
+    const gen = await c.download(check.manifest)
+    const final = await c.state()
+    // download's own generation landed...
+    expect(final.generations[gen.id]).toBeTruthy()
+    // ...and the concurrently-written generation was preserved, not clobbered by a stale spread.
+    expect(final.generations.concurrent).toBeTruthy()
+  })
+})

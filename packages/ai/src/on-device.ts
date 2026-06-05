@@ -10,22 +10,34 @@
  * @module
  */
 
-import { notImplemented } from '@mindees/core'
-import type { AiBackend } from './contract'
+import { NotImplementedError } from '@mindees/core'
+import type { AiBackend, AiChunk } from './contract'
 
 /**
  * 🔬 Research track — not implemented. Returns an {@link AiBackend} whose `generate`
- * and `stream` throw {@link NotImplementedError}. Use a mock or server backend instead.
+ * **rejects** and whose `stream` **throws on iteration** with a {@link NotImplementedError}.
+ *
+ * It does NOT throw synchronously from the method call: the contract is `generate(): Promise`
+ * and `stream(): AsyncIterable`, so a caller's `await backend.generate(...)` / `for await` is
+ * what surfaces the error — the same shape a future native runtime will have. Use a mock or
+ * server backend for the working path.
  *
  * @experimental
  */
 export function createOnDeviceBackend(): AiBackend {
   return {
     generate() {
-      return notImplemented('ai.onDevice.generate (native on-device LLM runtime)')
+      return Promise.reject(
+        new NotImplementedError('ai.onDevice.generate (native on-device LLM runtime)'),
+      )
     },
-    stream() {
-      return notImplemented('ai.onDevice.stream (native on-device LLM runtime)')
+    stream(): AsyncIterable<AiChunk> {
+      return {
+        // biome-ignore lint/correctness/useYield: the iterator throws before it can yield.
+        async *[Symbol.asyncIterator](): AsyncIterator<AiChunk> {
+          throw new NotImplementedError('ai.onDevice.stream (native on-device LLM runtime)')
+        },
+      }
     },
   }
 }

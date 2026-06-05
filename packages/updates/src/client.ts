@@ -281,9 +281,21 @@ export function createUpdateClient(options: UpdateClientOptions): UpdateClient {
         manifest: canonicalManifestJson(manifest),
         status: 'pending',
       }
+      // Re-read state HERE, not the pre-transfer snapshot: the asset fetches above can await
+      // long enough for a concurrent apply()/boot()/rollback() to advance state. Spreading the
+      // stale `st` would clobber those writes — including regressing the anti-downgrade
+      // `highestVersion` floor. Merge the new generation into the FRESH snapshot, and re-assert
+      // the floor (another writer may have already moved past this version).
+      const fresh = await readStateOrInit()
+      if (manifest.version <= fresh.highestVersion) {
+        throw new UpdateError(
+          'VERSION_NOT_NEWER',
+          `manifest ${manifest.id} version ${manifest.version} is not newer than ${fresh.highestVersion}`,
+        )
+      }
       await storage.writeState({
-        ...st,
-        generations: { ...st.generations, [generation.id]: generation },
+        ...fresh,
+        generations: { ...fresh.generations, [generation.id]: generation },
       })
       return generation
     },
