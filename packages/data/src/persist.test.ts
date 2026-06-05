@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryPersistence } from './persist'
+import {
+  createMemoryPersistence,
+  createPersistentEngine,
+  createWebStoragePersistence,
+  persistEngine,
+} from './persist'
 import { createMemoryOpLog, createSyncServer } from './server'
 import { createSyncEngine, type SyncSnapshot } from './sync'
+
+const tick = () => new Promise((r) => setTimeout(r, 0))
 
 interface Note {
   text: string
@@ -66,5 +73,81 @@ describe('persistence', () => {
     })
     a2.set('notes', 'x', { text: 'after' }) // seeded clock ticks to (1000,1,a) > the persisted stamp
     expect(a2.get('x')?.text).toBe('after') // pre-fix: 'before' — the edit lost the same-stamp tie
+  })
+})
+
+describe('persistence adapters + auto-persist', () => {
+  it('createWebStoragePersistence round-trips via injected web storage', async () => {
+    const store = new Map<string, string>()
+    const p = createWebStoragePersistence({
+      getItem: (k) => store.get(k) ?? null,
+      setItem: (k, v) => {
+        store.set(k, v)
+      },
+    })
+    expect(await p.load('k')).toBeNull()
+    await p.save('k', 'v')
+    expect(await p.load('k')).toBe('v')
+  })
+
+  it('persistEngine auto-saves the snapshot on each mutation', async () => {
+    const server = createSyncServer<Note>({ log: createMemoryOpLog<Note>() })
+    const p = createMemoryPersistence()
+    const engine = persistEngine(
+      createSyncEngine<Note>({ nodeId: 'a', transport: server, now: () => 1 }),
+      p,
+      'k',
+    )
+    engine.set('notes', 'x', { text: 'hi' })
+    await tick() // let the serialized save flush
+    const saved = JSON.parse((await p.load('k')) as string) as SyncSnapshot<Note>
+    expect(saved.seq).toBe(1)
+    const restored = createSyncEngine<Note>({
+      nodeId: 'a',
+      transport: server,
+      now: () => 1,
+      snapshot: saved,
+    })
+    expect(restored.get('x')?.text).toBe('hi')
+  })
+
+  it('createPersistentEngine restores prior state and resumes seq across a restart', async () => {
+    const server = createSyncServer<Note>({ log: createMemoryOpLog<Note>() })
+    const p = createMemoryPersistence()
+    // Session 1.
+    const a1 = await createPersistentEngine<Note>({
+      nodeId: 'a',
+      transport: server,
+      now: () => 1,
+      persistence: p,
+      key: 'a',
+    })
+    a1.set('notes', 'x', { text: 'one' })
+    await tick()
+    // Session 2: a fresh persistent engine restores the auto-saved snapshot.
+    const a2 = await createPersistentEngine<Note>({
+      nodeId: 'a',
+      transport: server,
+      now: () => 1,
+      persistence: p,
+      key: 'a',
+    })
+    expect(a2.get('x')?.text).toBe('one') // state survived restart
+    expect(a2.set('notes', 'y', { text: 'two' }).id).toBe('a:2') // seq resumed (no op-id collision)
+  })
+
+  it('loadSnapshot via createPersistentEngine tolerates a corrupt blob (starts fresh)', async () => {
+    const server = createSyncServer<Note>({ log: createMemoryOpLog<Note>() })
+    const p = createMemoryPersistence()
+    await p.save('k', '{ not valid json')
+    const engine = await createPersistentEngine<Note>({
+      nodeId: 'a',
+      transport: server,
+      now: () => 1,
+      persistence: p,
+      key: 'k',
+    })
+    expect(engine.records()).toEqual([]) // no throw; clean start
+    expect(engine.set('notes', 'x', { text: 'ok' }).id).toBe('a:1')
   })
 })
