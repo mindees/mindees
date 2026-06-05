@@ -112,6 +112,10 @@ const MAX_FLUSH_ITERATIONS = 100_000
 let reactiveScheduler: Scheduler | null = null
 /** Monotonic counter for default `'normal'`-lane dedup keys. */
 let effectKeySeq = 0
+/** >0 while inside a {@link startTransition}; effects staled during it defer (when a scheduler exists). */
+let transitionDepth = 0
+/** Sync effects staled inside the current transition — treated as deferred for THIS drain only. */
+const transitionTagged = new Set<AnyComputation>()
 
 /**
  * Inject (or clear) the {@link Scheduler} that `effect(fn, { priority: 'normal' })` defers through.
@@ -219,7 +223,14 @@ class Computation<T> implements OwnerNode {
     if (this.state < state) {
       const wasClean = this.state === CLEAN
       this.state = state
-      if (this.isEffect && wasClean) effectQueue.push(this)
+      if (this.isEffect && wasClean) {
+        effectQueue.push(this)
+        // Inside a startTransition (with a scheduler), tag a SYNC effect so this drain defers it —
+        // without permanently changing its lane. No-op on every default path (transitionDepth 0).
+        if (transitionDepth > 0 && reactiveScheduler && this.lane === 'sync') {
+          transitionTagged.add(this)
+        }
+      }
       if (this.observers) {
         for (const o of this.observers) o.markStale(CHECK)
       }
@@ -443,20 +454,22 @@ function flushEffects(): void {
       const e = effectQueue[i]
       i++
       if (e && e.state !== CLEAN && e.state !== DISPOSED) {
-        if (e.lane === 'normal' && reactiveScheduler) {
+        // Defer when the effect's own lane is 'normal', OR it was staled inside a startTransition
+        // (tagged for THIS drain only) — but only if a scheduler is injected. Otherwise sync.
+        if (reactiveScheduler && (e.lane === 'normal' || transitionTagged.has(e))) {
           // Deferred lane: hand the flush to the scheduler under a stable key, so rapid re-stales
           // coalesce (latest wins) and the body runs later — reading the LATEST values at run time
           // (updateIfNecessary recomputes sources in order), so glitch-freedom is preserved.
           const node = e
           const sched = reactiveScheduler
+          // A transition-tagged sync effect has no key yet; mint a stable one so its re-stales coalesce.
+          if (node.schedKey === undefined) node.schedKey = `mindees:effect:${effectKeySeq++}`
           node.pendingTask = sched.schedule(
             () => {
               node.pendingTask = null
               if (node.state !== CLEAN && node.state !== DISPOSED) node.updateIfNecessary()
             },
-            node.schedKey !== undefined
-              ? { priority: 'normal', key: node.schedKey }
-              : { priority: 'normal' },
+            { priority: 'normal', key: node.schedKey },
           )
         } else {
           // Synchronous lane — byte-identical to the pre-scheduler behavior (and the path every
@@ -471,6 +484,7 @@ function flushEffects(): void {
     }
   } finally {
     effectQueue.length = 0
+    transitionTagged.clear() // transition tags apply only to the drain that observed them
     flushing = false
   }
   if (errors.length === 1) throw errors[0]
@@ -613,6 +627,38 @@ export function effect(fn: () => void, options?: EffectOptions): () => void {
   adopt(node)
   node.updateIfNecessary() // first run is ALWAYS synchronous (establishes deps + initial paint)
   return () => disposeComputation(node)
+}
+
+/**
+ * Apply the writes in `fn` as a low-priority **transition**: the writes take effect immediately
+ * (reads inside/after see the latest values), but the effects they invalidate are **deferred**
+ * through the injected {@link setReactiveScheduler scheduler} instead of running synchronously — so a
+ * heavy re-render triggered by, say, a keystroke doesn't block the interaction. With no scheduler
+ * injected, this is a plain synchronous batch (no deferral) — safe for SSR/tests.
+ *
+ * @example
+ * input.set(value)               // urgent: the field updates now
+ * startTransition(() => query.set(value)) // the expensive results re-render can lag
+ */
+export function startTransition(fn: () => void): void {
+  transitionDepth++
+  try {
+    batch(fn) // coalesce the transition's writes into one flush; effects staled in it get tagged
+  } finally {
+    transitionDepth--
+  }
+}
+
+/**
+ * A **deferred view** of `source`: it tracks `source` on the scheduler's low-priority lane, so under
+ * sustained updates it lags behind the live value (the React `useDeferredValue` pattern — show stale
+ * results while the latest are computed). With no scheduler injected it mirrors `source`
+ * synchronously (no lag), so SSR/tests see the live value. Must be created inside an owner.
+ */
+export function deferred<T>(source: Accessor<T>): Accessor<T> {
+  const out = signal(source())
+  effect(() => out.set(source()), { priority: 'normal' })
+  return () => out()
 }
 
 /**
