@@ -57,6 +57,31 @@ export {
   type SelectorEquals,
 } from './component'
 export { NotImplementedError } from './errors'
+/**
+ * Gesture recognizers: tap/longPress/pan/pinch/swipe → reactive state that drives styles and the
+ * animation engine (RN Gesture Handler / Flutter GestureDetector parity).
+ */
+export {
+  _setGestureClock,
+  composeGestures,
+  type GestureHandlers,
+  longPress,
+  normalizePointer,
+  type PanEvent,
+  type PanState,
+  type PinchEvent,
+  type PinchState,
+  type PointerSample,
+  pan,
+  panAnimated,
+  pinch,
+  type Recognizer,
+  type SwipeDirection,
+  type SwipeEvent,
+  swipe,
+  type TapState,
+  tap,
+} from './gesture'
 export { notImplemented } from './not-implemented'
 /**
  * Fine-grained reactivity: signals, computed values, effects, batching, and
