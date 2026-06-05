@@ -1,5 +1,16 @@
 # @mindees/cli
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [25832b1]
+- Updated dependencies [2eba52a]
+- Updated dependencies [2cbc407]
+  - @mindees/compiler@0.3.0
+  - @mindees/core@0.3.0
+  - @mindees/ai@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes

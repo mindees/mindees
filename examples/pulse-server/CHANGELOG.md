@@ -1,5 +1,12 @@
 # @mindees/example-pulse-server
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [2cbc407]
+  - @mindees/updates@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes
