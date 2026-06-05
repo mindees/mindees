@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+/// <reference lib="dom" />
 import { createElement, signal } from '@mindees/core'
 import { createDomBackend, render } from '@mindees/renderer'
 import { describe, expect, it } from 'vitest'
