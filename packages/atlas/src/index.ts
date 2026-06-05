@@ -65,6 +65,7 @@ export {
   type WindowDimensions,
 } from './environment'
 export { type BaseProps, type Reactive, resolveStyle, toHostProps } from './host'
+export { animateTo, motion } from './motion'
 export {
   FocusScope,
   type FocusScopeProps,

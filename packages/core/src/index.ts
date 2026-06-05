@@ -1,6 +1,32 @@
 import type { Maturity, PackageInfo } from './types'
 
 /**
+ * Animation engine: reactive animated values + timing/spring drivers + interpolate, driven by an
+ * injected frame source (RN Animated/Reanimated + Flutter AnimationController parity).
+ */
+export {
+  _activeAnimationCount,
+  _resetAnimation,
+  type AnimatedValue,
+  type AnimationHandle,
+  animate,
+  cubicBezier,
+  type Easing,
+  easeInOutQuad,
+  easeInQuad,
+  easeOutCubic,
+  easeOutQuad,
+  type FrameSource,
+  getFrameSource,
+  interpolate,
+  linear,
+  manualFrameSource,
+  rafFrameSource,
+  setFrameSource,
+  spring,
+  timing,
+} from './animation'
+/**
  * Component model: a renderer-agnostic element tree plus selector-based,
  * re-render-isolated context. (Phase 2)
  */
