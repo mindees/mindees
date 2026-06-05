@@ -12,8 +12,8 @@
  */
 
 import type { Id } from './collection'
-import { type Clock, createClock, type Hlc } from './hlc'
-import { type LwwRegister, mergeRegister } from './lww'
+import { type Clock, compareHlc, createClock, type Hlc } from './hlc'
+import { type LwwMap, type LwwRegister, mergeRegister } from './lww'
 
 /** An HLC-stamped, idempotently-applied record mutation. */
 export type Op<T> = {
@@ -29,9 +29,36 @@ export type Op<T> = {
   readonly recordId: Id
   /** The merge key (10B). */
   readonly hlc: Hlc
-} & ({ readonly kind: 'set'; readonly value: T } | { readonly kind: 'del' })
+} & (
+  | {
+      readonly kind: 'set'
+      /**
+       * The **changed fields only** (a partial record). Each field is stamped at this op's
+       * HLC and merged independently, so two replicas editing *different* fields of the same
+       * record both keep their edit. Omitted fields are untouched — `set` MERGES, it does not
+       * replace. (Records must be plain objects; the field is the merge granularity.)
+       */
+      readonly value: Partial<T>
+    }
+  | { readonly kind: 'del' }
+)
 
-/** A convergent materialized view: per-record LWW state built by applying ops. */
+/**
+ * A record's convergent state: a per-field LWW map plus an optional whole-record delete
+ * tombstone. A field is live iff it's a `set` whose stamp is strictly newer than the tombstone
+ * (so a delete shadows older fields, but a later field-write *resurrects* that field).
+ */
+export interface RecordState {
+  /** Per-field LWW registers (the merge granularity). */
+  readonly fields: LwwMap<unknown>
+  /** Whole-record delete stamp, or `null` if never deleted. */
+  readonly tomb: Hlc | null
+}
+
+/** The persisted dump entry — new format, or a legacy whole-record register (auto-migrated). */
+type DumpEntry<T> = readonly [Id, RecordState | LwwRegister<T>]
+
+/** A convergent materialized view: per-record, per-field LWW state built by applying ops. */
 export interface MutationLog<T> {
   /** Merge an op into the state (commutative + idempotent). Returns whether state changed. */
   apply(op: Op<T>): boolean
@@ -39,48 +66,95 @@ export interface MutationLog<T> {
   get(recordId: Id): T | undefined
   /** All live records as `[recordId, value]` pairs. */
   records(): Array<readonly [Id, T]>
-  /** The full per-record register state (incl. tombstones) — for persistence. */
-  dump(): Array<readonly [Id, LwwRegister<T>]>
+  /** The full per-record state (incl. tombstones) — for persistence. */
+  dump(): Array<readonly [Id, RecordState]>
 }
 
-/** Create a {@link MutationLog}, optionally seeded from a {@link MutationLog.dump}. */
-export function createMutationLog<T>(
-  initial?: Iterable<readonly [Id, LwwRegister<T>]>,
-): MutationLog<T> {
-  const state = new Map<Id, LwwRegister<T>>(initial)
+const EMPTY_FIELDS: LwwMap<unknown> = Object.freeze(Object.create(null))
+
+/** Migrate a dump entry: pass through new {@link RecordState}, lift a legacy whole-record register. */
+function migrateState<T>(value: RecordState | LwwRegister<T>): RecordState {
+  if ('fields' in value) return value // already the new per-field format
+  const reg = value as LwwRegister<T>
+  if (reg.op === 'del') return { fields: EMPTY_FIELDS, tomb: reg.stamp }
+  // Legacy whole-record `set`: lift each field to its own register at the record's stamp.
+  const fields: Record<string, LwwRegister<unknown>> = Object.create(null)
+  const record = reg.value as Record<string, unknown>
+  if (record && typeof record === 'object') {
+    for (const k of Object.keys(record))
+      fields[k] = { stamp: reg.stamp, op: 'set', value: record[k] }
+  }
+  return { fields, tomb: null }
+}
+
+/** Reconstruct a record's live value from its per-field state (tombstone-shadowed). */
+function reconstruct<T>(rs: RecordState): T | undefined {
+  const out: Record<string, unknown> = {}
+  let live = false
+  for (const k of Object.keys(rs.fields)) {
+    const reg = rs.fields[k]
+    if (!reg || reg.op !== 'set') continue
+    // A field survives a whole-record delete only if it was written strictly after it.
+    if (rs.tomb !== null && compareHlc(reg.stamp, rs.tomb) <= 0) continue
+    out[k] = reg.value
+    live = true
+  }
+  return live ? (out as T) : undefined
+}
+
+/** Create a {@link MutationLog}, optionally seeded from a {@link MutationLog.dump} (legacy-migrated). */
+export function createMutationLog<T>(initial?: Iterable<DumpEntry<T>>): MutationLog<T> {
+  const state = new Map<Id, RecordState>()
+  if (initial) for (const [id, value] of initial) state.set(id, migrateState(value))
 
   return {
     apply(op): boolean {
-      const incoming: LwwRegister<T> =
-        op.kind === 'set'
-          ? { stamp: op.hlc, op: 'set', value: op.value }
-          : { stamp: op.hlc, op: 'del' }
-      const existing = state.get(op.recordId)
-      const merged = existing ? mergeRegister(existing, incoming) : incoming
-      if (existing === merged) return false // mergeRegister returns an arg by reference
-      state.set(op.recordId, merged)
+      const prev = state.get(op.recordId) ?? { fields: EMPTY_FIELDS, tomb: null }
+      if (op.kind === 'set') {
+        // Merge each changed field independently (per-field LWW): concurrent edits to
+        // DIFFERENT fields both survive; same-field conflicts resolve by HLC.
+        const value = op.value as Record<string, unknown>
+        let changed = false
+        let fields = prev.fields
+        for (const k of Object.keys(value)) {
+          const incoming: LwwRegister<unknown> = { stamp: op.hlc, op: 'set', value: value[k] }
+          const existing = Object.hasOwn(fields, k) ? fields[k] : undefined
+          const merged = existing ? mergeRegister(existing, incoming) : incoming
+          if (merged === existing) continue // idempotent / older — no change to this field
+          if (!changed) {
+            const copy: Record<string, LwwRegister<unknown>> = Object.create(null)
+            for (const j of Object.keys(fields)) copy[j] = fields[j] as LwwRegister<unknown>
+            fields = copy
+            changed = true
+          }
+          ;(fields as Record<string, LwwRegister<unknown>>)[k] = merged
+        }
+        if (!changed) return false
+        state.set(op.recordId, { fields, tomb: prev.tomb })
+        return true
+      }
+      // del: advance the whole-record tombstone (max HLC).
+      const tomb = prev.tomb === null || compareHlc(op.hlc, prev.tomb) > 0 ? op.hlc : prev.tomb
+      if (tomb === prev.tomb) return false
+      state.set(op.recordId, { fields: prev.fields, tomb })
       return true
     },
     get(recordId): T | undefined {
-      const reg = state.get(recordId)
-      return reg ? lwwReg(reg) : undefined
+      const rs = state.get(recordId)
+      return rs ? reconstruct<T>(rs) : undefined
     },
     records(): Array<readonly [Id, T]> {
       const out: Array<readonly [Id, T]> = []
-      for (const [recordId, reg] of state) {
-        if (reg.op === 'set') out.push([recordId, reg.value])
+      for (const [recordId, rs] of state) {
+        const value = reconstruct<T>(rs)
+        if (value !== undefined) out.push([recordId, value])
       }
       return out
     },
-    dump(): Array<readonly [Id, LwwRegister<T>]> {
+    dump(): Array<readonly [Id, RecordState]> {
       return [...state]
     },
   }
-}
-
-/** Read the live value of a single register (mirrors `lwwGet` for a bare register). */
-function lwwReg<T>(reg: LwwRegister<T>): T | undefined {
-  return reg.op === 'set' ? reg.value : undefined
 }
 
 /** An opaque, monotonic sync cursor (the hub's log position). */
@@ -128,8 +202,11 @@ export interface SyncSnapshot<T> {
   readonly seq: number
   /** The last pull cursor. */
   readonly cursor: Cursor | null
-  /** The materialized per-record register state. */
-  readonly registers: ReadonlyArray<readonly [Id, LwwRegister<T>]>
+  /**
+   * The materialized per-record state (per-field LWW + tombstone). Legacy snapshots that stored
+   * a whole-record register per id are auto-migrated on restore, so old persisted data still loads.
+   */
+  readonly registers: ReadonlyArray<readonly [Id, RecordState]>
   /** Local ops applied but not yet acked (retried on next sync). */
   readonly outbox: readonly Op<T>[]
   /**
@@ -160,8 +237,13 @@ export interface SyncEngineOptions<T> {
 
 /** A local-first sync engine over a {@link SyncTransport}. */
 export interface SyncEngine<T> {
-  /** Optimistically set a record locally and queue the op for the next `sync()`. */
-  set(collection: string, recordId: Id, value: T): Op<T>
+  /**
+   * Optimistically **merge** record fields locally and queue the op. Pass only the fields you
+   * changed: `set('users', 'u1', { name: 'Ada' })` leaves other fields untouched and lets a
+   * concurrent edit to a *different* field on another replica survive. (Per-field LWW — not a
+   * whole-record replace. To remove a record use {@link SyncEngine.delete}.)
+   */
+  set(collection: string, recordId: Id, value: Partial<T>): Op<T>
   /** Optimistically delete a record locally and queue the op. */
   delete(collection: string, recordId: Id): Op<T>
   /** Read a record's live value (local + already-synced state). */
@@ -192,7 +274,9 @@ export function createSyncEngine<T>(options: SyncEngineOptions<T>): SyncEngine<T
   const outbox: Op<T>[] = snapshot ? [...snapshot.outbox] : []
   let seq = snapshot?.seq ?? 0
   let cursor: Cursor | null = snapshot?.cursor ?? null
-  let syncing = false
+  // Serializes sync() runs (see sync() below) so overlapping callers neither double-pull nor
+  // lose their queued ops to an early-return coalesce.
+  let syncChain: Promise<void> = Promise.resolve()
 
   const emit = (op: Op<T>): Op<T> => {
     log.apply(op) // optimistic local apply
@@ -238,16 +322,17 @@ export function createSyncEngine<T>(options: SyncEngineOptions<T>): SyncEngine<T
       return [...outbox]
     },
 
-    async sync(signal): Promise<void> {
-      // Not re-entrant: overlapping calls would double-pull and regress the cursor.
-      // Concurrent calls coalesce into the in-flight one; call sync() again afterward.
-      if (syncing) return
-      syncing = true
-      try {
-        await runSync(signal)
-      } finally {
-        syncing = false
-      }
+    sync(signal): Promise<void> {
+      // Serialize, don't coalesce: each call waits for the prior run, then does its OWN full
+      // push+pull. This keeps runs non-overlapping (no double-pull / cursor regression) while
+      // guaranteeing a caller's just-queued ops are actually pushed — the previous "return early
+      // while another sync is in flight" silently dropped that work.
+      const run = syncChain.then(() => runSync(signal))
+      syncChain = run.then(
+        () => undefined,
+        () => undefined,
+      )
+      return run
     },
 
     export(): SyncSnapshot<T> {
