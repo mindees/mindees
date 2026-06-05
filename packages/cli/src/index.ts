@@ -17,6 +17,17 @@ export {
 } from './create-target'
 /** Dev orchestrator (rebuild-on-change). */
 export { type DevOptions, type DevSession, startDev, type Watcher } from './dev'
+export {
+  createDevServer,
+  createNodeWatcher,
+  type DevBuildStatus,
+  type DevServer,
+  type DevServerOptions,
+  type NodeWatcherOptions,
+  renderDevPage,
+  type WatchFn,
+  type WatchHandle,
+} from './dev-server'
 /** Environment diagnostics. */
 export { doctorSummary, renderDoctor, runDoctor } from './doctor'
 /** Filesystem abstraction. */

@@ -220,9 +220,15 @@ function cmdDev(ctx: CliContext): CommandResult {
   // The dev server transport (HTTP + HMR socket) is a developer-preview layer in
   // `bin`. The CLI command here reports how to use it; the tested rebuild
   // orchestrator lives in `dev.ts` (`startDev`).
-  out(ctx.write, 'mindees dev — developer preview.')
-  out(ctx.write, 'The rebuild-on-change orchestrator is available via startDev(); the')
-  out(ctx.write, 'HTTP/HMR transport is being finalized. Use `mindees build` for now.')
+  out(ctx.write, 'mindees dev — build + watch + live-reload preview.')
+  out(
+    ctx.write,
+    'Run via the `mindees` binary (it starts the HTTP server); set MINDEES_DEV_PORT to',
+  )
+  out(
+    ctx.write,
+    'override the port (default 3000). The browser reloads automatically on each rebuild.',
+  )
   return { exitCode: 0 }
 }
 

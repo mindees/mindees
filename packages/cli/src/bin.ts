@@ -8,12 +8,23 @@
  * @module
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  watch as fsWatch,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
+import { createServer } from 'node:http'
 import { dirname, join, relative, sep } from 'node:path'
 import process from 'node:process'
 import type { AiBackend } from '@mindees/ai'
 import { type AdapterName, createServerBackend, type FetchLike } from '@mindees/ai/server'
 import { type CliContext, runCliAsync } from './cli'
+import { startDev } from './dev'
+import { createDevServer, createNodeWatcher, renderDevPage } from './dev-server'
 import type { FileSystem } from './fs'
 import { VERSION } from './index'
 import type { EnvProbe, OutputLine } from './types'
@@ -84,6 +95,44 @@ function aiBackendFromEnv(): AiBackend | undefined {
   })
 }
 
+/**
+ * `mindees dev` — the long-running transport over the tested {@link startDev} orchestrator:
+ * build + watch `src/`, serve a live-reload preview, and reload the browser on each rebuild. This
+ * is the I/O glue; the watcher, server, and orchestrator it wires are unit-tested in their modules.
+ */
+function runDevServer(ctx: CliContext): void {
+  const port = Number(process.env.MINDEES_DEV_PORT ?? 3000) || 3000
+  const server = createDevServer({ html: '<body>MindeesNative dev — building…</body>' })
+  const watcher = createNodeWatcher(['src'], {
+    watch: (path, opts, listener) =>
+      fsWatch(path, { recursive: opts.recursive ?? false }, (event, filename) =>
+        listener(event, typeof filename === 'string' ? filename : null),
+      ),
+  })
+  startDev(ctx.fs, watcher, {
+    onRebuild: (result) => {
+      server.setHtml(renderDevPage(result))
+      server.bump()
+      ctx.write({
+        text: result.ok
+          ? `rebuilt: ${result.compiled.length} file(s) ok`
+          : `rebuild failed: ${result.diagnostics.filter((d) => d.severity === 'error').length} error(s)`,
+        stream: result.ok ? 'out' : 'err',
+      })
+    },
+  })
+  createServer((req, res) => {
+    const out = server.handle(req.method ?? 'GET', req.url ?? '/')
+    res.writeHead(out.status, out.headers)
+    res.end(out.body)
+  }).listen(port, () => {
+    ctx.write({
+      text: `mindees dev — serving http://localhost:${port} (live reload on)`,
+      stream: 'out',
+    })
+  })
+}
+
 async function main(): Promise<void> {
   const cwd = process.cwd()
   const write = (line: OutputLine): void => {
@@ -98,6 +147,12 @@ async function main(): Promise<void> {
     version: VERSION,
     write,
     ...(backend ? { aiBackend: backend } : {}),
+  }
+  // `dev` is a long-running transport (not a one-shot command), so it's wired here in the I/O entry
+  // rather than the synchronous CLI dispatch. Everything else goes through the tested core.
+  if (process.argv[2] === 'dev') {
+    runDevServer(ctx)
+    return
   }
   const { exitCode } = await runCliAsync(process.argv.slice(2), ctx)
   process.exitCode = exitCode
