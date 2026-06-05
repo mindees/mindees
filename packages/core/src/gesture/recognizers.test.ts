@@ -194,3 +194,45 @@ describe('panAnimated', () => {
     expect(x()).toBe(0) // settled back to origin
   })
 })
+
+describe('gesture hardening (adversarial findings)', () => {
+  it('longPress fires onEnd when it had fired and then the pointer moves past slop', () => {
+    const onEnd = vi.fn()
+    const g = longPress({ onEnd })
+    g.handlers.onPointerDown(ev(1, 0, 0, 0))
+    fireTimers() // long-press fires
+    g.handlers.onPointerMove(ev(1, 40, 0, 50)) // slop after fire → must end
+    expect(onEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('an axis:"y" pan does NOT activate on purely horizontal movement', () => {
+    const g = pan({ axis: 'y' })
+    g.handlers.onPointerDown(ev(1, 0, 0, 0))
+    g.handlers.onPointerMove(ev(1, 80, 0, 16)) // big horizontal, zero vertical
+    expect(g.state.active()).toBe(false)
+    g.handlers.onPointerMove(ev(1, 80, 40, 32)) // now vertical past slop
+    expect(g.state.active()).toBe(true)
+  })
+
+  it('pinch survives a pinned finger lifting while a third remains (re-pairs, stays active)', () => {
+    const g = pinch({})
+    g.handlers.onPointerDown(ev(1, 0, 0, 0))
+    g.handlers.onPointerDown(ev(2, 100, 0, 0)) // pair [1,2], active
+    g.handlers.onPointerDown(ev(3, 50, 50, 0)) // third finger tracked
+    expect(g.state.active()).toBe(true)
+    g.handlers.onPointerUp(ev(1, 0, 0, 16)) // a PINNED finger lifts; 2 remain → re-pair
+    expect(g.state.active()).toBe(true) // gesture did not die
+  })
+
+  it('pan hands off to a remaining pointer when the active one is cancelled', () => {
+    const g = pan({})
+    g.handlers.onPointerDown(ev(1, 0, 0, 0))
+    g.handlers.onPointerDown(ev(2, 200, 200, 0))
+    g.handlers.onPointerMove(ev(1, 40, 0, 16)) // pointer 1 active
+    expect(g.state.active()).toBe(true)
+    g.handlers.onPointerCancel(ev(1, 40, 0, 32)) // cancel the active one
+    // pointer 2 can now claim by moving past slop
+    g.handlers.onPointerMove(ev(2, 260, 200, 48))
+    expect(g.state.active()).toBe(true)
+  })
+})

@@ -215,8 +215,11 @@ export function pan(config: {
         if (!p) return
         track(p, s)
         if (s.pointerId !== id) return
+        // Slop on the AXIS-FILTERED delta: an `axis: 'y'` pan must not activate on horizontal travel.
+        const [sx, sy] = filt(p.x - p.startX, p.y - p.startY)
+        const slop = Math.hypot(sx, sy)
         batch(() => {
-          if (!active && dist(p.x, p.y, p.startX, p.startY) >= minDistance) {
+          if (!active && slop >= minDistance) {
             active = true
             active$.set(true)
             writeFrom(p)
@@ -249,7 +252,8 @@ export function pan(config: {
         }
         pointers.delete(s.pointerId)
         if (s.pointerId === id) {
-          id = null
+          // Hand off to another still-down pointer (mirror onPointerUp) so it can re-claim the pan.
+          id = pointers.keys().next().value ?? null
           active = false
           active$.set(false)
         }
@@ -308,10 +312,11 @@ export function tap(config: {
             dist(s.x, s.y, down.x, down.y) <= maxDistance && s.t - down.t <= maxDurationMs
           if (within) config.onTap?.()
         }
-        reset()
+        if (!down || s.pointerId === down.pointerId) reset() // ignore a foreign pointer's cancel/up
       },
-      onPointerCancel(): void {
-        reset()
+      onPointerCancel(e): void {
+        const s = normalizePointer(e)
+        if (!down || s.pointerId === down.pointerId) reset() // a foreign pointer must not kill our tap
       },
     },
   }
@@ -343,6 +348,11 @@ export function longPress(config: {
     fired = false
     active$.set(false)
   }
+  /** End the press, firing onEnd iff the long-press had fired, then reset. */
+  const finish = (): void => {
+    if (fired) config.onEnd?.()
+    reset()
+  }
   return {
     state: { active: () => active$() },
     reset,
@@ -362,18 +372,16 @@ export function longPress(config: {
         if (!down) return
         const s = normalizePointer(e)
         if (s.pointerId === down.pointerId && dist(s.x, s.y, down.x, down.y) > maxDistance) {
-          reset() // slop exceeded before the timer fired → fail
+          finish() // slop exceeded → end (onEnd iff it had fired), then fail
         }
       },
       onPointerUp(e): void {
         const s = normalizePointer(e)
-        if (down && s.pointerId === down.pointerId) {
-          if (fired) config.onEnd?.()
-          reset()
-        }
+        if (down && s.pointerId === down.pointerId) finish()
       },
-      onPointerCancel(): void {
-        reset()
+      onPointerCancel(e): void {
+        const s = normalizePointer(e)
+        if (!down || s.pointerId === down.pointerId) finish()
       },
     },
   }
@@ -433,6 +441,8 @@ export function pinch(config: {
     batch(() => {
       active$.set(false)
       scale$.set(1)
+      fx$.set(0)
+      fy$.set(0)
     })
   }
   const begin = (): void => {
@@ -441,13 +451,36 @@ export function pinch(config: {
     startDist = dist(pp[0].x, pp[0].y, pp[1].x, pp[1].y)
     lastScale = 1
     lastT = Math.max(pp[0].t, pp[1].t)
-    active$.set(true)
-    config.onBegin?.({
-      scale: 1,
-      velocity: 0,
-      focalX: (pp[0].x + pp[1].x) / 2,
-      focalY: (pp[0].y + pp[1].y) / 2,
+    const focalX = (pp[0].x + pp[1].x) / 2
+    const focalY = (pp[0].y + pp[1].y) / 2
+    batch(() => {
+      active$.set(true)
+      scale$.set(1)
+      fx$.set(focalX) // seed focal so a style reading focalX/Y is correct from the first frame
+      fy$.set(focalY)
     })
+    config.onBegin?.({ scale: 1, velocity: 0, focalX, focalY })
+  }
+  /** A pointer left: if it was a pinned finger but ≥2 remain, re-pin survivors continuously; else end. */
+  const onLift = (s: PointerSample): void => {
+    pts.delete(s.pointerId)
+    if (!active$() || !pair) return
+    const wasPinned = s.pointerId === pair[0] || s.pointerId === pair[1]
+    if (!wasPinned) return // a non-pinned finger lifted — pinch continues unaffected
+    if (pts.size >= 2) {
+      const ids = [...pts.keys()]
+      pair = [ids[0] as number, ids[1] as number]
+      const pp = pairPts()
+      if (pp) {
+        // Re-base so dist/startDist keeps equalling the CURRENT scale (no jump on the next move).
+        const d = dist(pp[0].x, pp[0].y, pp[1].x, pp[1].y)
+        startDist = d / Math.max(scale$(), 1e-4)
+        lastScale = scale$()
+      }
+      return
+    }
+    config.onEnd?.({ scale: scale$(), velocity: 0, focalX: fx$(), focalY: fy$() })
+    reset()
   }
   return {
     state: {
@@ -482,20 +515,10 @@ export function pinch(config: {
         config.onUpdate?.(ev)
       },
       onPointerUp(e): void {
-        const s = normalizePointer(e)
-        pts.delete(s.pointerId)
-        if (pair && (s.pointerId === pair[0] || s.pointerId === pair[1]) && active$()) {
-          config.onEnd?.({ scale: scale$(), velocity: 0, focalX: fx$(), focalY: fy$() })
-          reset()
-        }
+        onLift(normalizePointer(e))
       },
       onPointerCancel(e): void {
-        const s = normalizePointer(e)
-        pts.delete(s.pointerId)
-        if (pair && (s.pointerId === pair[0] || s.pointerId === pair[1]) && active$()) {
-          config.onEnd?.({ scale: scale$(), velocity: 0, focalX: fx$(), focalY: fy$() })
-          reset()
-        }
+        onLift(normalizePointer(e))
       },
     },
   }
@@ -560,10 +583,13 @@ export function swipe(config: {
             config.onSwipe?.({ direction: dir, velocityX: p.vx, velocityY: p.vy, x: p.x, y: p.y })
           }
         }
-        reset()
+        pointers.delete(s.pointerId) // per-pointer: another finger can still produce its own swipe
+        if (pointers.size === 0) active$.set(false)
       },
-      onPointerCancel(): void {
-        reset()
+      onPointerCancel(e): void {
+        const s = normalizePointer(e)
+        pointers.delete(s.pointerId)
+        if (pointers.size === 0) active$.set(false)
       },
     },
   }
@@ -582,9 +608,19 @@ export function composeGestures(recognizers: readonly Recognizer<never>[]): Reco
   const fan =
     (key: keyof GestureHandlers) =>
     (e: unknown): void => {
+      let firstError: unknown
       batch(() => {
-        for (const r of recognizers) r.handlers[key](e)
+        // Isolate each recognizer: one throwing must not skip the rest (e.g. leaving a sibling's
+        // long-press timer armed). Collect the first error and rethrow after all have run.
+        for (const r of recognizers) {
+          try {
+            r.handlers[key](e)
+          } catch (err) {
+            if (firstError === undefined) firstError = err
+          }
+        }
       })
+      if (firstError !== undefined) throw firstError
     }
   return {
     state: {} as never,

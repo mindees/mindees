@@ -32,6 +32,10 @@ export function panAnimated(
     onBegin: () => {
       baseX = untrack(x)
       baseY = untrack(y)
+      // Grab mid-fling: writing the values stops any in-flight release spring immediately, so the
+      // drag takes over instead of fighting the animation (AnimatedValue.set cancels its driver).
+      x.set(baseX)
+      y.set(baseY)
     },
     onUpdate: (e) => {
       x.set(baseX + e.translationX)
