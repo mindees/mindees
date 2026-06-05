@@ -146,6 +146,41 @@ describe('createRouter — re-render isolation', () => {
     dispose()
     router.dispose()
   })
+
+  it('router.params() is isolated — no re-run when params are unchanged across a nav', () => {
+    const router = makeRouter('/posts/1?page=1')
+    const runs = vi.fn()
+    const dispose = effect(() => {
+      router.params()
+      runs()
+    })
+    expect(runs).toHaveBeenCalledTimes(1)
+    // search-only change → params {postId:'1'} unchanged → params() must NOT re-emit.
+    router.navigate('/posts/1?page=2')
+    expect(runs).toHaveBeenCalledTimes(1)
+    // params change → re-emit.
+    router.navigate('/posts/2')
+    expect(runs).toHaveBeenCalledTimes(2)
+    dispose()
+    router.dispose()
+  })
+})
+
+describe('createRouter — invalid route patterns are dropped, not thrown', () => {
+  it('ignores a catch-all-parent-with-children route instead of poisoning all state', () => {
+    const r = createRouter({
+      // `/docs/:rest*/edit` is structurally invalid (catch-all not last); it must be skipped.
+      routes: [
+        { path: '/', meta: { name: 'home' } },
+        { path: '/docs/:rest*', children: [{ path: 'edit', meta: { name: 'bad' } }] },
+      ],
+      history: createMemoryHistory({ initialEntries: ['/'] }),
+    })
+    // State is accessible (no throw); the valid home route still matches.
+    expect(r.match()?.route.meta?.name).toBe('home')
+    expect(() => r.navigate('/docs/a/b')).not.toThrow()
+    r.dispose()
+  })
 })
 
 describe('createRouter — nested routes', () => {

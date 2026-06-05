@@ -43,15 +43,13 @@ describe('typecheck (the gate)', () => {
     expect(hasErrors(diags)).toBe(true)
   })
 
-  it('parses + type-checks TSX (JSX is configured, not a syntax error)', () => {
-    // The JSX factory (`createElement`) isn't in scope here, so the checker
-    // reports factory/intrinsic-element diagnostics — proving JSX is parsed and
-    // semantically checked rather than failing to parse.
+  it('type-checks idiomatic automatic-JSX with no import (the runtime is configured)', () => {
+    // The framework ships automatic JSX: a component imports NOTHING, yet JSX resolves
+    // through `@mindees/core/jsx-runtime`'s `JSX` namespace. So this is valid — not the old
+    // "cannot find name 'createElement'" error that broke the framework's own component style.
     const diags = typecheck('export const a = <view>hi</view>')
-    expect(diags.length).toBeGreaterThan(0)
-    // The missing JSX factory shows up as "cannot find name 'createElement'".
-    expect(diags.some((d) => d.code === 'TS2552' || d.code === 'TS2304')).toBe(true)
-    // None are syntactic parse failures (those are TS1xxx).
+    expect(diags.filter((d) => d.severity === 'error')).toEqual([])
+    // It's parsed + semantically checked (no syntactic TS1xxx parse failures).
     expect(diags.every((d) => !/^TS1\d{3}$/.test(d.code))).toBe(true)
   })
 
@@ -66,8 +64,9 @@ describe('typecheck (the gate)', () => {
     // differently than the same source in a `.tsx` file.
     const tsDiags = typecheck('export const a = <view />', 'module.ts')
     expect(tsDiags.length).toBeGreaterThan(0)
+    // The same source in `.tsx` is valid JSX under the automatic runtime → no errors.
     const tsxDiags = typecheck('export const a = <view />', 'module.tsx')
-    expect(tsxDiags.some((d) => d.code === 'TS2552' || d.code === 'TS2304')).toBe(true)
+    expect(tsxDiags.filter((d) => d.severity === 'error')).toEqual([])
   })
 
   it('enforces strict flags (noUncheckedIndexedAccess)', () => {

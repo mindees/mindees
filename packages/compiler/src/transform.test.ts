@@ -63,3 +63,36 @@ describe('compileChecked — the gate refuses bad code', () => {
     expect(result.diagnostics.some((d) => d.code === 'TS2322')).toBe(true)
   })
 })
+
+describe('automatic JSX end-to-end (the framework component style compiles + runs)', () => {
+  it('gate accepts an import-less component and emit injects the runtime import', () => {
+    const src = 'export function App() {\n  return <view><text>hi</text></view>\n}\n'
+    const result = compileChecked(src, { fileName: 'App.tsx', flatten: false })
+    // The gate accepts idiomatic automatic JSX (no createElement import) — the headline bug.
+    expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([])
+    // Emit binds the runtime via an injected @mindees/core import (no runtime ReferenceError).
+    expect(result.code).toMatch(
+      /import\s*\{[^}]*\bcreateElement\b[^}]*\}\s*from\s*["']@mindees\/core["']/,
+    )
+    // And it actually runs once the runtime is provided.
+    const body = result.code
+      .replace(/\bexport\s+/g, '')
+      .replace(/^\s*import\b[^\n]*from\s*["']@mindees\/core["'];?\s*$/gm, '')
+    const run = new Function('createElement', 'Fragment', `${body}\nreturn App()`) as (
+      ce: (type: string, props: unknown, ...kids: unknown[]) => unknown,
+      f: unknown,
+    ) => unknown
+    const el = run((type, props, ...kids) => ({ type, props, kids }), Symbol('Fragment'))
+    expect(el).toEqual({
+      type: 'view',
+      props: null,
+      kids: [{ type: 'text', props: null, kids: ['hi'] }],
+    })
+  })
+
+  it('does not double-import when the component already imports createElement', () => {
+    const src = "import { createElement } from '@mindees/core'\nexport const a = <view>hi</view>\n"
+    const { code } = compile(src, { flatten: false })
+    expect(code.match(/from\s*["']@mindees\/core["']/g)?.length).toBe(1)
+  })
+})

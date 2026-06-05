@@ -34,10 +34,9 @@ export function useSearch(): () => Record<string, unknown> {
   return useRouter().search
 }
 
-/** Reactive accessor for the current pathname. */
+/** Reactive accessor for the current pathname (re-render isolated — only changes when the path does). */
 export function usePathname(): () => string {
-  const router = useRouter()
-  return () => router.location().pathname
+  return useRouter().select((state) => state.pathname)
 }
 
 let cachedRouter: Router | null = null

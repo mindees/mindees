@@ -14,11 +14,37 @@
 import ts from 'typescript'
 import type { Diagnostic } from './types'
 
-/** Synthetic ambient module that gives the single-module gate a JSX environment. */
+/**
+ * Synthetic ambient JSX environment for the single-module gate. The framework ships
+ * **automatic JSX** (`jsxImportSource: '@mindees/core'`), so the gate must type-check
+ * idiomatic components that import NOTHING — JSX resolves through the runtime module's
+ * `JSX` namespace. We declare that runtime module ambiently (production + dev) so the gate
+ * finds it under `noResolve`, and keep a global `JSX` namespace as a backstop.
+ */
 const JSX_LIB_FILE = '__mindees_jsx__.d.ts'
 const JSX_LIB_SOURCE = `declare namespace JSX {
   interface IntrinsicElements { [name: string]: Record<string, unknown> }
   type Element = unknown
+  interface ElementChildrenAttribute { children: object }
+}
+declare module '@mindees/core/jsx-runtime' {
+  export namespace JSX {
+    interface IntrinsicElements { [name: string]: Record<string, unknown> }
+    type Element = unknown
+    interface ElementChildrenAttribute { children: object }
+  }
+  export const jsx: (...args: unknown[]) => unknown
+  export const jsxs: (...args: unknown[]) => unknown
+  export const Fragment: unknown
+}
+declare module '@mindees/core/jsx-dev-runtime' {
+  export namespace JSX {
+    interface IntrinsicElements { [name: string]: Record<string, unknown> }
+    type Element = unknown
+    interface ElementChildrenAttribute { children: object }
+  }
+  export const jsxDEV: (...args: unknown[]) => unknown
+  export const Fragment: unknown
 }
 `
 
@@ -40,9 +66,11 @@ function defaultOptions(): ts.CompilerOptions {
     target: ts.ScriptTarget.ES2023,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
-    jsx: ts.JsxEmit.React,
-    jsxFactory: 'createElement',
-    jsxFragmentFactory: 'Fragment',
+    // Automatic JSX — the framework's shipped runtime. Idiomatic components import
+    // nothing; JSX resolves through `@mindees/core/jsx-runtime`'s `JSX` namespace
+    // (declared ambiently in JSX_LIB_SOURCE so the gate finds it under noResolve).
+    jsx: ts.JsxEmit.ReactJSX,
+    jsxImportSource: '@mindees/core',
     noEmit: true,
     skipLibCheck: true,
     // Type-check a single module in isolation; imports are not resolved here

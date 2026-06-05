@@ -21,7 +21,11 @@ describe('tree-flattening', () => {
     // The marker is hoisted into the module, so output never throws
     // "ReferenceError: _static is not defined" at runtime.
     expect(code).toContain('const _static =')
-    const body = code.replace(/\bexport\s+/g, '')
+    // Strip the export keyword + the injected `@mindees/core` runtime import (createElement
+    // is supplied as a param here) so the body runs inside `new Function`.
+    const body = code
+      .replace(/\bexport\s+/g, '')
+      .replace(/^\s*import\b[^\n]*from\s*["']@mindees\/core["'];?\s*$/gm, '')
     const run = new Function('createElement', `${body}\nreturn a`) as (
       createElement: (type: string, props: unknown, ...kids: unknown[]) => unknown,
     ) => unknown
