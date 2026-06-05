@@ -66,6 +66,12 @@ export {
 } from './environment'
 export { type BaseProps, type Reactive, resolveStyle, toHostProps } from './host'
 export {
+  FocusScope,
+  type FocusScopeProps,
+  Modal,
+  type ModalProps,
+} from './overlay'
+export {
   Button,
   type ButtonProps,
   Column,

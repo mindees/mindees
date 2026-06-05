@@ -87,9 +87,21 @@ function serializeHeadless(node: HeadlessNode, options?: SerializeOptions): stri
   return `<${tag}${attrs}>${inner}</${tag}>`
 }
 
+/** Options for {@link createHeadlessBackend}. */
+export interface HeadlessBackendOptions {
+  /**
+   * A designated overlay node for portals. Omit (the default) and `overlayRoot` is unimplemented,
+   * so portals mount IN PLACE — the SSR-correct behavior (`renderToString` only serializes the
+   * root's own children). Pass a node to test relocated portal placement.
+   */
+  readonly overlayRoot?: HeadlessNode
+}
+
 /** Create a {@link SerializableBackend} backed by an in-memory tree. */
-export function createHeadlessBackend(): SerializableBackend<HeadlessNode> {
-  return {
+export function createHeadlessBackend(
+  options: HeadlessBackendOptions = {},
+): SerializableBackend<HeadlessNode> {
+  const backend: SerializableBackend<HeadlessNode> = {
     createElement(type: string): HeadlessNode {
       return { type, props: {}, text: '', children: [], parent: null }
     },
@@ -151,6 +163,12 @@ export function createHeadlessBackend(): SerializableBackend<HeadlessNode> {
 
     serialize: serializeHeadless,
   }
+  // Only expose overlayRoot when a target was provided, so the default stays in-place (SSR-correct).
+  if (options.overlayRoot) {
+    const target = options.overlayRoot
+    backend.overlayRoot = () => target
+  }
+  return backend
 }
 
 /** Whether a prop key is an event handler (`onClick`, `onPress`, …). */

@@ -137,6 +137,7 @@ export function createNativeCommandBackend(
     children: [],
   }
 
+  let overlay: NativeCommandNode | null = null // lazily-created portal overlay (see overlayRoot)
   const pending: NativeCommand[] = []
   /** handlerId → handler function. The function never enters the command stream. */
   const handlers = new Map<string, (event?: unknown) => void>()
@@ -287,6 +288,32 @@ export function createNativeCommandBackend(
 
     isText(node: NativeCommandNode): boolean {
       return node.kind === 'text'
+    },
+
+    overlayRoot(): NativeCommandNode | null {
+      if (overlay) return overlay
+      // A dedicated 'overlay' element under root: better z-order than the content container, and a
+      // host can map the `data-mindees-overlay` marker to a window-level container. Until a host
+      // honors it, modals render here (a child of root) — declarative, never silently dropped.
+      const node: NativeCommandNode = {
+        id: nextId(),
+        kind: 'element',
+        tag: 'overlay',
+        text: '',
+        parent: root,
+        children: [],
+      }
+      emit({ type: 'createNode', id: node.id, tag: 'overlay' })
+      emit({ type: 'setProp', id: node.id, name: 'data-mindees-overlay', value: 'true' })
+      root.children.push(node)
+      emit({
+        type: 'insertChild',
+        parentId: root.id,
+        childId: node.id,
+        index: root.children.length - 1,
+      })
+      overlay = node
+      return overlay
     },
 
     getCommands(): readonly NativeCommand[] {

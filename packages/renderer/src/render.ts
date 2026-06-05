@@ -22,6 +22,7 @@ import {
   ELEMENT_TYPE,
   effect,
   isKeyedRegion,
+  isPortal,
   type MindeesElement,
   type MindeesNode,
   onCleanup,
@@ -29,6 +30,7 @@ import {
 } from '@mindees/core'
 import type { HostBackend } from './backend'
 import { bindKeyedChild } from './for'
+import { bindPortalChild } from './portal'
 
 /** A dynamic value: pass a function and the binding reacts to its signals. */
 type MaybeReactive<T> = T | (() => T)
@@ -141,6 +143,11 @@ export function mountNode<N>(
     return bindKeyedChild(node, backend, parent, anchor)
   }
 
+  // Portal region → relocate children to the overlay target (renders above the tree).
+  if (isPortal(node)) {
+    return bindPortalChild(node, backend, parent, anchor)
+  }
+
   // Function node → a reactive region (an accessor `() => MindeesNode`). Handled
   // uniformly here so it works at the top level and as a child.
   if (typeof node === 'function') {
@@ -175,10 +182,15 @@ export function mountNode<N>(
     // Host element.
     const el = backend.createElement(type)
     for (const [key, value] of Object.entries(node.props)) {
+      if (key === 'ref') continue // a callback, not an attr — invoked after insert
       bindProp(backend, el, key, value)
     }
     mountChildren(node.children, backend, el)
     backend.insert(parent, el, anchor)
+    // `ref: (hostNode) => void` — fired once the element is in the tree, so a caller (e.g. a
+    // focus scope) can capture the host node. Host-string elements only; opaque node type `N`.
+    const ref = node.props.ref
+    if (typeof ref === 'function') (ref as (node: N) => void)(el)
     return [el]
   }
 

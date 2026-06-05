@@ -127,6 +127,7 @@ export function createDomBackend(doc?: DomDocument): HostBackend<DomNode> {
     )
   }
   const document = documentRef
+  let overlay: DomElement | null = null // lazily-created portal overlay layer (see overlayRoot)
 
   return {
     createElement: (type) =>
@@ -203,6 +204,22 @@ export function createDomBackend(doc?: DomDocument): HostBackend<DomNode> {
     parentOf: (node) => node.parentNode,
     nextSibling: (node) => node.nextSibling,
     isText: (node) => node.nodeType === TEXT_NODE,
+
+    overlayRoot(): DomNode | null {
+      if (overlay) return overlay
+      // Lazily create ONE overlay layer on <body> (fallback <html>) — zero-config portals.
+      const host = document as unknown as {
+        body?: { appendChild(n: DomNode): void }
+        documentElement?: { appendChild(n: DomNode): void }
+      }
+      const mount = host.body ?? host.documentElement
+      if (!mount) return null // no DOM host (e.g. a bare document) → portal falls back in place
+      const layer = document.createElement('div')
+      layer.setAttribute('data-mindees-overlay', '')
+      mount.appendChild(layer)
+      overlay = layer
+      return overlay
+    },
   }
 }
 

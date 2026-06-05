@@ -39,6 +39,7 @@ export type MindeesNode =
   // the correct "some item type" here.
   // biome-ignore lint/suspicious/noExplicitAny: see above — invariant T at a node boundary.
   | KeyedRegion<any>
+  | PortalRegion
   | string
   | number
   | boolean
@@ -117,6 +118,47 @@ export function isKeyedRegion(value: unknown): value is KeyedRegion {
     typeof value === 'object' &&
     value !== null &&
     (value as { $$keyed?: unknown }).$$keyed === KEYED_REGION
+  )
+}
+
+/** Brand identifying a portal region (children relocated to an overlay target above the tree). */
+export const PORTAL: unique symbol = Symbol.for('mindees.portal')
+
+/**
+ * A portal: its children render into a different host parent (an overlay/root layer) than their
+ * position in the tree, while staying owned by the logical owner so reactive disposal + unmount
+ * still work. The renderer materializes it (`bindPortalChild`); build one with {@link portal}.
+ */
+export interface PortalRegion {
+  readonly $$portal: typeof PORTAL
+  /** Children to relocate, normalized to a (reactive) accessor. */
+  readonly children: () => MindeesNode
+  /** Optional explicit host target (an `N`); else the backend's overlay root; else the local parent. Opaque to core. */
+  readonly mount: unknown
+}
+
+/**
+ * Build a {@link PortalRegion} — relocate `children` to an overlay target. Pass `opts.mount` to
+ * override the target host node; otherwise the renderer uses the backend's overlay root (or, with
+ * no overlay, mounts in place — the SSR-correct default).
+ */
+export function portal(
+  children: MindeesNode | (() => MindeesNode),
+  opts?: { readonly mount?: unknown },
+): PortalRegion {
+  return {
+    $$portal: PORTAL,
+    children: typeof children === 'function' ? (children as () => MindeesNode) : () => children,
+    mount: opts?.mount,
+  }
+}
+
+/** Type guard: is `value` a {@link PortalRegion}? */
+export function isPortal(value: unknown): value is PortalRegion {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { $$portal?: unknown }).$$portal === PORTAL
   )
 }
 

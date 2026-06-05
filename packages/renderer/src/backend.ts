@@ -44,6 +44,13 @@ export interface HostBackend<N> {
   nextSibling(node: N): N | null
   /** True if `node` is a text host node (vs an element). */
   isText(node: N): boolean
+  /**
+   * Optional capability: the host node that portaled children mount into — an overlay/root layer
+   * above normal flow. The renderer's portal binding is the ONLY caller. Omit (or return `null`)
+   * and portals fall back to their local parent (in-place mount) — the correct, deterministic
+   * SSR / no-layer behavior.
+   */
+  overlayRoot?(): N | null
 }
 
 /** Options controlling {@link SerializableBackend.serialize}. */
