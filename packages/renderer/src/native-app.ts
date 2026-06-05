@@ -31,13 +31,22 @@ import {
   createScheduler,
   type FrameSource,
   type MindeesNode,
-  type Scheduler,
   setFrameSource,
   setReactiveScheduler,
 } from '@mindees/core'
 import { createNativeCommandBackend } from './native-command-backend'
 import type { NativeNodeId } from './native-protocol'
 import { render } from './render'
+
+// The reactive scheduler + animation frame source are PROCESS globals (one per runtime). This guard
+// makes a second `createNativeApp` that would re-wire them fail loudly instead of silently stealing
+// the first app's engines. Reset with `_resetNativeAppEngines()` between tests.
+let enginesWired = false
+
+/** @internal Test-only: reset the process-global engine-wiring guard. */
+export function _resetNativeAppEngines(): void {
+  enginesWired = false
+}
 
 /** The contract a native host drives: render once, dispatch events, and tick frames. */
 export interface NativeApp {
@@ -77,11 +86,13 @@ export interface CreateNativeAppOptions {
    */
   readonly expose?: boolean | string
   /**
-   * Reactive scheduler to install (powers `startTransition`/`deferred`/normal-lane effects).
-   * Default: a microtask-drained scheduler that flushes the command batch after each drain. Pass
-   * `false` to run the pure synchronous lane (no concurrency).
+   * Install the reactive scheduler that powers `startTransition`/`deferred`/normal-lane effects.
+   * `createNativeApp` owns this scheduler so it can flush the command batch after each microtask
+   * drain (otherwise deferred mutations would recompute but never reach the host). Pass `false` to
+   * run the pure synchronous lane; to use a fully custom scheduler, pass `false` and call
+   * `setReactiveScheduler` yourself (you then own flushing).
    */
-  readonly scheduler?: Scheduler | false
+  readonly scheduler?: false
   /**
    * Install the reactive scheduler + the vsync frame source. Default: `true` when the app is
    * exposed AND a host (`globalThis.MindeesHost`) is present — so SSR/Node/tests install nothing
@@ -129,9 +140,21 @@ export function createNativeApp(
   let storedTick: ((nowMs: number) => void) | null = null
 
   if (wireEngines) {
+    if (enginesWired) {
+      // The reactive scheduler + frame source are process globals; a second wiring would silently
+      // steal the first app's engines. Fail loudly instead. (One app per runtime; tests reset via
+      // _resetNativeAppEngines.)
+      throw new Error(
+        'createNativeApp: the reactive engines are already wired by another app instance. Create one ' +
+          'app per runtime, or pass `wireEngines: false` (and wire the scheduler/frame source yourself).',
+      )
+    }
+    enginesWired = true
+
     // A microtask-drained scheduler. After each drained task we run ONE coalesced trailing flush so
     // deferred/startTransition/normal-lane tree mutations (which land on a microtask, outside the
-    // frameTick + dispatchEvent windows) still reach the host — one frame late, never dropped.
+    // frameTick + dispatchEvent windows) still reach the host — one frame late, never dropped. We
+    // OWN this scheduler so the trailing flush is always wired (a custom scheduler couldn't be).
     if (options.scheduler !== false) {
       let flushQueued = false
       const trailingFlush = (): void => {
@@ -142,8 +165,7 @@ export function createNativeApp(
           flush()
         })
       }
-      const scheduler =
-        options.scheduler ??
+      setReactiveScheduler(
         createScheduler({
           scheduleMicrotask: (cb) =>
             queueMicrotask(() => {
@@ -156,32 +178,39 @@ export function createNativeApp(
               throw error
             })
           },
-        })
-      setReactiveScheduler(scheduler)
+        }),
+      )
     }
 
     // The vsync frame source: capture the engine's tick + signal the host to run/stop its loop. The
     // subscribe (START) fires the instant the first animation driver arms the loop; the unsubscribe
     // (STOP) fires the instant the last driver settles — so the host's vsync loop runs ONLY while
     // something animates (the battery win), with no separate heuristic to keep in sync.
+    //
+    // CRITICAL: only install the source when a host can actually DRIVE it (MindeesHostFrame present,
+    // i.e. there's a `frameTick` caller + a `setFrameLoopActive` listener). Arming a loop that
+    // nothing ticks would FREEZE animations at their start value — strictly worse than jumping to
+    // the final value. With no driver, leave the source null → animations jump-to-final (safe).
     const hostFrame = (globalThis as { MindeesHostFrame?: HostFrameApi }).MindeesHostFrame
-    const frameSource: FrameSource = (tick) => {
-      storedTick = tick
-      try {
-        hostFrame?.setFrameLoopActive?.(true)
-      } catch {
-        // a throwing host signal must not break arming the loop
-      }
-      return () => {
-        storedTick = null
+    if (hostFrame) {
+      const frameSource: FrameSource = (tick) => {
+        storedTick = tick
         try {
-          hostFrame?.setFrameLoopActive?.(false)
+          hostFrame.setFrameLoopActive?.(true)
         } catch {
-          // ditto: always stop the loop even if the host signal throws
+          // a throwing host signal must not break arming the loop
+        }
+        return () => {
+          storedTick = null
+          try {
+            hostFrame.setFrameLoopActive?.(false)
+          } catch {
+            // ditto: always stop the loop even if the host signal throws
+          }
         }
       }
+      setFrameSource(frameSource)
     }
-    setFrameSource(frameSource)
   }
 
   const app: NativeApp = {
