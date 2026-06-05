@@ -84,6 +84,15 @@ export function createRouterView(router: Router, options: RouterViewOptions = {}
 // Link — typed navigation links
 // ---------------------------------------------------------------------------
 
+/**
+ * When the link prefetches its target's loaders (warming the SWR cache so the destination
+ * resolves instantly). `'intent'` (default) prefetches on hover / press-in / focus — the
+ * Quantum differentiator vs Expo Router's manual-only `router.prefetch`. `'render'` prefetches
+ * on mount; `false` disables it. Prefetch is deduped per link and is a no-op for routes with no
+ * loader.
+ */
+export type PrefetchMode = 'intent' | 'render' | false
+
 /** Extra (non-target) props accepted by a {@link LinkComponent}. */
 export interface LinkOptions {
   /** Replace the current history entry instead of pushing. */
@@ -94,6 +103,8 @@ export interface LinkOptions {
   activeClass?: string
   /** Static class. */
   class?: string
+  /** Auto-prefetch policy (default `'intent'`). */
+  prefetch?: PrefetchMode
   /** Link content. */
   children?: MindeesNode
 }
@@ -114,6 +125,7 @@ interface LinkInput {
   as?: string
   activeClass?: string
   class?: string
+  prefetch?: PrefetchMode
   children?: MindeesNode
 }
 
@@ -169,8 +181,26 @@ export function createLink(router: Router): LinkComponent {
       router.navigate(href, { replace: props.replace === true })
     }
 
+    // Auto-prefetch: warm the target's loaders so navigation resolves instantly. Deduped per
+    // link (preload itself is also SWR-deduped), and a no-op for loader-less routes.
+    const prefetch: PrefetchMode = props.prefetch ?? 'intent'
+    let prefetched = false
+    const doPrefetch = (): void => {
+      if (prefetched || prefetch === false) return
+      prefetched = true
+      router.preload(href)
+    }
+
     const elementProps: Record<string, unknown> = { onClick }
     if (tag === 'a') elementProps.href = href
+    if (prefetch === 'intent') {
+      // Hover (web), press-in (touch/web), and keyboard focus all signal intent.
+      elementProps.onPointerEnter = doPrefetch
+      elementProps.onPointerDown = doPrefetch
+      elementProps.onFocus = doPrefetch
+    } else if (prefetch === 'render') {
+      doPrefetch()
+    }
 
     if (props.activeClass !== undefined) {
       const here = buildPath(props.to, props.params ?? {})

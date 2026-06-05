@@ -28,6 +28,7 @@ export {
   type LinkComponent,
   type LinkOptions,
   type LinkProps,
+  type PrefetchMode,
   type RouterViewOptions,
 } from './components'
 /** Loaders + data (SWR). */
