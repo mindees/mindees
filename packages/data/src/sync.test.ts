@@ -183,3 +183,163 @@ describe('sync — two peers converge through a hub', () => {
     expect(op.hlc.wallMs).toBeLessThan(farFuture) // our clock was clamped, not dragged to +1yr
   })
 })
+
+interface User {
+  name?: string
+  age?: number
+}
+
+describe('sync — per-field LWW', () => {
+  const hlc = (wallMs: number, nodeId = 'a') => ({ wallMs, counter: 0, nodeId })
+
+  it('preserves concurrent edits to DIFFERENT fields of the same record', async () => {
+    const hub = createMemoryHub<User>()
+    const a = createSyncEngine<User>({ nodeId: 'a', transport: hub, now: () => 1000 })
+    const b = createSyncEngine<User>({ nodeId: 'b', transport: hub, now: () => 1000 })
+    a.set('users', 'u1', { name: 'init', age: 0 })
+    await a.sync()
+    await b.sync() // both share the seed record
+
+    // OFFLINE, concurrent edits to DIFFERENT fields.
+    a.set('users', 'u1', { name: 'Ada' })
+    b.set('users', 'u1', { age: 36 })
+    await a.sync()
+    await b.sync()
+    await a.sync()
+
+    // Both edits survive on BOTH replicas — the whole-record-clobber bug is fixed.
+    expect(a.get('u1')).toEqual({ name: 'Ada', age: 36 })
+    expect(b.get('u1')).toEqual({ name: 'Ada', age: 36 })
+  })
+
+  it('set MERGES fields rather than replacing the record', () => {
+    const a = createSyncEngine<User>({
+      nodeId: 'a',
+      transport: createMemoryHub<User>(),
+      now: () => 1,
+    })
+    a.set('users', 'u1', { name: 'Ada' })
+    a.set('users', 'u1', { age: 36 }) // omitting `name` must NOT drop it
+    expect(a.get('u1')).toEqual({ name: 'Ada', age: 36 })
+  })
+
+  it('resurrects only the fields written after a whole-record delete', () => {
+    const log = createMutationLog<User>()
+    const op = (seq: number, w: number, body: Partial<Op<User>>): Op<User> =>
+      ({
+        id: `a:${seq}`,
+        actor: 'a',
+        seq,
+        collection: 'u',
+        recordId: 'u1',
+        hlc: hlc(w),
+        ...body,
+      }) as Op<User>
+    log.apply(op(1, 1, { kind: 'set', value: { name: 'Ada', age: 1 } }))
+    log.apply(op(2, 2, { kind: 'del' }))
+    expect(log.get('u1')).toBeUndefined() // deleted
+    log.apply(op(3, 3, { kind: 'set', value: { name: 'Bob' } })) // newer than the tomb
+    expect(log.get('u1')).toEqual({ name: 'Bob' }) // name resurrects; age (pre-delete) stays shadowed
+  })
+
+  it('migrates a legacy whole-record register dump on restore', () => {
+    const legacy = [['u1', { stamp: hlc(5), op: 'set', value: { name: 'Ada', age: 9 } }]]
+    const log = createMutationLog<User>(legacy as never)
+    expect(log.get('u1')).toEqual({ name: 'Ada', age: 9 })
+    // …and per-field merges apply on top of the migrated state.
+    log.apply({
+      id: 'b:1',
+      actor: 'b',
+      seq: 1,
+      collection: 'u',
+      recordId: 'u1',
+      hlc: hlc(6, 'b'),
+      kind: 'set',
+      value: { age: 10 },
+    })
+    expect(log.get('u1')).toEqual({ name: 'Ada', age: 10 })
+  })
+
+  it('overlapping sync() calls each push their ops (no silent coalesce no-op)', async () => {
+    const hub = createMemoryHub<User>()
+    const a = createSyncEngine<User>({ nodeId: 'a', transport: hub, now: () => 1 })
+    const b = createSyncEngine<User>({ nodeId: 'b', transport: hub, now: () => 1 })
+    a.set('users', 'u1', { name: 'A' })
+    const p1 = a.sync() // run 1 (in flight)
+    a.set('users', 'u2', { name: 'B' })
+    const p2 = a.sync() // run 2 while run 1 is in flight — must still push u2
+    await Promise.all([p1, p2])
+    await b.sync()
+    expect(b.get('u1')).toEqual({ name: 'A' })
+    expect(b.get('u2')).toEqual({ name: 'B' }) // pre-fix: dropped by the early-return coalesce
+  })
+})
+
+describe('sync — convergence + migration hardening', () => {
+  const hlc2 = (wallMs: number, nodeId = 'a') => ({ wallMs, counter: 0, nodeId })
+  const setOp = (
+    seq: number,
+    w: number,
+    recordId: string,
+    value: object,
+  ): Op<Record<string, unknown>> => ({
+    id: `a:${seq}`,
+    actor: 'a',
+    seq,
+    collection: 'u',
+    recordId,
+    hlc: hlc2(w),
+    kind: 'set',
+    value,
+  })
+
+  it('dump() is byte-identical across op orderings (canonical)', () => {
+    const a = createMutationLog<Record<string, unknown>>()
+    a.apply(setOp(1, 1, 'r1', { name: 'x' }))
+    a.apply(setOp(2, 2, 'r1', { age: 1 }))
+    a.apply(setOp(3, 1, 'r2', { name: 'y' }))
+    const b = createMutationLog<Record<string, unknown>>()
+    b.apply(setOp(3, 1, 'r2', { name: 'y' })) // r2 first
+    b.apply(setOp(2, 2, 'r1', { age: 1 })) // r1 fields reversed
+    b.apply(setOp(1, 1, 'r1', { name: 'x' }))
+    expect(JSON.stringify(a.dump())).toBe(JSON.stringify(b.dump()))
+  })
+
+  it('preserves a legacy array / primitive record through migration', () => {
+    const legacy = [
+      ['r1', { stamp: hlc2(5), op: 'set', value: [1, 2, 3] }],
+      ['r2', { stamp: hlc2(5), op: 'set', value: 'hello' }],
+    ]
+    const log = createMutationLog<unknown>(legacy as never)
+    expect(log.get('r1')).toEqual([1, 2, 3])
+    expect(log.get('r2')).toBe('hello')
+  })
+
+  it('treats a field named __proto__ as data (no prototype pollution)', () => {
+    const log = createMutationLog<Record<string, unknown>>()
+    log.apply(setOp(1, 1, 'r1', { ['__proto__']: { polluted: true } }))
+    const v = log.get('r1') as Record<string, unknown>
+    expect(Object.hasOwn(v, '__proto__')).toBe(true)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined() // global prototype untouched
+  })
+
+  it('clears acked ops from the outbox even when aborted right after push', async () => {
+    const hub = createMemoryHub<User>()
+    const signal = { aborted: false }
+    const a = createSyncEngine<User>({
+      nodeId: 'a',
+      transport: {
+        push: async (ops) => {
+          const r = await hub.push(ops)
+          signal.aborted = true // abort lands between push-resolve and the outbox splice
+          return r
+        },
+        pull: (c) => hub.pull(c),
+      },
+      now: () => 1,
+    })
+    a.set('users', 'u1', { name: 'A' })
+    await a.sync(signal)
+    expect(a.pending()).toHaveLength(0)
+  })
+})
