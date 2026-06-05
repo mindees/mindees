@@ -6,6 +6,8 @@ import {
   Fragment,
   createElement as h,
   isElement,
+  isPortal,
+  portal,
   renderComponent,
 } from './component'
 
@@ -79,5 +81,28 @@ describe('renderComponent', () => {
 describe('exports', () => {
   it('createElement is available', () => {
     expect(typeof createElement).toBe('function')
+  })
+})
+
+describe('portal', () => {
+  it('builds a branded PortalRegion and isPortal recognizes only it', () => {
+    const region = portal(createElement('text', null, 'modal'))
+    expect(isPortal(region)).toBe(true)
+    expect(isPortal(createElement('view'))).toBe(false)
+    expect(isPortal(null)).toBe(false)
+    expect(isPortal(() => null)).toBe(false)
+  })
+
+  it('normalizes children to an accessor and carries an optional mount target', () => {
+    const node = createElement('text', null, 'x')
+    const staticPortal = portal(node)
+    expect(typeof staticPortal.children).toBe('function')
+    expect(staticPortal.children()).toBe(node)
+    expect(staticPortal.mount).toBeUndefined()
+
+    const target = {}
+    const reactivePortal = portal(() => node, { mount: target })
+    expect(reactivePortal.children()).toBe(node)
+    expect(reactivePortal.mount).toBe(target)
   })
 })

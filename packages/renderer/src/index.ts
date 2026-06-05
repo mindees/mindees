@@ -76,6 +76,8 @@ export {
   type UnregisterEventCommand,
   type UpdateTextCommand,
 } from './native-protocol'
+/** Portal reconciliation (the renderer side of core's PortalRegion). */
+export { bindPortalChild } from './portal'
 /** The fine-grained reactive reconciler. */
 export { type Mounted, mountNode, render } from './render'
 /** Server-side rendering + hydration (web). */
