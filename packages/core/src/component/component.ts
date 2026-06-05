@@ -34,7 +34,11 @@ export type Component<P = Record<string, unknown>> = (props: P) => MindeesNode
  */
 export type MindeesNode =
   | MindeesElement
-  | KeyedRegion
+  // A node may hold a keyed region of ANY item type. KeyedRegion is invariant in T (its
+  // mapFn/key take T), so `KeyedRegion<unknown>` would reject `KeyedRegion<Row>`; `any` is
+  // the correct "some item type" here.
+  // biome-ignore lint/suspicious/noExplicitAny: see above — invariant T at a node boundary.
+  | KeyedRegion<any>
   | string
   | number
   | boolean

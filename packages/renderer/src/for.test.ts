@@ -1,6 +1,7 @@
 import { createElement, keyedRegion, type MindeesNode, onCleanup, signal } from '@mindees/core'
 import { describe, expect, it } from 'vitest'
-import { createHeadlessBackend, createHeadlessRoot, type HeadlessNode } from './headless'
+import { createHeadlessBackend, createHeadlessRoot } from './headless'
+import { createNativeCommandBackend } from './native-command-backend'
 import { render } from './render'
 
 function mount(node: MindeesNode) {
@@ -154,5 +155,69 @@ describe('bindKeyedChild — keyed reconciliation', () => {
     const after = rows()
     expect(after[0]).toBe(before[1]) // identity reused by object identity
     expect(after[1]).toBe(before[0])
+  })
+})
+
+describe('bindKeyedChild — robustness (adversarial findings)', () => {
+  it('is exception-safe: a mapFn throw mid-create does not corrupt the cache', () => {
+    let throwOn3 = false
+    const disposed: number[] = []
+    const items = signal(rowsOf({ id: 1, name: 'a' }))
+    const region = keyedRegion<Row>({
+      each: () => items(),
+      key: (r) => r.id,
+      children: (item) => {
+        const id = item().id
+        onCleanup(() => disposed.push(id))
+        if (throwOn3 && id === 3) throw new Error('boom')
+        return createElement('view', { 'data-id': id }, () => item().name)
+      },
+    })
+    const { html, rows } = mount(region)
+    expect(html()).toBe('<view data-id="1">a</view>')
+
+    // An update whose 3rd row throws mid-create.
+    throwOn3 = true
+    let threw = false
+    try {
+      items.set(rowsOf({ id: 1, name: 'a' }, { id: 2, name: 'b' }, { id: 3, name: 'c' }))
+    } catch {
+      threw = true
+    }
+    expect(threw).toBe(true)
+    // The just-created id2 was rolled back (disposed + removed); id1 is intact, not duplicated.
+    expect(disposed).toContain(2)
+    expect(html()).toBe('<view data-id="1">a</view>')
+    expect(rows()).toHaveLength(1)
+
+    // A subsequent CLEAN update reconciles against an un-corrupted cache (no duplicate/orphan).
+    throwOn3 = false
+    items.set(rowsOf({ id: 1, name: 'A2' }))
+    expect(html()).toBe('<view data-id="1">A2</view>')
+    expect(rows()).toHaveLength(1)
+  })
+
+  it('append moves zero existing nodes on the native command stream', () => {
+    const backend = createNativeCommandBackend()
+    const items = signal(rowsOf({ id: 1, name: 'a' }, { id: 2, name: 'b' }, { id: 3, name: 'c' }))
+    render(
+      listRegion(() => items()),
+      backend,
+      backend.root,
+    )
+    backend.flushCommands() // discard the initial mount commands
+
+    items.set(
+      rowsOf(
+        { id: 1, name: 'a' },
+        { id: 2, name: 'b' },
+        { id: 3, name: 'c' },
+        { id: 4, name: 'd' },
+      ),
+    )
+    const cmds = backend.flushCommands()
+    // A pure append creates + inserts the new row and moves NOTHING — no detach/reattach churn.
+    expect(cmds.some((c) => c.type === 'removeChild')).toBe(false)
+    expect(cmds.some((c) => c.type === 'createNode')).toBe(true) // id 4 created
   })
 })

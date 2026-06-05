@@ -86,8 +86,9 @@ export function bindKeyedChild<N, T>(
   const keyOf = region.key ?? ((item: T) => item as unknown)
 
   const removeNodes = (toRemove: readonly N[]): void => {
-    // parentOf-guarded: a nested region's outer re-run may have already detached these.
-    for (const node of toRemove) if (backend.parentOf(node)) backend.remove(parent, node)
+    // Guard on parent IDENTITY (not truthiness): a nested region's outer re-run may have
+    // already detached these, and the DOM backend's removeChild throws on a non-child.
+    for (const node of toRemove) if (backend.parentOf(node) === parent) backend.remove(parent, node)
   }
   const clearFallback = (): void => {
     if (fallbackDispose) {
@@ -140,57 +141,76 @@ export function bindKeyedChild<N, T>(
           cache.clear()
           const fallback = region.fallback
           if (fallback && !fallbackDispose) {
-            fallbackNodes = createRoot((dispose) => {
-              fallbackDispose = dispose
-              return mountNode(fallback(), backend, parent, marker)
-            })
+            try {
+              fallbackNodes = createRoot((dispose) => {
+                fallbackDispose = dispose
+                return mountNode(fallback(), backend, parent, marker)
+              })
+            } catch (error) {
+              clearFallback() // roll back a partially-mounted fallback, then surface the error
+              throw error
+            }
           }
           rebuildLiveNodes([])
           return
         }
         clearFallback() // non-empty: never leave a stale fallback mounted
 
-        // Record each surviving row's OLD position (insertion order) before we mutate the cache.
+        // Record each surviving row's OLD position (insertion order). `cache` stays AUTHORITATIVE
+        // until the build below fully succeeds, so a mapFn throw can't strand/duplicate survivors.
         const oldPos = new Map<Entry<N, T>, number>()
         let p = 0
         for (const entry of cache.values()) oldPos.set(entry, p++)
 
         // Build the new ordered rows: reuse on a key hit (patch signals), else create a root.
+        // Exception-safe: if a row's mapFn throws, tear down only the rows created in THIS pass
+        // and rethrow, leaving `cache` + the host tree exactly as they were (no duplicate/leaked
+        // rows that survive even a later clean update — the bug an adversarial review caught).
         const newCache = new Map<unknown, Entry<N, T>>()
         const order: Entry<N, T>[] = new Array(n)
-        for (let i = 0; i < n; i++) {
-          const k = keys[i]
-          const existing = cache.get(k)
-          if (existing) {
-            existing.itemSig.set(items[i] as T) // Object.is-gated → a same-ref item is a no-op
-            existing.indexSig.set(i)
-            cache.delete(k) // whatever stays in `cache` after this loop was removed
-            newCache.set(k, existing)
-            order[i] = existing
-          } else {
-            const item = items[i] as T
-            const captured = i
-            const entry = createRoot<Entry<N, T>>((dispose) => {
-              const itemSig = signal(item)
-              const indexSig = signal(captured)
-              const content = mountNode(
-                region.mapFn(
-                  () => itemSig(),
-                  () => indexSig(),
-                ),
-                backend,
-                parent,
-                marker,
-              )
-              return { nodes: content, itemSig, indexSig, dispose }
-            })
-            newCache.set(k, entry)
-            order[i] = entry
+        const reused = new Set<unknown>()
+        const created: Entry<N, T>[] = []
+        try {
+          for (let i = 0; i < n; i++) {
+            const k = keys[i]
+            const existing = cache.get(k)
+            if (existing) {
+              existing.itemSig.set(items[i] as T) // Object.is-gated → a same-ref item is a no-op
+              existing.indexSig.set(i)
+              reused.add(k)
+              newCache.set(k, existing)
+              order[i] = existing
+            } else {
+              const item = items[i] as T
+              const captured = i
+              const entry = createRoot<Entry<N, T>>((dispose) => {
+                const itemSig = signal(item)
+                const indexSig = signal(captured)
+                const content = mountNode(
+                  region.mapFn(
+                    () => itemSig(),
+                    () => indexSig(),
+                  ),
+                  backend,
+                  parent,
+                  marker,
+                )
+                return { nodes: content, itemSig, indexSig, dispose }
+              })
+              created.push(entry)
+              newCache.set(k, entry)
+              order[i] = entry
+            }
           }
+        } catch (error) {
+          for (const entry of created) disposeEntry(entry) // survivors stay in `cache`, untouched
+          throw error
         }
 
-        // Dispose rows whose key disappeared (the leftovers in the old cache).
-        for (const entry of cache.values()) disposeEntry(entry)
+        // Commit: dispose rows whose key disappeared (old cache minus the reused ones).
+        for (const [k, entry] of cache) {
+          if (!reused.has(k)) disposeEntry(entry)
+        }
 
         // Minimal moves: the LIS of survivors' old positions is already correctly ordered and
         // stays put; everything else (created rows + out-of-order survivors) is inserted.
@@ -207,12 +227,17 @@ export function bindKeyedChild<N, T>(
         const stable = new Set<number>()
         for (const idx of lis) stable.add(survivorTargetIndex[idx] as number)
 
-        // Walk target order last → first; insert any non-stable row before the running anchor.
+        // Walk target order last → first; insert a non-stable row before the running anchor ONLY
+        // if it isn't already there (its last node's next sibling is the anchor). The position
+        // check makes a pure append move zero nodes (no spurious native detach/reattach).
         let anchor: N = marker
         for (let i = n - 1; i >= 0; i--) {
           const entry = order[i] as Entry<N, T>
-          if (!stable.has(i)) {
-            for (const node of entry.nodes) backend.insert(parent, node, anchor)
+          if (!stable.has(i) && entry.nodes.length > 0) {
+            const last = entry.nodes[entry.nodes.length - 1] as N
+            if (backend.nextSibling(last) !== anchor) {
+              for (const node of entry.nodes) backend.insert(parent, node, anchor)
+            }
           }
           if (entry.nodes.length > 0) anchor = entry.nodes[0] as N
         }
