@@ -1,5 +1,17 @@
 # create-mindees
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [919c7c1]
+- Updated dependencies [503be19]
+- Updated dependencies [4d1707d]
+- Updated dependencies [4591937]
+- Updated dependencies [f8318f9]
+  - @mindees/cli@0.5.0
+  - @mindees/core@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

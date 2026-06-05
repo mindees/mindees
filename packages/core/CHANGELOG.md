@@ -1,5 +1,63 @@
 # @mindees/core
 
+## 0.5.0
+
+### Minor Changes
+
+- 503be19: Add an **animation system** — RN `Animated`/Reanimated + Flutter `AnimationController` parity, built
+  entirely on the reactive core.
+
+  - **`@mindees/core`**: `animate(initial)` returns an `AnimatedValue` that **is a reactive accessor**
+    (read it in a `style` fn → only that node re-renders, no renderer surface). Drive it with
+    `timing(av, { to, duration, easing })` or `spring(av, { to, stiffness, damping })`; `interpolate`
+    maps a value through ranges; `cubicBezier` + named easings. One injected `FrameSource`
+    (`setFrameSource` — mirroring `setReactiveScheduler`; `rafFrameSource()` for web, `manualFrameSource()`
+    for tests, vsync for native) drives a single loop that ticks all animations in **one `batch` per
+    frame** (glitch-free). With **no frame source** (SSR/headless), animations jump to their final value
+    synchronously — deterministic, never a hang. Animations started in a component scope auto-stop on
+    unmount; springs have a stability cap; `done` + `onComplete` settle exactly once.
+  - **`@mindees/atlas`**: `motion` (the easing tokens as ready easing fns) + `animateTo` (timing with
+    the standard duration/easing token defaults).
+
+- 4d1707d: Add a **gesture system** — RN Gesture Handler / Flutter GestureDetector parity, built on the reactive
+  core and composing with the animation engine.
+
+  - **`@mindees/core`**: `tap`, `longPress`, `pan`, `pinch`, `swipe` recognizer factories. Each returns
+    `{ handlers, state, reset }` — spread `handlers` (`onPointerDown/Move/Up/Cancel`) onto an element,
+    read `state` (reactive signals: pan's `translationX/Y` + `velocityX/Y`, pinch's `scale`/`focal`, …)
+    in a `style` accessor. `composeGestures([...])` merges recognizers onto one element (required since
+    the renderer binds a single listener per event). `panAnimated(x, y, { release })` is the headline:
+    drag follows the finger and **springs to a target seeded with the gesture velocity** on release.
+    Platform differences live only in `normalizePointer` (web PointerEvent + native payload); an
+    injectable clock makes long-press deterministic; SSR-safe (pure payload → signal).
+  - **`@mindees/atlas`**: `GestureView` — attach a recognizer to a view (handlers wired, auto-`reset`
+    on unmount).
+
+  Native multi-touch payload wiring is a documented research-track follow-up; an explicit exclusive
+  gesture arena (beyond per-recognizer slop disambiguation) is a follow-up.
+
+- 4591937: Wire the priority scheduler into reactivity — concurrent-class prioritized / deferred updates,
+  **without changing the synchronous default**. `effect(fn, { priority: 'normal' })` defers its
+  re-runs through a scheduler injected via `setReactiveScheduler(scheduler)` (interaction priority /
+  deferred heavy work); rapid re-stales coalesce to one run (latest value), and disposal cancels any
+  pending flush. The first run is always synchronous (deps + initial paint), and with no scheduler
+  injected — every existing call site, all tests, and SSR — `'normal'` falls back to synchronous, so
+  the glitch-free synchronous default is provably untouched (one `lane` field defaulting to `'sync'`
+  plus a single `flushEffects` branch that is unreachable unless a scheduler is set). `startTransition`
+  / `deferred` ergonomics + a native frame source are an additive follow-up.
+- f8318f9: Add `startTransition` and `deferred` — the ergonomic concurrent layer over the scheduler primitive.
+
+  - **`startTransition(fn)`** applies the writes in `fn` immediately (reads see the latest) but defers
+    the effects they invalidate onto the scheduler's low-priority lane — so a heavy re-render from a
+    keystroke doesn't block the interaction (the `useTransition` pattern). Coalesces the transition's
+    writes into one deferred flush.
+  - **`deferred(source)`** returns a low-priority view of an accessor that lags under sustained updates
+    (the `useDeferredValue` pattern — show stale results while the latest compute).
+
+  Both degrade to **synchronous** when no scheduler is injected (every existing call site, SSR, tests),
+  so the synchronous default is unchanged. The deferred lane also gained a runaway-loop cap and
+  guaranteed-unique per-effect scheduler keys (from the primitive's adversarial review).
+
 ## 0.4.0
 
 ### Minor Changes

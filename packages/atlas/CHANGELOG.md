@@ -1,5 +1,49 @@
 # @mindees/atlas
 
+## 0.5.0
+
+### Minor Changes
+
+- 503be19: Add an **animation system** — RN `Animated`/Reanimated + Flutter `AnimationController` parity, built
+  entirely on the reactive core.
+
+  - **`@mindees/core`**: `animate(initial)` returns an `AnimatedValue` that **is a reactive accessor**
+    (read it in a `style` fn → only that node re-renders, no renderer surface). Drive it with
+    `timing(av, { to, duration, easing })` or `spring(av, { to, stiffness, damping })`; `interpolate`
+    maps a value through ranges; `cubicBezier` + named easings. One injected `FrameSource`
+    (`setFrameSource` — mirroring `setReactiveScheduler`; `rafFrameSource()` for web, `manualFrameSource()`
+    for tests, vsync for native) drives a single loop that ticks all animations in **one `batch` per
+    frame** (glitch-free). With **no frame source** (SSR/headless), animations jump to their final value
+    synchronously — deterministic, never a hang. Animations started in a component scope auto-stop on
+    unmount; springs have a stability cap; `done` + `onComplete` settle exactly once.
+  - **`@mindees/atlas`**: `motion` (the easing tokens as ready easing fns) + `animateTo` (timing with
+    the standard duration/easing token defaults).
+
+- 4d1707d: Add a **gesture system** — RN Gesture Handler / Flutter GestureDetector parity, built on the reactive
+  core and composing with the animation engine.
+
+  - **`@mindees/core`**: `tap`, `longPress`, `pan`, `pinch`, `swipe` recognizer factories. Each returns
+    `{ handlers, state, reset }` — spread `handlers` (`onPointerDown/Move/Up/Cancel`) onto an element,
+    read `state` (reactive signals: pan's `translationX/Y` + `velocityX/Y`, pinch's `scale`/`focal`, …)
+    in a `style` accessor. `composeGestures([...])` merges recognizers onto one element (required since
+    the renderer binds a single listener per event). `panAnimated(x, y, { release })` is the headline:
+    drag follows the finger and **springs to a target seeded with the gesture velocity** on release.
+    Platform differences live only in `normalizePointer` (web PointerEvent + native payload); an
+    injectable clock makes long-press deterministic; SSR-safe (pure payload → signal).
+  - **`@mindees/atlas`**: `GestureView` — attach a recognizer to a view (handlers wired, auto-`reset`
+    on unmount).
+
+  Native multi-touch payload wiring is a documented research-track follow-up; an explicit exclusive
+  gesture arena (beyond per-recognizer slop disambiguation) is a follow-up.
+
+### Patch Changes
+
+- Updated dependencies [503be19]
+- Updated dependencies [4d1707d]
+- Updated dependencies [4591937]
+- Updated dependencies [f8318f9]
+  - @mindees/core@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
