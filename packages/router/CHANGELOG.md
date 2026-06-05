@@ -1,5 +1,31 @@
 # @mindees/router
 
+## 0.3.0
+
+### Minor Changes
+
+- 020fba0: `<Link>` now **auto-prefetches** its target's loaders, warming the SWR cache so the destination
+  renders instantly — the Quantum differentiator vs Expo Router's manual-only `router.prefetch`.
+  Policy via `prefetch`: `'intent'` (default — on hover, press-in, or keyboard focus), `'render'`
+  (on mount), or `false`. Deduped per link, and a no-op for routes with no loader.
+
+### Patch Changes
+
+- 25832b1: Fix three router lifecycle/isolation bugs:
+
+  - **`dispose()` now clears the active-router registry.** A disposed router no longer leaks
+    through `useRouter()`/`useParams()`/`<Link>` (identity-guarded so disposing an old router
+    can't clobber a newer active one).
+  - **`params()`/`search()`/`usePathname()` are re-render isolated.** They're memoized with
+    shallow equality (pathname via `select`), so navigating between locations with the same
+    params/search no longer re-runs subscribers — the headline selector-isolation guarantee.
+  - **An invalid synthesized route pattern no longer poisons all router state.** A structurally
+    invalid route (e.g. a catch-all parent with children → `/x/:rest*/y`) is dropped with a dev
+    warning at compile time instead of throwing out of the state memo on every access.
+
+- Updated dependencies [2eba52a]
+  - @mindees/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

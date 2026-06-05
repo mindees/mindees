@@ -1,6 +1,6 @@
 {
   "name": "@mindees/updates",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MindeesNative Pulse - signed over-the-air (OTA) updates: hash-addressed manifests, Ed25519 signing, content-addressed storage, atomic generations with crash-loop rollback.",
   "license": "MIT OR Apache-2.0",
   "type": "module",

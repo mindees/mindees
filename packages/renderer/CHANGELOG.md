@@ -1,5 +1,45 @@
 # @mindees/renderer
 
+## 0.3.0
+
+### Minor Changes
+
+- 0cf8168: Add `ActivityIndicator` — a spinning loading indicator. It emits a dedicated
+  `activityindicator` host element that each backend renders natively: the **DOM backend**
+  builds a CSS keyframe spinner (keyframes injected once per document; size from
+  `width`/`height`, the arc from `color`), and the Android host renderer maps it to an
+  indeterminate `ProgressBar` (with `color` → tint). Size/color flow through ordinary style
+  keys; defaults to the theme primary; `animating={false}` renders nothing.
+- 2eba52a: Add keyed list reconciliation — `For` (and the underlying `keyedRegion`/`bindKeyedChild`).
+
+  The idiomatic `() => items().map(...)` tears down and rebuilds every row on any change, destroying
+  host-node identity (focus, caret, scroll, input state) and, on native, emitting full dispose/create
+  churn. `For` reconciles **by key**: existing rows are reused (their item/index signals patched in
+  place), new keys created in their own reactive root, removed keys disposed, and host nodes moved with
+  a longest-increasing-subsequence pass so the minimum number move (append → 0, adjacent swap → 1, full
+  reverse → n−1). This delivers the spec's "O(what-changed), no diff storms, no FlatList cliff" promise.
+
+  - **`@mindees/core`**: `keyedRegion(options)` + `isKeyedRegion` + the `KeyedRegion` node type (added to
+    `MindeesNode`). A serializable description — no rendering logic — so it's renderer-agnostic.
+  - **`@mindees/renderer`**: `bindKeyedChild` (the reconciler) + a `mountNode` branch ahead of the
+    reactive-child path, so a `For` is never routed to the full-rebuild binding. `mountNode` is now exported.
+  - **`@mindees/atlas`**: `For` on the `@mindees/atlas/for` subpath — the ergonomic component
+    (default key = item identity; optional `key`/`fallback`). Complements the virtualized `List`.
+
+  Covered by reconciler tests (identity across reorder/reverse/append, in-place patch with no sibling
+  re-runs, scoped disposal, duplicate/null-key guards, fallback, identity keying) and a happy-dom test
+  proving DOM focus survives a reorder.
+
+### Patch Changes
+
+- 25832b1: Fix SSR style serialization: the headless/server backend emitted style objects with
+  camelCase CSS names and no units (`backgroundColor:red;marginTop:8`), so server-rendered
+  markup was invalid and never matched the hydrated DOM. The DOM and headless backends now
+  share one canonical serializer (`css.ts`) that kebab-cases names and applies `px` units
+  (`background-color:red;margin-top:8px`), so SSR output equals the client DOM.
+- Updated dependencies [2eba52a]
+  - @mindees/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
