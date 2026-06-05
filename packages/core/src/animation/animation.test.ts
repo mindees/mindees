@@ -170,3 +170,59 @@ describe('interpolate', () => {
     expect(() => interpolate(() => 0, [0, 1], [0])).toThrow(RangeError)
   })
 })
+
+describe('animation hardening (adversarial findings)', () => {
+  it('setFrameSource swap detaches the old source and drives under the new one', () => {
+    const a = manualFrameSource()
+    const b = manualFrameSource()
+    setFrameSource(a.source)
+    const av = animate(0)
+    timing(av, { to: 100, duration: 100, easing: linear })
+    a.tick(0)
+    setFrameSource(b.source) // swap A -> B mid-flight
+    b.tick(50)
+    expect(av()).toBeCloseTo(50) // B drives it
+    a.tick(50) // the OLD source must be detached (no effect)
+    expect(av()).toBeCloseTo(50) // unchanged — A did not leak
+  })
+
+  it('a NaN/Infinity duration falls back to the default and never writes NaN', () => {
+    const m = manualFrameSource()
+    setFrameSource(m.source)
+    const av = animate(0)
+    timing(av, { to: 100, duration: Number.NaN })
+    m.tick(0)
+    m.tick(16)
+    expect(Number.isNaN(av())).toBe(false)
+    // and it terminates (default 250ms) rather than looping forever
+    for (let t = 0; t <= 1000 && _activeAnimationCount() > 0; t += 16) m.tick(t)
+    expect(av()).toBe(100)
+    expect(_activeAnimationCount()).toBe(0)
+  })
+
+  it('a very stiff spring stays finite (substepped, no Infinity/NaN)', () => {
+    const m = manualFrameSource()
+    setFrameSource(m.source)
+    const av = animate(0)
+    spring(av, { to: 1, stiffness: 100000, mass: 1 })
+    let bad = false
+    for (let t = 0; t <= 12000 && _activeAnimationCount() > 0; t += 16) {
+      m.tick(t)
+      if (!Number.isFinite(av())) bad = true
+    }
+    expect(bad).toBe(false)
+    expect(av()).toBe(1)
+  })
+
+  it('timing leaves velocity at 0 on completion (clean spring handoff)', () => {
+    const m = manualFrameSource()
+    setFrameSource(m.source)
+    const av = animate(0)
+    timing(av, { to: 100, duration: 100, easing: linear })
+    m.tick(0)
+    m.tick(50)
+    m.tick(100)
+    expect(av()).toBe(100)
+    expect(av.velocity()).toBe(0)
+  })
+})

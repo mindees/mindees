@@ -65,20 +65,27 @@ let lastNow = -1 // -1 = uninitialized (a real frame can arrive at now=0)
 /** Inject (or clear) the frame source that drives animations. `null` (default) → jump-to-final. */
 export function setFrameSource(src: FrameSource | null): void {
   if (src === frameSource) return
-  frameSource = src
-  if (src === null && unsubscribe) {
-    // Detaching mid-flight: stop the loop and flush every active driver to its final value so
-    // nothing is left frozen (symmetric with the start-time SSR fallback).
+  // Detach the current loop FIRST so any change — including a non-null→non-null swap — can never
+  // leak the old subscription (which would keep driving) nor block resubscribing under the new one.
+  if (unsubscribe) {
     unsubscribe()
     unsubscribe = null
+  }
+  frameSource = src
+  if (src === null) {
+    // Detaching entirely: flush every active driver to its final value so nothing is left frozen
+    // (symmetric with the start-time SSR fallback).
     batch(() => {
       for (const d of [...active]) {
         writeValue(d.av, d.target)
         active.delete(d)
-        internals.get(d.av)!.driver = null
+        const st = internals.get(d.av)
+        if (st) st.driver = null
         d.settle(true)
       }
     })
+  } else if (active.size > 0) {
+    ensureLoop() // resubscribe in-flight animations under the new source
   }
 }
 
@@ -107,11 +114,16 @@ function ensureLoop(): void {
 
 function onFrame(now: number): void {
   if (lastNow < 0) lastNow = now // first frame establishes the baseline (dt = 0, no jump)
-  const dt = Math.min((now - lastNow) / 1000, MAX_DT)
+  // Clamp to [0, MAX_DT]: never integrate backward on a non-monotonic timestamp, never explode on a
+  // huge gap (backgrounded tab / GC / breakpoint).
+  const dt = Math.min(Math.max(0, (now - lastNow) / 1000), MAX_DT)
   // One batch per frame: every driver's write coalesces into a single flush, so a style reading
   // multiple animated values recomputes exactly once (glitch-free).
   batch(() => {
     for (const d of [...active]) {
+      // A sibling's onComplete this frame may have stopped this driver — don't tick a removed one
+      // (would violate stop()'s "keeps current value" contract with an extra write).
+      if (!active.has(d)) continue
       let running: boolean
       try {
         running = d.tick(now, dt)
@@ -230,24 +242,29 @@ export function timing(
     readonly onComplete?: (finished: boolean) => void
   },
 ): AnimationHandle {
-  const duration = opts.duration ?? DEFAULT_DURATION
+  // Sanitize: `??` only catches null/undefined, so a NaN/Infinity duration would write NaN forever
+  // (permanent under Object.is) — fall back to the default for any non-finite duration.
+  const duration = Number.isFinite(opts.duration) ? (opts.duration as number) : DEFAULT_DURATION
   const easing = opts.easing ?? linear
-  const delay = opts.delay ?? 0
+  const delay = Number.isFinite(opts.delay) ? (opts.delay as number) : 0
   return start(av, opts, (from, _settle) => {
     let startTime = -1 // -1 = uninitialized (a real frame can arrive at now=0)
     let prev = from
+    const settleAt = (): boolean => {
+      internals.get(av)!.vel.v = 0 // at rest: velocity is 0 (so a following spring doesn't inherit phantom momentum)
+      writeValue(av, opts.to)
+      return false
+    }
     return (now, dt) => {
       if (startTime < 0) startTime = now
       const elapsed = now - startTime - delay
-      if (elapsed <= 0) return true // still in the delay window
+      if (elapsed < 0) return true // still in the delay window
       const t = duration <= 0 ? 1 : Math.min(elapsed / duration, 1)
       const next = from + (opts.to - from) * easing(t)
+      if (!Number.isFinite(next)) return settleAt() // defensive: never write NaN/Infinity
       if (dt > 0) internals.get(av)!.vel.v = (next - prev) / dt
       prev = next
-      if (t >= 1) {
-        writeValue(av, opts.to)
-        return false
-      }
+      if (t >= 1) return settleAt()
       writeValue(av, next)
       return true
     }
@@ -268,21 +285,34 @@ export function spring(
     readonly onComplete?: (finished: boolean) => void
   },
 ): AnimationHandle {
-  const stiffness = opts.stiffness ?? 170
-  const damping = opts.damping ?? 26
-  const mass = opts.mass ?? 1
+  const stiffness = Math.max(0, opts.stiffness ?? 170)
+  const damping = Math.max(0, opts.damping ?? 26)
+  const mass = Math.max(1e-4, opts.mass ?? 1)
   const restDelta = opts.restDelta ?? 0.01
   const restVelocity = opts.restVelocity ?? 0.01
+  const omega = Math.sqrt(stiffness / mass) // natural frequency, for substep stability
   return start(av, opts, (from) => {
     let x = from
     let v = opts.velocity ?? internals.get(av)!.vel.v
     let frames = 0
     return (_now, dt) => {
       frames++
-      // Semi-implicit (symplectic) Euler — stable under the clamped dt.
-      const a = (-stiffness * (x - opts.to) - damping * v) / mass
-      v += a * dt
-      x += v * dt
+      // Semi-implicit (symplectic) Euler is only conditionally stable (omega·dt < ~2). Stiffness is
+      // user-controlled, so SUBSTEP the frame's dt to keep each step well inside the stable region —
+      // a stiff spring stays finite instead of diverging to Infinity/NaN.
+      const steps = Math.max(1, Math.ceil((dt * omega) / 1.5))
+      const sub = dt / steps
+      for (let i = 0; i < steps; i++) {
+        const a = (-stiffness * (x - opts.to) - damping * v) / mass
+        v += a * sub
+        x += v * sub
+      }
+      if (!Number.isFinite(x)) {
+        // Defensive: never write NaN/Infinity (permanent under Object.is) — snap to the target.
+        internals.get(av)!.vel.v = 0
+        writeValue(av, opts.to)
+        return false
+      }
       internals.get(av)!.vel.v = v
       if (
         (Math.abs(x - opts.to) < restDelta && Math.abs(v) < restVelocity) ||
@@ -316,6 +346,7 @@ export function interpolate(
   const n = inputRange.length
   return () => {
     const x = value()
+    if (Number.isNaN(x)) return outputRange[0] as number // a NaN source maps to the first output, not the last
     const lerp = (i: number): number => {
       const x0 = inputRange[i] as number
       const x1 = inputRange[i + 1] as number
