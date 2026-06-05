@@ -1,6 +1,7 @@
 export type {
   Accessor,
   ComputedOptions,
+  EffectOptions,
   EqualsFn,
   Memo,
   Owner,
@@ -16,6 +17,7 @@ export {
   memo,
   onCleanup,
   runWithOwner,
+  setReactiveScheduler,
   signal,
   untrack,
 } from './reactive'
