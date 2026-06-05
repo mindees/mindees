@@ -62,7 +62,7 @@ export const FocusScope: Component<FocusScopeProps> = (props) => {
   const callerStyle = props.style
   const style: Reactive<StyleInput> = () =>
     flattenStyle([
-      { position: 'relative', outline: 'none' },
+      { position: 'relative' },
       typeof callerStyle === 'function' ? callerStyle() : (callerStyle ?? {}),
     ])
 
