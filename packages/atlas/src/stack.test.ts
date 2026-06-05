@@ -34,7 +34,7 @@ const mountStack = (router: ReturnType<typeof makeRouter>, props = {}) => {
   const backend = createHeadlessBackend()
   const root = createHeadlessRoot()
   const Stack = createStackNavigator(router)
-  render(Stack(props), backend, root)
+  render(createElement(Stack, props), backend, root)
   return root
 }
 
@@ -96,5 +96,22 @@ describe('createStackNavigator', () => {
     // 'none' has no movement; one tick settles it to the destination
     for (let t = 0; t <= 600; t += 16) m.tick(t)
     expect(allText(root)).toContain('screen-B')
+  })
+})
+
+describe('createStackNavigator — interrupt safety (adversarial fixes)', () => {
+  it('navigating back to the origin mid-push ends on the origin (no url/screen desync)', () => {
+    const m = manualFrameSource()
+    setFrameSource(m.source)
+    const router = makeRouter()
+    const root = mountStack(router)
+    router.navigate('/b') // PUSH starts
+    m.tick(0)
+    m.tick(30) // mid-transition, not settled
+    router.navigate('/a') // back to origin mid-push → must reconcile to A, not finish on B
+    for (let t = 30; t <= 2000; t += 16) m.tick(t)
+    const end = allText(root)
+    expect(end).toContain('screen-A')
+    expect(end).not.toContain('screen-B')
   })
 })
