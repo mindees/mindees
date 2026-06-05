@@ -261,6 +261,11 @@ export const Chip: Component<ChipProps> = (props) => {
     {
       ...rest,
       role: rest.role ?? 'button',
+      // Reactive `aria-pressed` so a toggle chip announces its selected state as it changes.
+      state: () => ({
+        ...(typeof rest.state === 'function' ? rest.state() : (rest.state ?? {})),
+        pressed: isSelected(),
+      }),
       ...(onPress ? { onPress } : {}),
       ...(disabled ? { disabled: true } : {}),
       style: mergeStyle(base, style),
@@ -311,7 +316,11 @@ export const Switch: Component<SwitchProps> = (props) => {
     {
       ...rest,
       role: rest.role ?? 'switch',
-      state: { ...(rest.state ?? {}), checked: isOn() },
+      // Reactive state → `aria-checked` tracks the toggle (a static object would bake it once).
+      state: () => ({
+        ...(typeof rest.state === 'function' ? rest.state() : (rest.state ?? {})),
+        checked: isOn(),
+      }),
       ...(disabled ? { disabled: true } : {}),
       ...(handlePress ? { onPress: handlePress } : {}),
       style: mergeStyle(track, style),
@@ -393,7 +402,15 @@ export const ProgressBar: Component<ProgressBarProps> = (props) => {
   })
   return createElement(
     View,
-    { ...rest, role: rest.role ?? 'progressbar', style: mergeStyle(track, style) },
+    {
+      ...rest,
+      role: rest.role ?? 'progressbar',
+      // A progressbar with no value is inaccessible — emit a reactive aria-valuenow (0..1 range).
+      valueMin: 0,
+      valueMax: 1,
+      valueNow: () => Math.max(0, Math.min(1, progress())),
+      style: mergeStyle(track, style),
+    },
     createElement(View, { style: fill }),
   )
 }
