@@ -1,7 +1,27 @@
-import { createElement as h, signal } from '@mindees/core'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  _resetAnimation,
+  animate,
+  deferred,
+  createElement as h,
+  linear,
+  setReactiveScheduler,
+  signal,
+  timing,
+} from '@mindees/core'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createNativeApp } from './native-app'
 import type { NativeCommand } from './native-protocol'
+
+afterEach(() => {
+  // The reactive scheduler + animation frame source are process singletons; reset between tests that
+  // wire the engines so they don't leak across cases.
+  _resetAnimation()
+  setReactiveScheduler(null)
+  const g = globalThis as Record<string, unknown>
+  delete g.MindeesApp
+  delete g.MindeesHost
+  delete g.MindeesHostFrame
+})
 
 /** A tiny counter component: a button whose press increments a reactive label. */
 function makeCounter() {
@@ -90,5 +110,81 @@ describe('createNativeApp', () => {
     app.start()
     expect(emit).toHaveBeenCalledTimes(1)
     delete g.MindeesHost
+  })
+})
+
+describe('createNativeApp — on-device engines (P2: smooth by default)', () => {
+  /** A view whose `data-x` prop tracks an animated value (so each frame emits a setProp). */
+  function makeAnimatedApp() {
+    const App = () => {
+      const x = animate(0)
+      timing(x, { to: 100, duration: 100, easing: linear })
+      return h('view', { 'data-x': () => Math.round(x()) })
+    }
+    return App
+  }
+  const dataX = (cmds: NativeCommand[]): number[] =>
+    cmds
+      .filter(
+        (c): c is Extract<NativeCommand, { type: 'setProp' }> =>
+          c.type === 'setProp' && c.name === 'data-x',
+      )
+      .map((c) => c.value as number)
+
+  it('frameTick advances an animation frame-by-frame and flushes each frame', () => {
+    const emitted: string[] = []
+    const app = createNativeApp(h(makeAnimatedApp(), null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+      wireEngines: true, // force-wire without a real host
+    })
+    app.start()
+    emitted.length = 0
+    app.frameTick(0) // baseline frame (dt=0, no movement)
+    app.frameTick(50) // halfway
+    const mid = dataX(commandsFrom(emitted))
+    app.frameTick(100) // settle
+    const all = dataX(commandsFrom(emitted))
+    expect(mid.some((v) => v > 0 && v < 100)).toBe(true) // a real intermediate (not a jump)
+    expect(all.some((v) => v === 100)).toBe(true) // reached the target
+  })
+
+  it('with no host installs no frame source — the animation jumps to its final value', () => {
+    const emitted: string[] = []
+    // expose:false + no MindeesHost → wireEngines defaults false → no frame source.
+    const app = createNativeApp(h(makeAnimatedApp(), null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+    })
+    app.start()
+    expect(dataX(commandsFrom(emitted)).some((v) => v === 100)).toBe(true) // final, synchronously
+    emitted.length = 0
+    app.frameTick(16) // no frame source → no-op
+    expect(emitted).toHaveLength(0)
+  })
+
+  it('emits a deferred/normal-lane update via the coalesced trailing flush', async () => {
+    const emitted: string[] = []
+    let bump!: (n: number) => void
+    const App = () => {
+      const src = signal(0)
+      bump = (n) => src.set(n)
+      const d = deferred(() => src())
+      return h('view', { 'data-d': () => d() })
+    }
+    const app = createNativeApp(h(App, null), {
+      emit: (j) => emitted.push(j),
+      expose: false,
+      wireEngines: true,
+    })
+    app.start()
+    emitted.length = 0
+    bump(7) // schedules the deferred (normal-lane) effect on a microtask — not emitted synchronously
+    expect(emitted).toHaveLength(0)
+    for (let i = 0; i < 6; i++) await Promise.resolve() // drain microtasks
+    const cmds = commandsFrom(emitted)
+    expect(cmds.some((c) => c.type === 'setProp' && c.name === 'data-d' && c.value === 7)).toBe(
+      true,
+    ) // reached the host, one tick late (not dropped)
   })
 })
