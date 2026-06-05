@@ -195,7 +195,12 @@ export function generateRouteModule(
 ): string {
   const importBase = (options.importBase ?? './app').replace(/\/+$/, '')
   const exportName = options.exportName ?? 'routes'
-  const routeFiles = [...files].filter((f) => ROUTE_FILE.test(f)).sort()
+  // Normalize separators: backslashes are invalid in import specifiers, and the map keys must be
+  // the POSIX paths `routesFromModules` matches against.
+  const routeFiles = [...files]
+    .map((f) => f.replace(/\\/g, '/'))
+    .filter((f) => ROUTE_FILE.test(f))
+    .sort()
   const imports = routeFiles.map(
     (file, i) => `import * as _route${i} from '${importBase}/${stripExt(file)}'`,
   )

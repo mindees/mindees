@@ -28,6 +28,13 @@ describe('generateRouteModule', () => {
   it('emits an empty map for no route files', () => {
     expect(generateRouteModule([])).toContain('export const routes = {\n\n}')
   })
+
+  it('normalizes Windows backslash paths in import specifiers and map keys', () => {
+    const src = generateRouteModule(['blog\\[slug].tsx'], { importBase: './app' })
+    expect(src).toContain("import * as _route0 from './app/blog/[slug]'") // POSIX specifier
+    expect(src).toContain('"blog/[slug].tsx": _route0,') // POSIX map key
+    expect(src).not.toContain('\\') // no backslashes leak into generated code
+  })
 })
 
 describe('fileToRoute', () => {
