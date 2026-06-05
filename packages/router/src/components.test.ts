@@ -291,3 +291,62 @@ describe('createLink', () => {
     router.dispose()
   })
 })
+
+describe('createLink — auto-prefetch', () => {
+  const prefetchRoutes = () => {
+    let loaded = 0
+    const routes = [
+      { path: '/' },
+      {
+        path: '/p/:id',
+        loader: () => {
+          loaded++
+          return 'data'
+        },
+      },
+    ]
+    return { routes, loaded: () => loaded }
+  }
+
+  // Loaders run in a microtask, so let scheduled loads settle before asserting.
+  const tick = () => new Promise((r) => setTimeout(r, 0))
+
+  it("prefetches the target's loader on intent (pointer enter), deduped", async () => {
+    const { routes, loaded } = prefetchRoutes()
+    const { router } = setup(routes)
+    const Link = createLink(router)
+    const el = Link({ to: '/p/:id', params: { id: '1' }, children: 'go' })
+    await tick()
+    expect(loaded()).toBe(0) // default 'intent' does NOT prefetch on render
+    ;(el.props.onPointerEnter as () => void)()
+    await tick()
+    expect(loaded()).toBe(1) // warmed on intent
+    ;(el.props.onPointerEnter as () => void)() // deduped per link
+    ;(el.props.onFocus as () => void)()
+    await tick()
+    expect(loaded()).toBe(1)
+    router.dispose()
+  })
+
+  it("prefetch='render' warms on mount; prefetch=false disables it", async () => {
+    const a = prefetchRoutes()
+    const ra = setup(a.routes)
+    createLink(ra.router)({ to: '/p/:id', params: { id: '1' }, prefetch: 'render', children: 'go' })
+    await tick()
+    expect(a.loaded()).toBe(1) // warmed immediately on render
+    ra.router.dispose()
+
+    const b = prefetchRoutes()
+    const rb = setup(b.routes)
+    const el = createLink(rb.router)({
+      to: '/p/:id',
+      params: { id: '1' },
+      prefetch: false,
+      children: 'go',
+    })
+    expect(el.props.onPointerEnter).toBeUndefined() // no intent handlers wired
+    await tick()
+    expect(b.loaded()).toBe(0)
+    rb.router.dispose()
+  })
+})
