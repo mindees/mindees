@@ -70,7 +70,16 @@ export {
   orRemove,
   orValues,
 } from './or-set'
-export { createMemoryPersistence, type Persistence } from './persist'
+export {
+  createMemoryPersistence,
+  createPersistentEngine,
+  createWebStoragePersistence,
+  loadSnapshot,
+  type Persistence,
+  type PersistentEngineOptions,
+  persistEngine,
+  type WebStorageLike,
+} from './persist'
 export {
   type Cursor,
   createMemoryHub,
