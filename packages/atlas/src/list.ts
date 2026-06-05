@@ -213,11 +213,20 @@ export function createList<T>(options: ListOptions<T>): MindeesNode {
       ...rows,
     )
 
+    // A reactive (accessor) `style` must stay reactive — eagerly flattening it would
+    // Object.assign a function and silently drop it. Keep it a function when the caller's is.
+    const baseScrollStyle: StyleInput = { height, position: 'relative' }
+    const callerStyle = options.style
+    const scrollStyle: Reactive<StyleInput> =
+      typeof callerStyle === 'function'
+        ? () => flattenStyle([baseScrollStyle, (callerStyle as () => StyleInput)()])
+        : flattenStyle([baseScrollStyle, callerStyle as StyleInput])
+
     return createElement(
       ScrollView,
       {
         onScroll: (event: unknown) => scrollTop.set(readScrollTop(event)),
-        style: flattenStyle([{ height, position: 'relative' }, options.style as StyleInput]),
+        style: scrollStyle,
       },
       spacer,
     )
