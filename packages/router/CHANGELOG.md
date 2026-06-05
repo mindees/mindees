@@ -1,5 +1,11 @@
 # @mindees/router
 
+## 0.6.0
+
+### Patch Changes
+
+- @mindees/core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

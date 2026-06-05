@@ -1,5 +1,21 @@
 # @mindees/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- b14ef4d: The `mindees` CLI now greets you with a friendly **branded banner** — the MindeesNative logo. On
+  image-capable terminals (iTerm2 / WezTerm) it prints the actual logo PNG inline; everywhere else it
+  shows a clean ANSI wordmark with the tagline + version. Shown on `mindees help` and after
+  `mindees create`. Output stays plain + parseable when piped or under `NO_COLOR` (no banner on
+  non-TTY stdout).
+
+### Patch Changes
+
+- @mindees/ai@0.6.0
+- @mindees/compiler@0.6.0
+- @mindees/core@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes
