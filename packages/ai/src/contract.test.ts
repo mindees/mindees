@@ -79,9 +79,14 @@ describe('mock backend — stream', () => {
 })
 
 describe('on-device backend — research track', () => {
-  it('throws NotImplementedError from generate and stream', async () => {
+  it('honors the async contract: generate rejects, stream throws on iteration (not a sync throw)', async () => {
     const backend = createOnDeviceBackend()
-    expect(() => backend.generate({ messages: [] })).toThrow(NotImplementedError)
-    expect(() => backend.stream({ messages: [] })).toThrow(NotImplementedError)
+    // generate() must NOT throw synchronously — it returns a rejecting Promise.
+    const promise = backend.generate({ messages: [] })
+    expect(promise).toBeInstanceOf(Promise)
+    await expect(promise).rejects.toBeInstanceOf(NotImplementedError)
+    // stream() must NOT throw synchronously — it returns an AsyncIterable that throws on iteration.
+    const iterator = backend.stream({ messages: [] })[Symbol.asyncIterator]()
+    await expect(iterator.next()).rejects.toBeInstanceOf(NotImplementedError)
   })
 })
