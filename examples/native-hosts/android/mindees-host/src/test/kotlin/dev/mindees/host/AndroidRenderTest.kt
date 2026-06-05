@@ -19,6 +19,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -80,6 +81,26 @@ class AndroidRenderTest {
         )
         assertEquals(1, view.childCount)
         assertTrue(view.getChildAt(0) is Button)
+    }
+
+    @Test
+    fun rendersActivityIndicatorAsTintedIndeterminateProgressBar() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"s","tag":"activityindicator"},
+                  {"type":"setProp","id":"s","name":"style","value":{"width":32,"height":32,"color":"#ff0000"}},
+                  {"type":"insertChild","parentId":"host-root","childId":"s","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val spinner = container.getChildAt(0)
+        assertTrue(spinner is ProgressBar)
+        assertTrue((spinner as ProgressBar).isIndeterminate)
+        assertEquals(Color.RED, spinner.indeterminateTintList?.defaultColor)
     }
 
     @Test

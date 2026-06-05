@@ -168,3 +168,30 @@ describe('DOM backend (happy-dom)', () => {
     expect(container.childNodes.length).toBe(0)
   })
 })
+
+describe('DOM backend — activityindicator spinner', () => {
+  it('renders a spinner div with animation + size/color, injecting keyframes once', () => {
+    const container = document.createElement('div')
+    const backend = createDomBackend(document as never)
+    render(
+      h('activityindicator', { style: { width: 24, height: 24, color: '#ff0000' } }),
+      backend,
+      container as never,
+    )
+    const spinner = container.firstElementChild as HTMLElement
+    expect(spinner.tagName).toBe('DIV')
+    expect(spinner.style.borderRadius).toBe('50%')
+    expect(spinner.style.animation).toContain('mindees-spin')
+    expect(spinner.style.borderTopColor.toLowerCase()).toBe('currentcolor')
+    // Size + color flow through ordinary style keys, applied over the base spinner styles.
+    expect(spinner.style.width).toBe('24px')
+    expect(spinner.style.color).toBe('#ff0000')
+    // Keyframes injected exactly once (a second indicator reuses them).
+    render(
+      h('activityindicator', {}),
+      createDomBackend(document as never),
+      document.createElement('div') as never,
+    )
+    expect(document.querySelectorAll('#mindees-keyframes').length).toBe(1)
+  })
+})

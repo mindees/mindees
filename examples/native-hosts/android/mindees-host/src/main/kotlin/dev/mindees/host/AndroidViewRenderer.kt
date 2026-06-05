@@ -17,6 +17,7 @@
 package dev.mindees.host
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -28,6 +29,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 
 /** Builds Android views from the command stream. Pair with [MindeesNativeHost]. */
@@ -78,6 +80,11 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         "image" -> ImageView(context)
         "textinput" -> EditText(context)
         "button" -> Button(context) // direct use; Atlas Button renders as a clickable 'view'
+        // Atlas ActivityIndicator → a native indeterminate spinner.
+        "activityindicator" -> ProgressBar(context).apply {
+            isIndeterminate = true
+            layoutOf(this)
+        }
         // 'view' / 'scrollview' / unknown → a flex container. (Real scrolling can wrap
         // this in a ScrollView later; the common case is a plain column/row.)
         else -> LinearLayout(context).apply {
@@ -212,6 +219,11 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
 
         // Text.
         if (text != null) applyText(text, style)
+
+        // Spinner tint (ActivityIndicator → ProgressBar): `color` drives the indeterminate arc.
+        (view as? ProgressBar)?.let { bar ->
+            color(style["color"])?.let { bar.indeterminateTintList = ColorStateList.valueOf(it) }
+        }
     }
 
     private fun applyPadding(view: View, style: Map<String, NativeProp>) {

@@ -2,6 +2,7 @@ import { createElement, isElement, type MindeesElement, signal } from '@mindees/
 import { renderToString } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  ActivityIndicator,
   Avatar,
   Badge,
   Card,
@@ -118,5 +119,24 @@ describe('ProgressBar', () => {
   it('clamps out-of-range progress', () => {
     const node = el(ProgressBar({ value: 2 }))
     expect(styleOf(el((node.children as unknown[])[0])).width).toBe('100%')
+  })
+})
+
+describe('ActivityIndicator', () => {
+  it('emits the activityindicator tag with size/color style + a11y', () => {
+    const node = el(ActivityIndicator({ size: 32, color: '#ffffff' }))
+    expect(node.type).toBe('activityindicator')
+    expect(node.props.role).toBe('status')
+    expect(node.props['aria-busy']).toBe('true')
+    expect(styleOf(node)).toMatchObject({ width: 32, height: 32, color: '#ffffff' })
+  })
+
+  it('renders nothing when animating is false', () => {
+    expect(ActivityIndicator({ animating: false })).toBeNull()
+  })
+
+  it('defaults the color to the theme primary', () => {
+    setEnvironment({ colorScheme: 'light' })
+    expect(styleOf(el(ActivityIndicator({}))).color).toBe('#2563eb') // blue-600 (light primary)
   })
 })
