@@ -21,12 +21,14 @@ import {
   createRoot,
   ELEMENT_TYPE,
   effect,
+  isKeyedRegion,
   type MindeesElement,
   type MindeesNode,
   onCleanup,
   untrack,
 } from '@mindees/core'
 import type { HostBackend } from './backend'
+import { bindKeyedChild } from './for'
 
 /** A dynamic value: pass a function and the binding reacts to its signals. */
 type MaybeReactive<T> = T | (() => T)
@@ -124,7 +126,7 @@ export function render<N, P>(
  * Mount a node into `parent` before `anchor`. Returns the top-level host nodes
  * created (for fragments / arrays this can be more than one).
  */
-function mountNode<N>(
+export function mountNode<N>(
   node: MindeesNode,
   backend: HostBackend<N>,
   parent: N,
@@ -132,6 +134,12 @@ function mountNode<N>(
 ): N[] {
   // Null-ish / boolean → nothing.
   if (node === null || node === undefined || typeof node === 'boolean') return []
+
+  // Keyed list region → keyed reconciliation (identity-preserving). Checked before the
+  // function branch so a `For` is never routed to the full-rebuild reactive-child path.
+  if (isKeyedRegion(node)) {
+    return bindKeyedChild(node, backend, parent, anchor)
+  }
 
   // Function node → a reactive region (an accessor `() => MindeesNode`). Handled
   // uniformly here so it works at the top level and as a child.
