@@ -55,7 +55,13 @@ export const FocusScope: Component<FocusScopeProps> = (props) => {
     if (props.restoreFocus !== false && previous && typeof previous.focus === 'function') {
       restore = () => previous.focus?.()
     }
-    if (props.autoFocus !== false && node && typeof node.focus === 'function') node.focus()
+    if (props.autoFocus !== false && node && typeof node.focus === 'function') {
+      // Defer: `ref` fires before the portal subtree is connected to the document, so a synchronous
+      // focus() would no-op. By the microtask the subtree is mounted; skip if it closed first.
+      queueMicrotask(() => {
+        if ((node as { isConnected?: boolean }).isConnected) node.focus?.()
+      })
+    }
   }
   onCleanup(() => restore?.())
 

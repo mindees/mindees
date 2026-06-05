@@ -264,6 +264,29 @@ export function createNativeCommandBackend(
       }
       node.parent = parent
       emit({ type: 'insertChild', parentId: parent.id, childId: node.id, index })
+
+      // Keep the portal overlay painting LAST: when app content lands directly in root while an
+      // overlay exists, move the overlay to the end so order-paint hosts (Android `addView`) draw
+      // the modal on top. (A host may instead map the 'overlay' tag to a top-layer container.)
+      if (
+        parent === root &&
+        node !== overlay &&
+        overlay !== null &&
+        root.children[root.children.length - 1] !== overlay
+      ) {
+        const at = root.children.indexOf(overlay)
+        if (at >= 0) {
+          root.children.splice(at, 1)
+          root.children.push(overlay)
+          emit({ type: 'removeChild', parentId: root.id, childId: overlay.id })
+          emit({
+            type: 'insertChild',
+            parentId: root.id,
+            childId: overlay.id,
+            index: root.children.length - 1,
+          })
+        }
+      }
     },
 
     remove(parent: NativeCommandNode, node: NativeCommandNode): void {

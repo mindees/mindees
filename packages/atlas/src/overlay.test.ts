@@ -81,3 +81,25 @@ describe('Modal', () => {
     other.remove()
   })
 })
+
+describe('FocusScope autofocus', () => {
+  const doc2 = () => document as never
+  it('auto-focuses the dialog once the subtree is connected', async () => {
+    const visible = signal(false)
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    render(
+      Modal({ visible, label: 'S', children: createElement('text', {}, 'b') }),
+      createDomBackend(doc2()),
+      container as never,
+    )
+    visible.set(true)
+    await Promise.resolve() // flush the deferred-focus microtask
+    // Assert on the active element's own attributes (other tests' overlay layers persist on body,
+    // so a bare [role=dialog] query could match a stale one).
+    const active = document.activeElement as HTMLElement
+    expect(active.getAttribute('role')).toBe('dialog')
+    expect(active.getAttribute('aria-label')).toBe('S')
+    container.remove()
+  })
+})

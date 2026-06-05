@@ -1,4 +1,4 @@
-import { createElement as h, signal } from '@mindees/core'
+import { createElement as h, portal, signal } from '@mindees/core'
 import { describe, expect, it, vi } from 'vitest'
 import { createNativeCommandBackend } from './native-command-backend'
 import type { NativeCommand, NativeNodeId } from './native-protocol'
@@ -347,5 +347,35 @@ describe('native command backend', () => {
     expect(() => createNativeCommandBackend({ rootId: Number.NaN })).toThrow(TypeError)
     const backend = createNativeCommandBackend({ idFactory: () => Number.POSITIVE_INFINITY })
     expect(() => backend.createElement('view')).toThrow(TypeError)
+  })
+})
+
+describe('native command backend — portal overlay', () => {
+  it('overlayRoot() emits a dedicated overlay node under root with the marker prop', () => {
+    const backend = createNativeCommandBackend()
+    render(portal(h('view', {}, h('text', {}, 'M'))), backend, backend.root)
+    const cmds = backend.getCommands()
+    const overlay = commandsOfType(cmds, 'createNode').find((c) => c.tag === 'overlay')
+    expect(overlay).toBeTruthy()
+    expect(
+      cmds.some(
+        (c) => c.type === 'setProp' && c.id === overlay?.id && c.name === 'data-mindees-overlay',
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps the overlay as the LAST root child so it paints on top (order-paint hosts)', () => {
+    const backend = createNativeCommandBackend()
+    render(
+      [
+        portal(h('view', {}, h('text', {}, 'DIALOG'))),
+        h('view', {}, h('text', {}, 'MAIN')),
+        h('view', {}, h('text', {}, 'FOOTER')),
+      ],
+      backend,
+      backend.root,
+    )
+    const order = backend.root.children.map((c) => (c.kind === 'text' ? '#text' : c.tag))
+    expect(order[order.length - 1]).toBe('overlay')
   })
 })
