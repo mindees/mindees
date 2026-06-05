@@ -7,6 +7,7 @@
  */
 
 import {
+  ActivityIndicator,
   Badge,
   Button,
   Card,
@@ -54,6 +55,12 @@ export default function About() {
           onValueChange={(v) => setEnvironment({ colorScheme: v ? 'dark' : 'light' })}
           label="Dark mode"
         />
+      </Row>
+      <Row style={{ gap: space.sm, alignItems: 'center' }}>
+        <ActivityIndicator size={20} />
+        <Text style={() => ({ fontSize: fontSize.footnote, color: theme().color.textMuted })}>
+          Syncing…
+        </Text>
       </Row>
       <ProgressBar value={0.6} />
       <Button

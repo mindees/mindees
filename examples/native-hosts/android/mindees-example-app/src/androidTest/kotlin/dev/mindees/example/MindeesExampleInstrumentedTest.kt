@@ -2,6 +2,7 @@ package dev.mindees.example
 
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -51,8 +52,10 @@ class MindeesExampleInstrumentedTest {
                 requireView(content, TextView::class.java) {
                     it.text.toString().startsWith("File-based routes")
                 }
-                // Atlas components render natively: the Badge's text is present.
+                // Atlas components render natively: the Badge's text is present, and the
+                // ActivityIndicator becomes a real native ProgressBar (indeterminate spinner).
                 requireView(content, TextView::class.java) { it.text.toString() == "v0.1.0" }
+                requireView(content, ProgressBar::class.java) { it.isIndeterminate }
                 // Home's content is gone (the old route subtree was removed + disposed).
                 assertNull(
                     findView(content, TextView::class.java) { it.text.toString() == "Mark done" },

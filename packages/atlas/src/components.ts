@@ -12,7 +12,7 @@
 
 import { type Accessor, type Component, createElement, type MindeesNode } from '@mindees/core'
 import { useKeyboard, useSafeAreaInsets } from './environment'
-import type { BaseProps, Reactive } from './host'
+import { type BaseProps, type Reactive, toHostProps } from './host'
 import { Image, Pressable, Text, View } from './primitives'
 import { flattenStyle, type StyleInput } from './style'
 import { fontWeight, radius as radiusScale, space, type Theme, useTheme } from './tokens'
@@ -396,4 +396,36 @@ export const ProgressBar: Component<ProgressBarProps> = (props) => {
     { ...rest, role: rest.role ?? 'progressbar', style: mergeStyle(track, style) },
     createElement(View, { style: fill }),
   )
+}
+
+// ---------------------------------------------------------------------------
+// ActivityIndicator
+// ---------------------------------------------------------------------------
+
+/**
+ * A spinning loading indicator. Emits the `activityindicator` host tag, which each backend
+ * renders natively: web → a CSS keyframe spinner (size from `width`/`height`, arc from `color`),
+ * Android → an indeterminate `ProgressBar`. Size/color flow through ordinary style keys.
+ */
+export interface ActivityIndicatorProps extends BaseProps {
+  /** Diameter in px (default 24). */
+  readonly size?: number
+  /** Spinner color (defaults to the theme primary). */
+  readonly color?: string
+  /** When false, renders nothing (so callers can gate it without a conditional). */
+  readonly animating?: boolean
+}
+export const ActivityIndicator: Component<ActivityIndicatorProps> = (props) => {
+  const theme = useTheme()
+  const { size = 24, color, animating = true, style, ...rest } = props
+  if (animating === false) return null
+  const base: Accessor<StyleInput> = () => ({
+    width: size,
+    height: size,
+    color: color ?? theme().color.primary,
+  })
+  const host = toHostProps({ ...rest, style: mergeStyle(base, style) })
+  if (!host.role) host.role = 'status'
+  host['aria-busy'] = 'true'
+  return createElement('activityindicator', host)
 }

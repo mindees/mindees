@@ -52,6 +52,45 @@ export function domTagFor(type: string): string {
   return TAG_ALIASES[type] ?? type
 }
 
+/**
+ * Inject the keyframes the `activityindicator` spinner needs, once per document. Uses a
+ * fuller DOM shape than {@link DomDocument}; on minimal/headless documents (no `head`) it's a
+ * no-op (tests don't need the animation, and the element still renders).
+ */
+function ensureSpinnerKeyframes(document: DomDocument): void {
+  const doc = document as unknown as {
+    getElementById?: (id: string) => unknown
+    head?: { appendChild: (node: unknown) => void }
+    createElement: (tag: string) => { id: string; textContent: string }
+  }
+  if (!doc.head || typeof doc.getElementById !== 'function') return
+  if (doc.getElementById('mindees-keyframes')) return
+  const style = doc.createElement('style')
+  style.id = 'mindees-keyframes'
+  style.textContent = '@keyframes mindees-spin{to{transform:rotate(360deg)}}'
+  doc.head.appendChild(style)
+}
+
+/**
+ * Build the web `activityindicator`: a CSS border-spinner. Size comes from the element's
+ * `width`/`height` style and the active arc from its `color` (`currentColor`), both applied
+ * normally afterwards — so the backend owns only the animation + ring shape.
+ */
+function createSpinner(document: DomDocument): DomElement {
+  ensureSpinnerKeyframes(document)
+  const el = document.createElement('div')
+  const s = el.style
+  s.boxSizing = 'border-box'
+  s.display = 'inline-block'
+  s.borderStyle = 'solid'
+  s.borderWidth = '3px'
+  s.borderColor = 'rgba(127, 127, 127, 0.30)'
+  s.borderTopColor = 'currentColor'
+  s.borderRadius = '50%'
+  s.animation = 'mindees-spin 0.8s linear infinite'
+  return el
+}
+
 function isEventProp(key: string): boolean {
   return (
     key.length > 2 && key[0] === 'o' && key[1] === 'n' && key[2] === (key[2] ?? '').toUpperCase()
@@ -115,7 +154,10 @@ export function createDomBackend(doc?: DomDocument): HostBackend<DomNode> {
   const document = documentRef
 
   return {
-    createElement: (type) => document.createElement(domTagFor(type)),
+    createElement: (type) =>
+      type === 'activityindicator'
+        ? createSpinner(document)
+        : document.createElement(domTagFor(type)),
     createText: (value) => document.createTextNode(value),
 
     setProp(node, key, value, prev): void {

@@ -951,6 +951,23 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			style: mergeStyle(track, style)
 		}, createElement(View, { style: fill }));
 	};
+	const ActivityIndicator = (props) => {
+		const theme = useTheme();
+		const { size = 24, color, animating = true, style, ...rest } = props;
+		if (animating === false) return null;
+		const base = () => ({
+			width: size,
+			height: size,
+			color: color ?? theme().color.primary
+		});
+		const host = toHostProps({
+			...rest,
+			style: mergeStyle(base, style)
+		});
+		if (!host.role) host.role = "status";
+		host["aria-busy"] = "true";
+		return createElement("activityindicator", host);
+	};
 
 //#endregion
 //#region ../../../../../packages/renderer/dist/headless.js
@@ -2481,6 +2498,19 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 						value: () => colorScheme() === "dark",
 						onValueChange: (v) => setEnvironment({ colorScheme: v ? "dark" : "light" }),
 						label: "Dark mode"
+					})]
+				}),
+				/* @__PURE__ */ jsxs(Row, {
+					style: {
+						gap: space.sm,
+						alignItems: "center"
+					},
+					children: [/* @__PURE__ */ jsx(ActivityIndicator, { size: 20 }), /* @__PURE__ */ jsx(Text, {
+						style: () => ({
+							fontSize: fontSize.footnote,
+							color: theme().color.textMuted
+						}),
+						children: "Syncing…"
 					})]
 				}),
 				/* @__PURE__ */ jsx(ProgressBar, { value: .6 }),
