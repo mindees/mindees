@@ -1,3 +1,4 @@
+import { signal } from '@mindees/core'
 import {
   createHeadlessBackend,
   createHeadlessRoot,
@@ -267,5 +268,23 @@ describe('createSectionList', () => {
       renderItem: (item) => Text({ children: () => item() }),
     })
     expect(mount(list).html()).toContain('Only')
+  })
+})
+
+describe('createList — reactive style is preserved', () => {
+  it('keeps an accessor `style` reactive on the scroll container (not dropped by eager flatten)', () => {
+    const bg = signal('red')
+    const list = createList({
+      items: listOf(3),
+      itemHeight: 20,
+      height: 100,
+      renderItem: () => Text({ children: 'x' }),
+      style: () => ({ backgroundColor: bg() }),
+    })
+    const sv = findByType(mount(list).root, 'scrollview')
+    expect((sv?.props.style as Record<string, unknown>).backgroundColor).toBe('red')
+    expect((sv?.props.style as Record<string, unknown>).height).toBe(100) // base style still merged
+    bg.set('blue')
+    expect((sv?.props.style as Record<string, unknown>).backgroundColor).toBe('blue')
   })
 })
