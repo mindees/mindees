@@ -24,6 +24,10 @@
     "./for": {
       "types": "./dist/for.d.ts",
       "import": "./dist/for.js"
+    },
+    "./stack": {
+      "types": "./dist/stack.d.ts",
+      "import": "./dist/stack.js"
     }
   },
   "publishConfig": {
@@ -39,7 +43,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mindees/core": "workspace:*"
+    "@mindees/core": "workspace:*",
+    "@mindees/router": "workspace:*"
   },
   "devDependencies": {
     "@mindees/renderer": "workspace:*",
