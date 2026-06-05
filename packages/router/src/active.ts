@@ -24,3 +24,12 @@ export function setActiveRouter(router: Router): void {
 export function getActiveRouter(): Router | null {
   return active
 }
+
+/**
+ * Clear the active router IF it is `router` (called by `dispose()`), so a disposed router
+ * no longer leaks through `useRouter()`/`<Link>`. Guarded by identity so disposing an old
+ * router doesn't clobber a newer active one.
+ */
+export function clearActiveRouter(router: Router): void {
+  if (active === router) active = null
+}

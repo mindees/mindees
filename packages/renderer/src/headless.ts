@@ -9,6 +9,7 @@
  */
 
 import type { SerializableBackend, SerializeOptions } from './backend'
+import { serializeStyle } from './css'
 
 /** A headless host node: an element (with tag/props/children) or a text node. */
 export interface HeadlessNode {
@@ -34,12 +35,13 @@ function escapeText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-/** Render an attribute value: a `style` object becomes a CSS string. */
+/**
+ * Render an attribute value: a `style` object becomes a CSS string via the SAME serializer
+ * the DOM backend uses (kebab-case names + `px` units), so SSR markup matches the hydrated DOM.
+ */
 function serializeAttrValue(value: unknown): string {
   if (value && typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>)
-      .map(([prop, v]) => `${prop}:${String(v)}`)
-      .join(';')
+    return serializeStyle(value as Record<string, unknown>)
   }
   return String(value)
 }

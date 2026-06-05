@@ -50,3 +50,22 @@ describe('router hooks', () => {
     expect(router.location().pathname).toBe('/about')
   })
 })
+
+describe('router lifecycle: dispose clears the active registry', () => {
+  it('a disposed router stops answering useRouter()', () => {
+    const r = createRouter({ routes, history: createMemoryHistory({ initialEntries: ['/'] }) })
+    expect(useRouter()).toBe(r)
+    r.dispose()
+    // The active registry is cleared on dispose — no leaked disposed router.
+    expect(() => useRouter()).toThrow(/no active router/i)
+  })
+
+  it('disposing an OLD router does not clobber a newer active one', () => {
+    const older = createRouter({ routes, history: createMemoryHistory({ initialEntries: ['/'] }) })
+    const newer = createRouter({ routes, history: createMemoryHistory({ initialEntries: ['/'] }) })
+    expect(useRouter()).toBe(newer)
+    older.dispose() // identity-guarded: must not clear `newer`
+    expect(useRouter()).toBe(newer)
+    newer.dispose()
+  })
+})

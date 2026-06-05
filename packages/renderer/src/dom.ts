@@ -11,6 +11,7 @@
  */
 
 import type { HostBackend } from './backend'
+import { styleValue } from './css'
 
 /** A minimal structural view of the DOM we use (so types don't require `lib.dom`). */
 interface DomDocument {
@@ -95,32 +96,6 @@ function isEventProp(key: string): boolean {
   return (
     key.length > 2 && key[0] === 'o' && key[1] === 'n' && key[2] === (key[2] ?? '').toUpperCase()
   )
-}
-
-/**
- * CSS properties whose numeric value is unitless (no `px`). Mirrors React DOM's
- * `isUnitlessNumber` set — everything else gets `px` appended to a bare number, so a
- * platform-agnostic `{ width: 12 }` renders as `12px` on web (and stays `12` on native).
- */
-const UNITLESS_STYLE_PROPS = new Set([
-  'opacity',
-  'flex',
-  'flexGrow',
-  'flexShrink',
-  'order',
-  'zIndex',
-  'fontWeight',
-  'lineHeight',
-  'aspectRatio',
-])
-
-/** Stringify a style value, appending `px` to a finite number on a non-unitless property. */
-function styleValue(prop: string, value: unknown): string {
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return '' // NaN/Infinity → unset, never the literal "NaN"
-    return UNITLESS_STYLE_PROPS.has(prop) ? String(value) : `${value}px`
-  }
-  return String(value)
 }
 
 /**

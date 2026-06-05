@@ -21,7 +21,7 @@ import {
   type Signal,
   signal,
 } from '@mindees/core'
-import { setActiveRouter } from './active'
+import { clearActiveRouter, setActiveRouter } from './active'
 import {
   createLoaderManager,
   type LoaderData,
@@ -42,6 +42,7 @@ import {
   type HasPathParams,
   matchPattern,
   type PathParams,
+  parsePattern,
 } from './pattern'
 import { parseQuery, type QueryValue, safeValidateSearch, stringifyQuery } from './search'
 import type { StandardSchemaV1 } from './standard-schema'
@@ -304,9 +305,43 @@ function flattenRouteTree(
   return out
 }
 
-/** Flatten + sort a route tree most-specific first (static > dynamic > catch-all). */
+/** Dev-only warning (silent in production). */
+function warnDev(message: string): void {
+  const g = globalThis as {
+    process?: { env?: Record<string, string | undefined> }
+    console?: { warn?: (message: string) => void }
+  }
+  if (g.process?.env?.NODE_ENV === 'production') return
+  g.console?.warn?.(`[router] ${message}`)
+}
+
+/** Shallow record equality — params/search only "change" when an entry actually changes. */
+function shallowEqualRecord(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  if (a === b) return true
+  const ak = Object.keys(a)
+  if (ak.length !== Object.keys(b).length) return false
+  for (const k of ak) if (a[k] !== b[k]) return false
+  return true
+}
+
+/**
+ * Flatten + sort a route tree most-specific first (static > dynamic > catch-all). Routes whose
+ * synthesized pattern is invalid (a catch-all parent with children would place a catch-all
+ * segment before a literal one) are dropped with a dev warning rather than thrown — one bad
+ * route must not poison all router state.
+ */
 function compileRoutes(routes: readonly RouteRecord[]): FlatRoute[] {
-  return flattenRouteTree(routes, '', []).sort((a, b) => compareSpecificity(a.fullPath, b.fullPath))
+  return flattenRouteTree(routes, '', [])
+    .filter((fr) => {
+      try {
+        parsePattern(fr.fullPath)
+        return true
+      } catch (error) {
+        warnDev(`ignoring invalid route pattern ${fr.fullPath}: ${(error as Error).message}`)
+        return false
+      }
+    })
+    .sort((a, b) => compareSpecificity(a.fullPath, b.fullPath))
 }
 
 /**
@@ -417,6 +452,8 @@ export function createRouter(options: CreateRouterOptions): Router {
   let flatMemo!: Memo<FlatRoute[]>
   let locationSig!: Signal<RouterLocation>
   let stateMemo!: Memo<RouterState>
+  let paramsMemo!: Memo<Record<string, string>>
+  let searchMemo!: Memo<Record<string, unknown>>
   let loaders!: LoaderManager
 
   const dispose = createRoot((disposeRoot) => {
@@ -437,6 +474,10 @@ export function createRouter(options: CreateRouterOptions): Router {
         search: leaf ? leaf.search : EMPTY_SEARCH,
       }
     })
+    // Re-render isolation: params()/search() only emit when an entry actually changes,
+    // not on every navigation (stateMemo returns a fresh object each time).
+    paramsMemo = computed(() => stateMemo().params, { equals: shallowEqualRecord })
+    searchMemo = computed(() => stateMemo().search, { equals: shallowEqualRecord })
 
     // Reactive data version: bumped on any loader-cache change; loader reads
     // subscribe to it so a component's data binding updates when its load
@@ -509,8 +550,8 @@ export function createRouter(options: CreateRouterOptions): Router {
     location: () => locationSig(),
     matches: () => stateMemo().matches,
     match: () => stateMemo().match,
-    params: () => stateMemo().params,
-    search: () => stateMemo().search,
+    params: () => paramsMemo(),
+    search: () => searchMemo(),
     select: <S>(selector: (state: RouterState) => S, equals: (a: S, b: S) => boolean = Object.is) =>
       computed(() => selector(stateMemo()), { equals }),
     navigate: navigate as Router['navigate'],
@@ -520,7 +561,12 @@ export function createRouter(options: CreateRouterOptions): Router {
     setRoutes: (routes) => routesSig.set(routes),
     routes: () => routesSig(),
     history,
-    dispose,
+    // Tear down reactivity AND drop the active-router registration, so a disposed
+    // router no longer answers useRouter()/useParams()/Link.
+    dispose: () => {
+      dispose()
+      clearActiveRouter(router)
+    },
   }
   // Register as the active router so hooks (useRouter, …) and the bound Link resolve it.
   setActiveRouter(router)

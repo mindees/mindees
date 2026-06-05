@@ -25,3 +25,26 @@ describe('headless backend — serialize is binding-independent', () => {
     expect(backend.serialize(el)).toBe('<view title="a&quot;b&lt;c"></view>')
   })
 })
+
+describe('headless SSR — style serialization matches the DOM', () => {
+  it('serializes a style object to kebab-case CSS with px units (not camelCase/unitless)', () => {
+    const b = createHeadlessBackend()
+    const el = b.createElement('view')
+    b.setProp(el, 'style', { backgroundColor: 'red', marginTop: 8, opacity: 0.5 }, undefined)
+    expect(b.serialize(el)).toBe(
+      '<view style="background-color:red;margin-top:8px;opacity:0.5"></view>',
+    )
+  })
+
+  it('drops nullish / non-finite style values', () => {
+    const b = createHeadlessBackend()
+    const el = b.createElement('view')
+    b.setProp(
+      el,
+      'style',
+      { width: 10, height: null, color: undefined, opacity: Number.NaN },
+      undefined,
+    )
+    expect(b.serialize(el)).toBe('<view style="width:10px"></view>')
+  })
+})
