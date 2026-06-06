@@ -11,4 +11,4 @@
  */
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.8.0'
+export const VERSION = '0.9.0'

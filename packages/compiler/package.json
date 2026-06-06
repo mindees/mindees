@@ -1,6 +1,6 @@
 {
   "name": "@mindees/compiler",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "MindeesNative Compiler (MDC) — build-time optimizer: type-check gate, TSX→createElement transform, tree-flattening, per-route code-splitting, and a plugin API. TS→native AOT is a research track.",
   "license": "MIT OR Apache-2.0",
   "type": "module",

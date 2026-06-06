@@ -1,5 +1,15 @@
 # @mindees/compiler
 
+## 0.9.0
+
+### Patch Changes
+
+- 19b7b50: perf-lint: rules `MDC_PERF_003`/`MDC_PERF_004` now also catch reads of the **row accessor** a keyed
+  builder passes to its callback (`For`/`List`/`keyedRegion`/… `{ children|renderItem: (item, index) => … }`
+  where `item()`/`index()` are reads), closing the documented false-negative — without over-firing on a
+  plain function that merely has an `item` parameter.
+  - @mindees/core@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes
