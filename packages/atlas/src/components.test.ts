@@ -12,11 +12,14 @@ import {
   Avatar,
   Badge,
   Card,
+  Checkbox,
   Chip,
   Divider,
   KeyboardAvoidingView,
   ProgressBar,
+  RadioGroup,
   SafeAreaView,
+  Skeleton,
   Switch,
 } from './components'
 import { setEnvironment } from './environment'
@@ -187,5 +190,67 @@ describe('a11y reactivity', () => {
     expect(host?.props['aria-pressed']).toBe('false')
     selected.set(true)
     expect(host?.props['aria-pressed']).toBe('true')
+  })
+})
+
+describe('Checkbox / RadioGroup / Skeleton', () => {
+  const collectByRole = (
+    node: unknown,
+    role: string,
+    acc: MindeesElement[] = [],
+  ): MindeesElement[] => {
+    if (isElement(node)) {
+      if ((node.props as Record<string, unknown>).role === role) acc.push(node)
+      for (const c of node.children) collectByRole(c, role, acc)
+    } else if (Array.isArray(node)) {
+      for (const c of node) collectByRole(c, role, acc)
+    }
+    return acc
+  }
+
+  it('Checkbox has checkbox role and toggles the controlled value on press', () => {
+    const value = signal(false)
+    const node = el(Checkbox({ value, onValueChange: (v) => value.set(v) }))
+    expect(node.props.role).toBe('checkbox')
+    ;(node.props.onPress as () => void)()
+    expect(value()).toBe(true)
+  })
+
+  it('a disabled Checkbox is inert', () => {
+    expect(
+      el(Checkbox({ value: true, disabled: true, onValueChange: () => {} })).props.onPress,
+    ).toBeUndefined()
+  })
+
+  it('a labeled Checkbox still exposes the checkbox role', () => {
+    expect(
+      collectByRole(
+        Checkbox({ value: false, label: 'Accept', onValueChange: () => {} }),
+        'checkbox',
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('RadioGroup selects the pressed option', () => {
+    const value = signal('a')
+    const node = RadioGroup({
+      value,
+      options: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ],
+      onValueChange: (v) => value.set(v),
+    })
+    expect(el(node).props.role).toBe('radiogroup')
+    const radios = collectByRole(node, 'radio')
+    expect(radios).toHaveLength(2)
+    ;(radios[1]?.props.onPress as () => void)()
+    expect(value()).toBe('b')
+  })
+
+  it('Skeleton is an aria-busy status placeholder', () => {
+    const node = el(Skeleton({ width: 120, height: 20 }))
+    expect(node.props.role).toBe('status')
+    expect(node.props['aria-busy']).toBe('true')
   })
 })
