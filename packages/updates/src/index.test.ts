@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createWasmModuleRuntime,
-  info,
-  maturity,
-  NotImplementedError,
-  name,
-  VERSION,
-} from './index'
+import { createWasmModuleRuntime, info, maturity, name, VERSION } from './index'
 
 describe('@mindees/updates metadata', () => {
   it('exposes honest package metadata', () => {
@@ -24,7 +17,8 @@ describe('@mindees/updates metadata', () => {
     expect(info.version).toBe(VERSION)
   })
 
-  it('the WASM module runtime is a research track that throws (not a silent stub)', () => {
-    expect(() => createWasmModuleRuntime()).toThrow(NotImplementedError)
+  it('the WASM module runtime is implemented (returns a runtime with instantiate)', () => {
+    const runtime = createWasmModuleRuntime()
+    expect(typeof runtime.instantiate).toBe('function')
   })
 })

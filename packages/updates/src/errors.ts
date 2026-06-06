@@ -30,6 +30,8 @@ export type UpdateErrorCode =
   | 'GENERATION_UNKNOWN'
   /** `apply()` referenced a generation previously marked failed (cannot be re-activated). */
   | 'GENERATION_FAILED'
+  /** A WASM feature module is malformed, too large, or missing a required capability import. */
+  | 'MODULE_INVALID'
 
 /** An OTA update error carrying a stable {@link UpdateErrorCode}. */
 export class UpdateError extends Error {

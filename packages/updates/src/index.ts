@@ -76,16 +76,17 @@ export {
 } from './store'
 
 /**
- * 🔬 Research track — not implemented. A sandboxed WASM module runtime for shipping
- * signed, capability-secure feature modules at runtime. Throws
- * {@link NotImplementedError}; the working path today is signed JS/asset updates
- * (above).
- *
- * @experimental
+ * Pulse sandboxed WASM module runtime (spec §10) — ship signed, capability-secure feature modules
+ * that run at runtime in their own linear memory, reachable only through the capabilities you grant.
+ * Core WebAssembly today; the full Component Model (WASI 0.2/0.3) is a follow-up behind the same seam.
  */
-export function createWasmModuleRuntime(): never {
-  throw new NotImplementedError('WASM Component-Model module runtime for OTA updates')
-}
+export {
+  type Capabilities,
+  createWasmModuleRuntime,
+  type WasmModuleInstance,
+  type WasmModuleRuntime,
+  type WasmModuleRuntimeOptions,
+} from './wasm'
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }
