@@ -47,7 +47,7 @@ public final class ModelRenderer: HostRenderer {
     public func removeProp(_ view: ModelNode, _ name: String) { view.props[name] = nil }
     public func insert(parent: ModelNode, child: ModelNode, index: Int) { parent.insert(child, at: index) }
     public func remove(parent: ModelNode, child: ModelNode) { parent.remove(child) }
-    public func addEvent(_ view: ModelNode, eventName: String, handlerId: String, fire: @escaping () -> Void) {
+    public func addEvent(_ view: ModelNode, eventName: String, handlerId: String, fire: @escaping (_ value: String?) -> Void) {
         view.events[eventName] = handlerId
     }
     public func removeEvent(_ view: ModelNode, eventName: String, handlerId: String) {

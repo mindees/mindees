@@ -52,8 +52,14 @@ export function _resetNativeAppEngines(): void {
 export interface NativeApp {
   /** Mount the app and flush the initial command batch to the host. */
   start(): void
-  /** Invoke a registered handler (a native event fired), then flush the resulting batch. */
-  dispatchEvent(handlerId: string, event?: unknown): boolean
+  /**
+   * Invoke a registered handler (a native event fired), then flush the resulting batch.
+   * `dispatchEvent(handlerId)` for notify-only events (press/click); `dispatchEvent(handlerId, value)`
+   * for value-carrying events (text change) — JS wraps `value` as `{ target: { value } }` so handlers
+   * read it via the standard event shape. The host passes the RAW string value (never the object);
+   * an absent/null value (no second arg) leaves notify-only behavior unchanged.
+   */
+  dispatchEvent(handlerId: string, value?: string | null): boolean
   /**
    * Advance animations by one frame: forward the host's vsync timestamp (ms) to the animation
    * engine, then flush the resulting command batch. The host calls this each vsync while the frame
@@ -218,7 +224,11 @@ export function createNativeApp(
       render(root, backend, backend.root)
       flush()
     },
-    dispatchEvent(handlerId: string, event?: unknown): boolean {
+    dispatchEvent(handlerId: string, value?: string | null): boolean {
+      // No value (press/click) → undefined event (unchanged). A string (incl. "" — a cleared field)
+      // → { target: { value } } so eventValue() reads the typed text. `== null` treats both undefined
+      // and a host-passed null as "no value" while still delivering an empty-string clear.
+      const event = value === undefined || value === null ? undefined : { target: { value } }
       const handled = backend.dispatchEvent(handlerId, event)
       flush()
       return handled

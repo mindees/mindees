@@ -19,7 +19,7 @@ class MindeesRuntimeBridgeTest {
             rootId = "host-root",
             root = root,
             renderer = renderer,
-            onEvent = { handlerId -> bridge.dispatchEvent(handlerId) },
+            onEvent = { handlerId, value -> bridge.dispatchEvent(handlerId, value) },
         )
 
         bridge = MindeesRuntimeBridge(host, runtime)
@@ -36,11 +36,11 @@ class MindeesRuntimeBridgeTest {
         val runtime = RecordingRuntime()
         val renderer = ModelRenderer()
         val root = renderer.makeElement("root")
-        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val host = MindeesNativeHost("host-root", root, renderer) { _, _ -> }
         val bridge = MindeesRuntimeBridge(host, runtime)
 
         bridge.start()
-        bridge.dispatchEvent("counter.increment")
+        bridge.dispatchEvent("counter.increment", null)
 
         assertEquals(listOf("counter.increment"), runtime.dispatched)
         assertEquals("<view>Count: 1<button></button></view>", inner(root))
@@ -51,7 +51,7 @@ class MindeesRuntimeBridgeTest {
         val runtime = RecordingRuntime()
         val renderer = ModelRenderer()
         val root = renderer.makeElement("root")
-        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val host = MindeesNativeHost("host-root", root, renderer) { _, _ -> }
         val bridge = MindeesRuntimeBridge(host, runtime)
 
         bridge.start()
@@ -66,7 +66,7 @@ class MindeesRuntimeBridgeTest {
         val runtime = RecordingRuntime()
         val renderer = ModelRenderer()
         val root = renderer.makeElement("root")
-        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val host = MindeesNativeHost("host-root", root, renderer) { _, _ -> }
         val bridge = MindeesRuntimeBridge(host, runtime)
 
         bridge.frameTick(16.0) // not started yet → no-op, no throw
@@ -78,11 +78,11 @@ class MindeesRuntimeBridgeTest {
         val runtime = RecordingRuntime()
         val renderer = ModelRenderer()
         val root = renderer.makeElement("root")
-        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val host = MindeesNativeHost("host-root", root, renderer) { _, _ -> }
         val bridge = MindeesRuntimeBridge(host, runtime)
 
         assertThrows(IllegalStateException::class.java) {
-            bridge.dispatchEvent("counter.increment")
+            bridge.dispatchEvent("counter.increment", null)
         }
     }
 
@@ -91,7 +91,7 @@ class MindeesRuntimeBridgeTest {
         val runtime = FailingRuntime()
         val renderer = ModelRenderer()
         val root = renderer.makeElement("root")
-        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val host = MindeesNativeHost("host-root", root, renderer) { _, _ -> }
         val bridge = MindeesRuntimeBridge(host, runtime)
 
         assertThrows(IllegalStateException::class.java) {
@@ -99,7 +99,7 @@ class MindeesRuntimeBridgeTest {
         }
         assertEquals(1, runtime.closeCount)
         assertThrows(IllegalStateException::class.java) {
-            bridge.dispatchEvent("counter.increment")
+            bridge.dispatchEvent("counter.increment", null)
         }
     }
 
@@ -108,7 +108,7 @@ class MindeesRuntimeBridgeTest {
         val runtime = CloseFailingRuntime()
         val renderer = ModelRenderer()
         val root = renderer.makeElement("root")
-        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val host = MindeesNativeHost("host-root", root, renderer) { _, _ -> }
         val bridge = MindeesRuntimeBridge(host, runtime)
 
         bridge.start()
@@ -120,7 +120,7 @@ class MindeesRuntimeBridgeTest {
         bridge.close()
         assertEquals(1, runtime.closeCount)
         assertThrows(IllegalStateException::class.java) {
-            bridge.dispatchEvent("counter.increment")
+            bridge.dispatchEvent("counter.increment", null)
         }
     }
 
@@ -154,7 +154,7 @@ class MindeesRuntimeBridgeTest {
             )
         }
 
-        override fun dispatchEvent(handlerId: String) {
+        override fun dispatchEvent(handlerId: String, value: String?) {
             dispatched.add(handlerId)
             if (handlerId == "counter.increment") {
                 sink?.applyBatch(
@@ -183,7 +183,7 @@ class MindeesRuntimeBridgeTest {
             throw IllegalStateException("startup failed")
         }
 
-        override fun dispatchEvent(handlerId: String) {
+        override fun dispatchEvent(handlerId: String, value: String?) {
             throw AssertionError("dispatchEvent should not be called after failed startup")
         }
 
@@ -199,7 +199,7 @@ class MindeesRuntimeBridgeTest {
 
         override fun start(sink: NativeCommandSink) = Unit
 
-        override fun dispatchEvent(handlerId: String) {
+        override fun dispatchEvent(handlerId: String, value: String?) {
             throw AssertionError("dispatchEvent should not be called after failed close")
         }
 

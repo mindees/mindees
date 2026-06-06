@@ -47,7 +47,7 @@ class AndroidRenderTest {
     private fun newHost(): Pair<MindeesNativeHost<View>, FlexboxLayout> {
         val context = RuntimeEnvironment.getApplication()
         val container = FlexboxLayout(context)
-        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {}
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) { _, _ -> }
         return host to container
     }
 
@@ -120,8 +120,8 @@ class AndroidRenderTest {
         val fired = mutableListOf<String>()
         val context = RuntimeEnvironment.getApplication()
         val container = FlexboxLayout(context)
-        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
-            fired.add(it)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) { id, _ ->
+            fired.add(id)
         }
         host.apply(
             NativeCommandCodec.decodeBatch(
@@ -317,8 +317,8 @@ class AndroidRenderTest {
         val fired = mutableListOf<String>()
         val context = RuntimeEnvironment.getApplication()
         val container = FlexboxLayout(context)
-        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
-            fired.add(it)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) { id, _ ->
+            fired.add(id)
         }
         host.apply(
             NativeCommandCodec.decodeBatch(
@@ -416,11 +416,11 @@ class AndroidRenderTest {
 
     @Test
     fun wiresTextChangeWatcherThatDispatchesAndDetaches() {
-        val fired = mutableListOf<String>()
+        val fired = mutableListOf<Pair<String, String?>>()
         val context = RuntimeEnvironment.getApplication()
         val container = FlexboxLayout(context)
-        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
-            fired.add(it)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) { id, value ->
+            fired.add(id to value)
         }
         host.apply(
             NativeCommandCodec.decodeBatch(
@@ -435,14 +435,14 @@ class AndroidRenderTest {
         )
         val et = container.getChildAt(0) as EditText
         et.setText("abc") // Robolectric runs the TextWatcher synchronously
-        assertEquals(listOf("ch1"), fired)
+        assertEquals(listOf("ch1" to "abc"), fired) // the typed text reaches onEvent (not just the id)
         host.apply(
             NativeCommandCodec.decodeBatch(
                 """[{"type":"unregisterEvent","id":"a","eventName":"input","handlerId":"ch1"}]""",
             ),
         )
         et.setText("def")
-        assertEquals(listOf("ch1"), fired) // detached → no further dispatch
+        assertEquals(listOf("ch1" to "abc"), fired) // detached → no further dispatch
     }
 
     @Test
@@ -474,11 +474,11 @@ class AndroidRenderTest {
 
     @Test
     fun supportsBothInputAndChangeWatchersIndependently() {
-        val fired = mutableListOf<String>()
+        val fired = mutableListOf<Pair<String, String?>>()
         val context = RuntimeEnvironment.getApplication()
         val container = FlexboxLayout(context)
-        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
-            fired.add(it)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) { id, value ->
+            fired.add(id to value)
         }
         host.apply(
             NativeCommandCodec.decodeBatch(
@@ -493,9 +493,9 @@ class AndroidRenderTest {
             ),
         )
         val et = container.getChildAt(0) as EditText
-        et.setText("x") // both watchers fire
-        assertTrue(fired.contains("in1"))
-        assertTrue(fired.contains("ch1"))
+        et.setText("x") // both watchers fire, each carrying the field text
+        assertTrue(fired.contains("in1" to "x"))
+        assertTrue(fired.contains("ch1" to "x"))
         fired.clear()
         host.apply(
             NativeCommandCodec.decodeBatch(
@@ -503,6 +503,6 @@ class AndroidRenderTest {
             ),
         )
         et.setText("y") // input detached; change still fires
-        assertEquals(listOf("ch1"), fired)
+        assertEquals(listOf("ch1" to "y"), fired)
     }
 }

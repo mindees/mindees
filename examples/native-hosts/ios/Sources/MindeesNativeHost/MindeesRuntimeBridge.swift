@@ -18,7 +18,7 @@ public protocol NativeCommandSink: AnyObject {
 /// A minimal embedded JavaScript runtime contract for MindeesNative examples.
 public protocol MindeesScriptRuntime: AnyObject {
     func start(sink: NativeCommandSink) throws
-    func dispatchEvent(handlerId: String) throws
+    func dispatchEvent(handlerId: String, value: String?) throws
     func close()
 }
 
@@ -87,9 +87,9 @@ public final class MindeesRuntimeBridge<R: HostRenderer>: NativeCommandSink {
         }
     }
 
-    public func dispatchEvent(handlerId: String) throws {
+    public func dispatchEvent(handlerId: String, value: String? = nil) throws {
         guard started else { throw MindeesRuntimeBridgeError.notStarted }
-        try runtime.dispatchEvent(handlerId: handlerId)
+        try runtime.dispatchEvent(handlerId: handlerId, value: value)
     }
 
     public func close() {
@@ -169,9 +169,12 @@ public final class JavaScriptCoreMindeesRuntime: MindeesScriptRuntime {
         hostApi = nextHostApi
     }
 
-    public func dispatchEvent(handlerId: String) throws {
+    public func dispatchEvent(handlerId: String, value: String?) throws {
         guard let app else { throw JavaScriptCoreMindeesRuntimeError.notStarted }
-        _ = app.invokeMethod("dispatchEvent", withArguments: [handlerId])
+        // Pass the raw value as a 2nd JS arg only when present; the JS layer wraps it as
+        // { target: { value } }. Notify-only events pass [handlerId] alone (value stays undefined in JS).
+        let arguments: [Any] = value.map { [handlerId, $0] } ?? [handlerId]
+        _ = app.invokeMethod("dispatchEvent", withArguments: arguments)
         try rethrowPendingFailures(from: hostApi)
     }
 

@@ -38,8 +38,8 @@ class MainActivity : Activity() {
             rootId = HOST_ROOT_ID,
             root = root,
             renderer = renderer,
-            onEvent = { handlerId ->
-                bridge?.dispatchEvent(handlerId)
+            onEvent = { handlerId, value ->
+                bridge?.dispatchEvent(handlerId, value)
                     ?: error("Mindees runtime bridge has not started")
             },
         )
