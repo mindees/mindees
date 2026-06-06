@@ -14,12 +14,16 @@ import android.view.Choreographer
 class FrameDriver(private val tick: (Double) -> Unit) {
     private var running = false
 
-    private val callback = Choreographer.FrameCallback { frameTimeNanos ->
-        if (!running) return@FrameCallback
-        tick(frameTimeNanos / 1_000_000.0)
-        // Re-perpetuate ONLY while running; setActive(false) simply stops re-posting, so the loop
-        // dies after the in-flight frame — nothing to cancel, no leaked callback.
-        Choreographer.getInstance().postFrameCallback(this.callback)
+    // An explicit anonymous object (NOT a SAM lambda): the body re-posts `this`, and a lambda that
+    // referenced its own `val` would make Kotlin's type inference recurse.
+    private val callback: Choreographer.FrameCallback = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!running) return
+            tick(frameTimeNanos / 1_000_000.0)
+            // Re-perpetuate ONLY while running; setActive(false) simply stops re-posting, so the loop
+            // dies after the in-flight frame — nothing to cancel, no leaked callback.
+            Choreographer.getInstance().postFrameCallback(this)
+        }
     }
 
     /** Start (true) or stop (false) the vsync loop. Idempotent. */
