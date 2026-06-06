@@ -41,6 +41,16 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
         }
     }
 
+    func testForwardsOptionalValueToRuntime() throws {
+        let runtime = RecordingRuntime()
+        let (bridge, _) = makeBridge(runtime: runtime)
+        try bridge.start()
+        try bridge.dispatchEvent(handlerId: "field.input", value: "abc") // text change carries the value
+        try bridge.dispatchEvent(handlerId: "btn.press", value: nil) // notify-only carries nil
+        XCTAssertEqual(runtime.dispatched, ["field.input", "btn.press"])
+        XCTAssertEqual(runtime.dispatchedValues, ["abc", nil])
+    }
+
     func testStartFailureClosesRuntimeAndLeavesBridgeStopped() {
         let runtime = FailingRuntime()
         let (bridge, _) = makeBridge(runtime: runtime)
@@ -240,11 +250,13 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
 private final class RecordingRuntime: MindeesScriptRuntime {
     var closeCount = 0
     var dispatched: [String] = []
+    var dispatchedValues: [String?] = []
 
     func start(sink: NativeCommandSink) throws {}
 
     func dispatchEvent(handlerId: String, value: String?) throws {
         dispatched.append(handlerId)
+        dispatchedValues.append(value)
     }
 
     func close() {

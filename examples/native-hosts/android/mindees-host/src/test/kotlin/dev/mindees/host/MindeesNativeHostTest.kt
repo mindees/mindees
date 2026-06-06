@@ -15,7 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MindeesNativeHostTest {
-    private fun makeHost(onEvent: (String) -> Unit = {}): Pair<MindeesNativeHost<ModelNode>, ModelNode> {
+    private fun makeHost(onEvent: (String, String?) -> Unit = { _, _ -> }): Pair<MindeesNativeHost<ModelNode>, ModelNode> {
         val renderer = ModelRenderer()
         val root = renderer.makeElement("root")
         val host = MindeesNativeHost("host-root", root, renderer, onEvent)
@@ -94,7 +94,7 @@ class MindeesNativeHostTest {
     @Test
     fun wiresEvents() {
         val fired = mutableListOf<String>()
-        val (host, root) = makeHost { fired.add(it) }
+        val (host, root) = makeHost { id, _ -> fired.add(id) }
         host.apply(
             listOf(
                 NativeCommand.CreateNode("btn", "button"),

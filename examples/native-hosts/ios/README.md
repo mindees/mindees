@@ -59,8 +59,8 @@ let host = MindeesNativeHost(
     rootId: "host-root",
     root: container,
     renderer: renderer,
-    onEvent: { handlerId in
-        try? bridge.dispatchEvent(handlerId: handlerId) // -> MindeesApp.dispatchEvent
+    onEvent: { handlerId, value in
+        try? bridge.dispatchEvent(handlerId: handlerId, value: value) // -> MindeesApp.dispatchEvent
     }
 )
 
@@ -75,7 +75,9 @@ try bridge.start()
 The embedded script must expose `globalThis.MindeesApp = { start, dispatchEvent }`.
 During `start()`, JavaScript sends serialized command batches through
 `MindeesHost.emit(JSON.stringify(commands))`; native `press` callbacks call
-`dispatchEvent(handlerId)` back into the same runtime.
+`dispatchEvent(handlerId, nil)` and input/change callbacks call
+`dispatchEvent(handlerId, value)` back into the same runtime — the JS layer wraps a
+non-nil value as `{ target: { value } }`.
 
 ## Status
 
