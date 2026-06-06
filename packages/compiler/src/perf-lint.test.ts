@@ -176,3 +176,21 @@ describe('perf-lint', () => {
     expect(perfLint(src, 'm.ts').map((d) => d.code)).toContain('MDC_PERF_003')
   })
 })
+
+describe('perf-lint — For/List row callback-param accessors (003/004)', () => {
+  it('004 flags a repeated row-accessor read in a loop inside a For row', () => {
+    const src =
+      'const r = For({ each: () => xs(), key: (t:any) => t.id, children: (item:()=>any) => { for (let i=0;i<3;i++){ use(item().a); log(item().b) } return null } })'
+    expect(codes(src)).toContain('MDC_PERF_004')
+  })
+  it('003 flags a heavy loop over a row accessor in an effect inside a For row', () => {
+    const src =
+      'const r = For({ each: () => xs(), key: (t:any) => t.id, children: (item:()=>number[]) => { effect(() => { let t=0; for (const x of item()) t+=x }); return null } })'
+    expect(codes(src)).toContain('MDC_PERF_003')
+  })
+  it('does not seed a non-keyed call (no false positive)', () => {
+    // a plain function with an `item` param is NOT a keyed-builder row → not seeded → no 004
+    const src = 'function plain(item:()=>any){ for (let i=0;i<3;i++){ use(item()); log(item()) } }'
+    expect(codes(src)).not.toContain('MDC_PERF_004')
+  })
+})

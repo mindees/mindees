@@ -73,6 +73,9 @@ export function perfLint(
 
   // --- pre-pass: the set of identifiers bound to reactive accessors (signal/computed/memo/use*) ---
   const accessors = new Set<string>()
+  const addParamName = (param: ts.ParameterDeclaration | undefined): void => {
+    if (param && ts.isIdentifier(param.name)) accessors.add(param.name.text)
+  }
   const collectAccessors = (node: ts.Node): void => {
     if (
       ts.isVariableDeclaration(node) &&
@@ -87,6 +90,27 @@ export function perfLint(
           ? callee.name.text
           : ''
       if (ACCESSOR_FACTORY.test(name)) accessors.add(node.name.text)
+    }
+    // A keyed builder's row callback receives accessors: For/List({ children|renderItem: (item, index) => … })
+    // where item()/index() are reads. Seed those param names so rules 003/004 see them.
+    if (
+      ts.isCallExpression(node) &&
+      keyed.has(ts.isIdentifier(node.expression) ? node.expression.text : '')
+    ) {
+      const arg = node.arguments[0]
+      if (arg && ts.isObjectLiteralExpression(arg)) {
+        for (const p of arg.properties) {
+          if (
+            ts.isPropertyAssignment(p) &&
+            ts.isIdentifier(p.name) &&
+            (p.name.text === 'children' || p.name.text === 'renderItem') &&
+            (ts.isArrowFunction(p.initializer) || ts.isFunctionExpression(p.initializer))
+          ) {
+            addParamName(p.initializer.parameters[0]) // item accessor
+            addParamName(p.initializer.parameters[1]) // index accessor
+          }
+        }
+      }
     }
     ts.forEachChild(node, collectAccessors)
   }
