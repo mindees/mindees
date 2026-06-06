@@ -5,6 +5,8 @@ import { NotImplementedError, notImplemented } from '@mindees/core'
 export { compileToNative, type NativeTarget } from './aot'
 /** Tree-flattening optimizer pass. */
 export { createFlattenTransformer, STATIC_MARKER } from './flatten'
+/** Build-time perf-lint (opt-in via `compileChecked(src, { perf: true })`). */
+export { type PerfLintOptions, perfLint } from './perf-lint'
 /** Per-route code-splitting manifest + file-based route codegen. */
 export {
   buildRouteManifest,

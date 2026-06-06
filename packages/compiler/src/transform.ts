@@ -12,6 +12,7 @@
 
 import ts from 'typescript'
 import { createFlattenTransformer } from './flatten'
+import { perfLint } from './perf-lint'
 import { hasErrors, typecheck } from './typecheck'
 import type { CompileOptions, CompileResult, CompileStats } from './types'
 
@@ -154,6 +155,14 @@ export function compileChecked(source: string, options: CompileOptions = {}): Co
     return { code: '', diagnostics, stats: { flattenedNodes: 0, totalElements: 0 } }
   }
   const compiled = compile(source, options)
-  // Surface any type-check warnings alongside the compile result.
-  return { ...compiled, diagnostics: [...diagnostics, ...compiled.diagnostics] }
+  // Opt-in build-time perf-lint: warnings only (never blocks — the gate above already returned on
+  // errors, and every perf diagnostic is severity 'warning').
+  const perfDiagnostics = options.perf
+    ? perfLint(source, fileName, typeof options.perf === 'object' ? options.perf : {})
+    : []
+  // Surface type-check warnings + perf warnings alongside the compile result.
+  return {
+    ...compiled,
+    diagnostics: [...diagnostics, ...perfDiagnostics, ...compiled.diagnostics],
+  }
 }
