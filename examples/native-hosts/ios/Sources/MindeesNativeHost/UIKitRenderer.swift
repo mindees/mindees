@@ -53,6 +53,10 @@ public final class UIKitRenderer: HostRenderer {
             return UIImageView()
         case "textinput":
             return UITextField() // styling deferred; at least not a stack
+        case "activityindicator":
+            let spinner = UIActivityIndicatorView(style: .medium)
+            spinner.startAnimating()
+            return spinner
         case "scrollview":
             return makeScrollHost(axis: .vertical)
         case "horizontalscrollview":
@@ -317,6 +321,10 @@ public final class UIKitRenderer: HostRenderer {
         if let button = view as? UIButton, let label = button.titleLabel {
             applyText(label, s)
             if let c = colorValue(s["color"]) { button.setTitleColor(c, for: .normal) }
+        }
+        // ActivityIndicator → `color` tints the spinner (mirrors Android's indeterminate tint).
+        if let spinner = view as? UIActivityIndicatorView, let c = colorValue(s["color"]) {
+            spinner.color = c
         }
     }
 

@@ -296,6 +296,23 @@ final class UIKitRenderTests: XCTestCase {
         XCTAssertFalse(b.isEnabled)
     }
 
+    func testRendersActivityIndicator() throws {
+        let container = UIView()
+        let host = MindeesNativeHost(
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
+        )
+        try host.apply(decode("""
+        [
+          {"type":"createNode","id":"s","tag":"activityindicator"},
+          {"type":"setProp","id":"s","name":"style","value":{"color":"#ff0000"}},
+          {"type":"insertChild","parentId":"host-root","childId":"s","index":0}
+        ]
+        """))
+        let spinner = try XCTUnwrap(container.subviews.first as? UIActivityIndicatorView)
+        XCTAssertTrue(spinner.isAnimating) // spins by default
+        XCTAssertNotNil(spinner.color) // color tint applied
+    }
+
     func testWiresAndDetachesTextChangeTarget() throws {
         // Asserts the renderer's wiring (target added for .editingChanged, removed on unregister) —
         // like the press test asserts recognizer registration. UITextField gates .editingChanged to a
