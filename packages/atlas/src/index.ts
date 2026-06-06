@@ -71,6 +71,7 @@ export {
   useWindowDimensions,
   type WindowDimensions,
 } from './environment'
+export { type Field, type FormApi, type UseFormOptions, useForm } from './form'
 export { type AttachableGesture, GestureView, type GestureViewProps } from './gesture'
 export {
   type AsyncState,
