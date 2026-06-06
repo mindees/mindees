@@ -15,7 +15,8 @@ OTA updates. Built in the open.
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
-[![Status: v0.1.0 experimental](https://img.shields.io/badge/status-v0.1.0%20experimental-orange.svg)](./STATUS.md)
+[![Status: v0.8.0 experimental](https://img.shields.io/badge/status-v0.8.0%20experimental-orange.svg)](./STATUS.md)
+[![npm](https://img.shields.io/badge/npm-%40mindees%2F*-cb3837.svg)](https://www.npmjs.com/org/mindees)
 
 [Status](./STATUS.md) · [Roadmap](./ROADMAP.md) · [Contributing](./CONTRIBUTING.md) · [RFCs](./rfcs/README.md) · [Discussions](https://github.com/mindees/mindees/discussions)
 
@@ -23,22 +24,26 @@ OTA updates. Built in the open.
 
 ---
 
-> ### ⚠️ v0.1.0 — experimental, building in the open
+> ### ⚠️ v0.8.0 — experimental, building in the open (all 10 packages on npm)
 >
-> MindeesNative is **not production-ready yet** — we are building it phase by
-> phase, bottom-up, and we follow one rule above all: **everything we ship
-> actually works.** [`STATUS.md`](./STATUS.md) is the honest, per-package source
-> of truth for what's real today versus what's still planned. **The reactive
-> core, renderer (with SSR), compiler, CLI, and typed router are done and
-> tested** — see the live examples below. The **native rendering strand** is real:
-> the command backend, a strict conformance contract, and **iOS + Android host
-> projects that render the command stream into correct native view trees** are all
-> verified in CI (Phases 8A-8E), Android now has an embedded QuickJS example
-> app that CI runs on an emulator through a real JS<->native bridge (Phase 8F-A/B),
-> and iOS has a JavaScriptCore bridge verified on an iOS Simulator (Phase 8F-C).
-> Pulse OTA, Continuum data, Synapse AI, and Atlas UI are implemented in their
-> documented experimental scope. Still missing: physical-device proof, app-store
-> packaging, and production hardening, so production native mobile apps are not ready.
+> MindeesNative is **not production-ready yet** — we are building it in public and
+> follow one rule above all: **everything we ship actually works.**
+> [`STATUS.md`](./STATUS.md) is the honest, per-package source of truth.
+>
+> **Real and tested today:** fine-grained + **concurrent** reactivity (signals,
+> scheduler, `startTransition`/`deferred`), the Helix renderer with **real SSR**, the
+> compiler (now with an opt-in **perf-lint**), the CLI, the typed **router with an
+> animated stack navigator**, an **animation engine** (timing/spring/interpolate), a
+> **gesture system** (tap/long-press/pan/pinch/swipe), and a batteries-included
+> **Atlas** UI kit (20+ components, standard hooks, a `useForm` with Standard-Schema
+> validation). Animations/gestures/transitions run **smooth on a real Android device
+> via vsync**, verified in CI on an emulator through an embedded-QuickJS JS↔native
+> bridge; iOS has a JavaScriptCore bridge verified on the Simulator. Pulse OTA,
+> Continuum local-first data, and Synapse AI ship in their documented experimental
+> scope. **Still missing:** physical-device proof, a published native host library,
+> app-store packaging, and production hardening — so end-to-end production native
+> mobile apps are not ready yet. We benchmark against the **latest stable React
+> Native (0.85) and Flutter (3.44)**.
 >
 > ⭐ **Star the repo** to follow along, and check the
 > [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
@@ -208,6 +213,48 @@ changed param update. Plus a typed `createLink`, **SWR data loaders** (with
 `AbortSignal` cancellation, `preload` intent-prefetch, and `invalidate`),
 **navigation guards** (cancel / redirect / idempotent), and **web view
 transitions**. See [`@mindees/router`](./packages/router).
+
+### 🎬 Animations & gestures as signals — no worklet runtime to learn
+
+An `AnimatedValue` **is a signal**, so reading it in a `style` re-renders only that
+node — no separate animation API, no Reanimated worklet mental model. Gestures are
+signals too, and a flick hands its velocity to a spring:
+
+```ts
+import { animate, timing, spring, pan } from '@mindees/core'
+
+const x = animate(0)
+timing(x, { to: 100, duration: 250 })          // tween
+spring(x, { to: 0, stiffness: 170 })           // physics, velocity-aware
+
+// drag → spring-on-release, all reactive:
+const drag = pan({ axis: 'x', onUpdate: (e) => x.set(e.translationX) })
+```
+
+One injected frame source drives every animation in **one batch per frame**
+(glitch-free), and the loop **sleeps when nothing is animating** (zero idle cost).
+On a native host it's wired to **vsync automatically** — smooth by default. Atlas
+adds an **animated stack navigator** (slide/fade + edge **swipe-back**) and
+`tap`/`longPress`/`pan`/`pinch`/`swipe` recognizers.
+
+### 🔋 Batteries RN & Flutter make you install a library for — built in
+
+```ts
+import { useForm, useToggle, useAsync, Checkbox } from '@mindees/atlas'
+
+const form = useForm({
+  initialValues: { email: '' },
+  schema: z.object({ email: z.string().email() }),   // any Standard Schema
+  onSubmit: (values) => save(values),
+})
+form.field('email').error()   // reactive, per-field — re-renders only this field
+```
+
+`useForm` (Standard-Schema validation), `useToggle`/`useCounter`/`usePrevious`/
+`useReducer`/`useAsync`, plus **20+ accessible components** (`Checkbox`, `RadioGroup`,
+`Switch`, `Skeleton`, `Modal`, virtualized `List`, …) and **design-token theming**
+with automatic dark mode. And an opt-in **compiler perf-lint** warns you at build
+time when code will jank — something neither React Native nor Flutter ships.
 
 ## 📦 Packages
 
