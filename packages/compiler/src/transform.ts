@@ -11,6 +11,7 @@
  */
 
 import ts from 'typescript'
+import { checkBudget } from './budget'
 import { createFlattenTransformer } from './flatten'
 import { perfLint } from './perf-lint'
 import { hasErrors, typecheck } from './typecheck'
@@ -160,9 +161,20 @@ export function compileChecked(source: string, options: CompileOptions = {}): Co
   const perfDiagnostics = options.perf
     ? perfLint(source, fileName, typeof options.perf === 'object' ? options.perf : {})
     : []
-  // Surface type-check warnings + perf warnings alongside the compile result.
-  return {
-    ...compiled,
-    diagnostics: [...diagnostics, ...perfDiagnostics, ...compiled.diagnostics],
+  // Performance budget (spec §12): violations are ERRORS that refuse to emit — "100% optimized,
+  // enforced." Attach the budget errors to a file so editors surface them.
+  const budgetDiagnostics = options.budget
+    ? checkBudget(compiled, options.budget).map((d) => ({ ...d, file: fileName }))
+    : []
+  const allDiagnostics = [
+    ...diagnostics,
+    ...perfDiagnostics,
+    ...budgetDiagnostics,
+    ...compiled.diagnostics,
+  ]
+  if (hasErrors(budgetDiagnostics)) {
+    // Over budget → refuse to emit (same contract as the type-check gate above).
+    return { code: '', diagnostics: allDiagnostics, stats: compiled.stats }
   }
+  return { ...compiled, diagnostics: allDiagnostics }
 }

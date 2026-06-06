@@ -4,6 +4,7 @@
  * @module
  */
 
+import type { BudgetOptions } from './budget'
 import type { PerfLintOptions } from './perf-lint'
 
 /** Severity of a {@link Diagnostic}. */
@@ -65,6 +66,11 @@ export interface CompileOptions {
    * render footguns; never blocks the build. `true` for defaults, or pass {@link PerfLintOptions}.
    */
   perf?: boolean | PerfLintOptions
+  /**
+   * Enforce a performance budget (`compileChecked` only): a violation is an **error** that refuses to
+   * emit (spec §12 — "100% optimized, enforced"). See {@link BudgetOptions}.
+   */
+  budget?: BudgetOptions
 }
 
 /**

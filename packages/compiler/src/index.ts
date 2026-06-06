@@ -3,6 +3,8 @@ import { NotImplementedError, notImplemented } from '@mindees/core'
 
 /** TS → native AOT (research track). */
 export { compileToNative, type NativeTarget } from './aot'
+/** Build-time performance budget (opt-in via `compileChecked(src, { budget })`) — fails the build. */
+export { type BudgetOptions, checkBudget } from './budget'
 /** Tree-flattening optimizer pass. */
 export { createFlattenTransformer, STATIC_MARKER } from './flatten'
 /** Build-time perf-lint (opt-in via `compileChecked(src, { perf: true })`). */
