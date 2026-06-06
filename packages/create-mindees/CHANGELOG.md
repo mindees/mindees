@@ -1,5 +1,19 @@
 # create-mindees
 
+## 0.10.0
+
+### Minor Changes
+
+- 009face: Add an **`app`** starter template (`mindees create my-app --template app`) — a polished, batteries-on
+  starting point using the Atlas UI kit (`Card`/`Button`/`Switch`/`Text`), a standard hook (`useToggle`),
+  and a real screen, so an ordinary developer has something working and good-looking in seconds.
+
+### Patch Changes
+
+- Updated dependencies [009face]
+  - @mindees/cli@0.10.0
+  - @mindees/core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
