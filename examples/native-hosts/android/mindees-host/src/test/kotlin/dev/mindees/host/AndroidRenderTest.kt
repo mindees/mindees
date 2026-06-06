@@ -251,6 +251,35 @@ class AndroidRenderTest {
     }
 
     @Test
+    fun appliesElevationPerCornerRadiusAndLineClamp() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"card","tag":"view"},
+                  {"type":"setProp","id":"card","name":"style","value":{
+                    "elevation":6,"backgroundColor":"#222222",
+                    "borderTopLeftRadius":16,"borderBottomRightRadius":4
+                  }},
+                  {"type":"createNode","id":"t","tag":"text"},
+                  {"type":"setProp","id":"t","name":"style","value":{"numberOfLines":1}},
+                  {"type":"createText","id":"s","text":"a very long line that should be clamped"},
+                  {"type":"insertChild","parentId":"t","childId":"s","index":0},
+                  {"type":"insertChild","parentId":"card","childId":"t","index":0},
+                  {"type":"insertChild","parentId":"host-root","childId":"card","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val card = container.getChildAt(0) as FlexboxLayout
+        assertTrue(card.elevation > 0f) // elevation → shadow
+        assertTrue(card.background is GradientDrawable) // per-corner radii applied without crashing
+        val label = card.getChildAt(0) as TextView
+        assertEquals(1, label.maxLines) // numberOfLines → maxLines + ellipsize
+    }
+
+    @Test
     fun appliesAtlasTextStyle() {
         val (host, container) = newHost()
         host.apply(
