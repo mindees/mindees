@@ -57,6 +57,27 @@ export {
   parseManifest,
   type UpdateManifest,
 } from './manifest'
+/**
+ * Server-Driven UI (Pulse §10): compile an allowlisted, schema-versioned JSON tree into a live
+ * MindeesNode tree, and apply incremental updates with JSON Merge Patch (RFC 7396) / JSON Patch
+ * (RFC 6902). No `eval` — components + actions are pre-registered.
+ */
+export {
+  applyJsonPatch,
+  applyMergePatch,
+  compileSdui,
+  type JsonPatchOp,
+  type SduiActionHandler,
+  type SduiActionRef,
+  type SduiBindRef,
+  SduiError,
+  type SduiErrorCode,
+  type SduiJson,
+  type SduiLimits,
+  type SduiNode,
+  type SduiPropValue,
+  type SduiRegistry,
+} from './sdui'
 export {
   type SignatureEntry,
   type SignedManifest,
