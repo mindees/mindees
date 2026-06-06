@@ -446,3 +446,171 @@ export const ActivityIndicator: Component<ActivityIndicatorProps> = (props) => {
   host['aria-busy'] = 'true'
   return createElement('activityindicator', host)
 }
+
+// ---------------------------------------------------------------------------
+// Checkbox
+// ---------------------------------------------------------------------------
+
+/** Props for {@link Checkbox}. */
+export interface CheckboxProps extends Omit<BaseProps, 'style'> {
+  /** Controlled checked state (static or reactive). */
+  readonly value: Reactive<boolean>
+  readonly onValueChange?: (value: boolean) => void
+  readonly disabled?: boolean
+  /** Optional label rendered beside the box (a string becomes a `Text`). */
+  readonly label?: MindeesNode
+  readonly style?: Reactive<StyleInput>
+}
+
+/** An accessible checkbox (RN ships none built-in). Toggles `value`; `aria-checked` tracks it. */
+export const Checkbox: Component<CheckboxProps> = (props) => {
+  const theme = useTheme()
+  const { value, onValueChange, disabled, label, style, ...rest } = props
+  const isOn = toAccessor(value, false)
+  const box: Accessor<StyleInput> = () => ({
+    width: 22,
+    height: 22,
+    borderRadius: radiusScale.sm,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: isOn() ? theme().color.primary : theme().color.textMuted,
+    backgroundColor: isOn() ? theme().color.primary : 'transparent',
+    opacity: disabled ? 0.5 : 1,
+  })
+  const check = createElement(
+    Text,
+    {
+      style: () => ({ color: theme().color.onPrimary, fontSize: 14, fontWeight: fontWeight.bold }),
+    },
+    () => (isOn() ? '✓' : ''),
+  )
+  const handlePress = onValueChange && !disabled ? () => onValueChange(!isOn()) : undefined
+  const boxEl = createElement(
+    Pressable,
+    {
+      ...rest,
+      role: rest.role ?? 'checkbox',
+      state: () => ({
+        ...(typeof rest.state === 'function' ? rest.state() : (rest.state ?? {})),
+        checked: isOn(),
+      }),
+      ...(disabled ? { disabled: true } : {}),
+      ...(handlePress ? { onPress: handlePress } : {}),
+      style: mergeStyle(box, style),
+    },
+    check,
+  )
+  if (label === undefined) return boxEl
+  return createElement(
+    View,
+    { style: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: space.sm } },
+    boxEl,
+    typeof label === 'string' ? createElement(Text, {}, label) : label,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// RadioGroup
+// ---------------------------------------------------------------------------
+
+/** One option in a {@link RadioGroup}. */
+export interface RadioOption {
+  readonly value: string
+  readonly label: MindeesNode
+}
+
+/** Props for {@link RadioGroup}. */
+export interface RadioGroupProps extends Omit<BaseProps, 'style'> {
+  /** Controlled selected value (static or reactive). */
+  readonly value: Reactive<string>
+  readonly options: readonly RadioOption[]
+  readonly onValueChange?: (value: string) => void
+  readonly disabled?: boolean
+  readonly style?: Reactive<StyleInput>
+}
+
+/** A single-select radio group (RN ships none built-in). Each row is `role="radio"`. */
+export const RadioGroup: Component<RadioGroupProps> = (props) => {
+  const theme = useTheme()
+  const { value, options, onValueChange, disabled, style, ...rest } = props
+  const selected = toAccessor(value, '')
+  const rows = options.map((option) => {
+    const checked = (): boolean => selected() === option.value
+    const dot = createElement(View, {
+      style: () => ({
+        width: 12,
+        height: 12,
+        borderRadius: radiusScale.full,
+        backgroundColor: checked() ? theme().color.primary : 'transparent',
+      }),
+    })
+    const ring = createElement(
+      View,
+      {
+        style: () => ({
+          width: 22,
+          height: 22,
+          borderRadius: radiusScale.full,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 2,
+          borderColor: checked() ? theme().color.primary : theme().color.textMuted,
+        }),
+      },
+      dot,
+    )
+    const handlePress = onValueChange && !disabled ? () => onValueChange(option.value) : undefined
+    return createElement(
+      Pressable,
+      {
+        role: 'radio',
+        state: () => ({ checked: checked() }),
+        ...(disabled ? { disabled: true } : {}),
+        ...(handlePress ? { onPress: handlePress } : {}),
+        style: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: space.sm },
+      },
+      ring,
+      typeof option.label === 'string' ? createElement(Text, {}, option.label) : option.label,
+    )
+  })
+  return createElement(
+    View,
+    {
+      ...toHostProps({ ...rest, style }),
+      role: rest.role ?? 'radiogroup',
+      style: mergeStyle({ display: 'flex', flexDirection: 'column', gap: space.sm }, style),
+    },
+    ...rows,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton
+// ---------------------------------------------------------------------------
+
+/** Props for {@link Skeleton}. */
+export interface SkeletonProps extends Omit<BaseProps, 'style'> {
+  readonly width?: number | string
+  readonly height?: number | string
+  readonly radius?: number
+  readonly style?: Reactive<StyleInput>
+}
+
+/** A muted loading placeholder block (RN ships none built-in). */
+export const Skeleton: Component<SkeletonProps> = (props) => {
+  const theme = useTheme()
+  const { width = '100%', height = 16, radius = radiusScale.sm, style, ...rest } = props
+  const base: Accessor<StyleInput> = () => ({
+    width,
+    height,
+    borderRadius: radius,
+    backgroundColor: theme().color.surfaceVariant,
+  })
+  const host = toHostProps({ ...rest, style: mergeStyle(base, style) })
+  if (!host.role) host.role = 'status'
+  host['aria-busy'] = 'true'
+  return createElement('view', host)
+}
