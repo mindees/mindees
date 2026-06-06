@@ -19,6 +19,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -252,6 +253,7 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         // Visual.
         applyBackground(view, style)
         numOf(style["opacity"])?.let { view.alpha = it.toFloat() }
+        dimen(style["elevation"])?.let { view.elevation = it.toFloat() } // shadow (px)
 
         // Text.
         if (text != null) applyText(text, style)
@@ -277,10 +279,24 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         val radius = dimen(style["borderRadius"])
         val borderW = dimen(style["borderWidth"])
         val borderC = color(style["borderColor"])
-        if (bg == null && radius == null && borderW == null && borderC == null) return
+        val tl = dimen(style["borderTopLeftRadius"])
+        val tr = dimen(style["borderTopRightRadius"])
+        val br = dimen(style["borderBottomRightRadius"])
+        val bl = dimen(style["borderBottomLeftRadius"])
+        val perCorner = tl != null || tr != null || br != null || bl != null
+        if (bg == null && radius == null && borderW == null && borderC == null && !perCorner) return
         val drawable = (view.background as? GradientDrawable) ?: GradientDrawable()
         bg?.let { drawable.setColor(it) }
-        radius?.let { drawable.cornerRadius = it.toFloat() }
+        if (perCorner) {
+            // Per-corner radii fall back to the uniform borderRadius (or 0). Order: TL, TR, BR, BL.
+            val t = (tl ?: radius ?: 0).toFloat()
+            val r = (tr ?: radius ?: 0).toFloat()
+            val b = (br ?: radius ?: 0).toFloat()
+            val l = (bl ?: radius ?: 0).toFloat()
+            drawable.cornerRadii = floatArrayOf(t, t, r, r, b, b, l, l)
+        } else {
+            radius?.let { drawable.cornerRadius = it.toFloat() }
+        }
         if (borderW != null || borderC != null) {
             drawable.setStroke(borderW ?: 0, borderC ?: Color.TRANSPARENT)
         }
@@ -296,6 +312,14 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             text.setTypeface(text.typeface, if (bold) Typeface.BOLD else Typeface.NORMAL)
         }
         (style["textAlign"] as? NativeProp.Str)?.value?.let { text.gravity = textGravity(it) }
+        // numberOfLines → clamp lines + ellipsize the tail (RN's `numberOfLines`).
+        numOf(style["numberOfLines"])?.let { n ->
+            val lines = n.toInt()
+            if (lines > 0) {
+                text.maxLines = lines
+                text.ellipsize = TextUtils.TruncateAt.END
+            }
+        }
     }
 
     // --- LayoutParams + gaps ---
