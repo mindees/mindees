@@ -32,8 +32,6 @@ public final class UIKitRenderer: HostRenderer {
     /// hold child views, so its text-NODE children compose into its `.text` instead of nesting labels.
     private var textParts: [ObjectIdentifier: [UIView]] = [:]
     private var textOwner: [ObjectIdentifier: UIView] = [:]
-    /// UITextField change forwarders, keyed by field then eventName (input/change independent).
-    private var editForwarders: [ObjectIdentifier: [String: EditForwarder]] = [:]
 
     /// The flex container to configure for a node: itself, or a scrollview's inner content stack.
     private func contentFor(_ view: UIView) -> UIView { scrollContent[ObjectIdentifier(view)] ?? view }
@@ -192,7 +190,7 @@ public final class UIKitRenderer: HostRenderer {
         let id = ObjectIdentifier(view)
         scrollContent.removeValue(forKey: id)
         sizeConstraints.removeValue(forKey: id)
-        editForwarders.removeValue(forKey: id) // releasing the forwarders detaches them from the field
+        // (Edit forwarders are associated objects on the field — auto-released when it deallocates.)
         // Detach from any text composition it participated in (as node or as owner).
         if let owner = textOwner.removeValue(forKey: id) {
             textParts[ObjectIdentifier(owner)]?.removeAll { $0 === view }
@@ -227,15 +225,17 @@ public final class UIKitRenderer: HostRenderer {
         // bridge limit as Android). Value delivery needs a cross-layer bridge widening (follow-up).
         case "input", "change":
             guard let field = view as? UITextField else { return }
-            let id = ObjectIdentifier(field)
-            var byEvent = editForwarders[id] ?? [:]
-            if let existing = byEvent[eventName] {
+            // Retain the forwarder via an associated object on the FIELD (the same proven mechanism as
+            // ControlForwarder), keyed per-event so input + change stay independent.
+            let store = (objc_getAssociatedObject(field, &EditForwarder.assocKey) as? NSMutableDictionary)
+                ?? NSMutableDictionary()
+            if let existing = store[eventName] as? EditForwarder {
                 field.removeTarget(existing, action: #selector(EditForwarder.handleChange), for: .editingChanged)
             }
             let forwarder = EditForwarder(fire)
             field.addTarget(forwarder, action: #selector(EditForwarder.handleChange), for: .editingChanged)
-            byEvent[eventName] = forwarder
-            editForwarders[id] = byEvent
+            store[eventName] = forwarder
+            objc_setAssociatedObject(field, &EditForwarder.assocKey, store, .OBJC_ASSOCIATION_RETAIN)
         default:
             return
         }
@@ -255,13 +255,11 @@ public final class UIKitRenderer: HostRenderer {
                 objc_setAssociatedObject(view, &TapForwarder.assocKey, nil, .OBJC_ASSOCIATION_RETAIN)
             }
         case "input", "change":
-            guard let field = view as? UITextField else { return }
-            let id = ObjectIdentifier(field)
-            if let existing = editForwarders[id]?[eventName] {
-                field.removeTarget(existing, action: #selector(EditForwarder.handleChange), for: .editingChanged)
-                editForwarders[id]?[eventName] = nil
-                if editForwarders[id]?.isEmpty == true { editForwarders.removeValue(forKey: id) }
-            }
+            guard let field = view as? UITextField,
+                  let store = objc_getAssociatedObject(field, &EditForwarder.assocKey) as? NSMutableDictionary,
+                  let existing = store[eventName] as? EditForwarder else { return }
+            field.removeTarget(existing, action: #selector(EditForwarder.handleChange), for: .editingChanged)
+            store.removeObject(forKey: eventName)
         default:
             return
         }
@@ -514,6 +512,7 @@ private final class ControlForwarder: NSObject {
 
 /// Bridges a UITextField `.editingChanged` to the `input`/`change` callback (notify-only, no value).
 private final class EditForwarder: NSObject {
+    static var assocKey: UInt8 = 0
     private let fire: () -> Void
 
     init(_ fire: @escaping () -> Void) {
