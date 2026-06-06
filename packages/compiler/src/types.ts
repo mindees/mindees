@@ -4,6 +4,8 @@
  * @module
  */
 
+import type { PerfLintOptions } from './perf-lint'
+
 /** Severity of a {@link Diagnostic}. */
 export type DiagnosticSeverity = 'error' | 'warning'
 
@@ -58,6 +60,11 @@ export interface CompileOptions {
   flatten?: boolean
   /** Additional transform plugins to run (after the built-in passes). */
   plugins?: MdcPlugin[]
+  /**
+   * Run the build-time perf-lint (`compileChecked` only) — emits `warning` diagnostics for reactive/
+   * render footguns; never blocks the build. `true` for defaults, or pass {@link PerfLintOptions}.
+   */
+  perf?: boolean | PerfLintOptions
 }
 
 /**

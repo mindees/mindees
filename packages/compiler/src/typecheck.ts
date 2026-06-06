@@ -92,7 +92,7 @@ function toSeverity(category: ts.DiagnosticCategory): 'error' | 'warning' | null
  * any TypeScript-internal helper). A `.ts` file thus rejects JSX, while `.tsx`
  * accepts it.
  */
-function scriptKindForFile(fileName: string): ts.ScriptKind {
+export function scriptKindForFile(fileName: string): ts.ScriptKind {
   const lower = fileName.toLowerCase()
   if (lower.endsWith('.tsx')) return ts.ScriptKind.TSX
   if (lower.endsWith('.jsx')) return ts.ScriptKind.JSX
