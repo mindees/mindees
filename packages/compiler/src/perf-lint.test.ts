@@ -101,6 +101,16 @@ describe('perf-lint', () => {
         ),
       ).not.toContain('MDC_PERF_005')
     })
+    it('does NOT flag when a teardown is returned by name', () => {
+      expect(
+        codes(
+          "effect(() => { window.addEventListener('resize', h); const teardown = () => window.removeEventListener('resize', h); return teardown })",
+        ),
+      ).not.toContain('MDC_PERF_005')
+      expect(
+        codes('effect(() => { const unsub = store.subscribe(fn); return unsub })'),
+      ).not.toContain('MDC_PERF_005')
+    })
   })
 
   describe('MDC_PERF_006 — constant function-valued prop', () => {
@@ -113,6 +123,26 @@ describe('perf-lint', () => {
       expect(
         codes(
           'const theme = useTheme(); const f = () => <view style={() => ({ color: theme().color })} />',
+        ),
+      ).not.toContain('MDC_PERF_006')
+    })
+    it('does NOT flag a style fn reading an accessor via prop / param / select / destructure', () => {
+      expect(
+        codes(
+          'function Badge(props:{active:()=>boolean}){ return <view style={() => ({ opacity: props.active() ? 1 : 0.5 })} /> }',
+        ),
+      ).not.toContain('MDC_PERF_006')
+      expect(
+        codes('const Row = ({theme}:any) => <view style={() => ({ color: theme().color })} />'),
+      ).not.toContain('MDC_PERF_006')
+      expect(
+        codes(
+          'const mode = provider.select((t:any)=>t.mode)\nconst Row = () => <view style={() => ({ background: mode() })} />',
+        ),
+      ).not.toContain('MDC_PERF_006')
+      expect(
+        codes(
+          'const [count]=useCounter()\nconst Row = () => <view style={() => ({ width: count() })} />',
         ),
       ).not.toContain('MDC_PERF_006')
     })

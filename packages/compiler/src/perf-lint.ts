@@ -143,6 +143,20 @@ export function perfLint(
     ts.isIdentifier(call.expression) ? call.expression.text : ''
   const propAccessName = (call: ts.CallExpression): string =>
     ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : ''
+  /** Does the subtree contain ANY call expression? (A returned literal with no call is provably static.) */
+  const containsAnyCall = (root: ts.Node): boolean => {
+    let found = false
+    const look = (n: ts.Node): void => {
+      if (found) return
+      if (ts.isCallExpression(n)) {
+        found = true
+        return
+      }
+      ts.forEachChild(n, look)
+    }
+    look(root)
+    return found
+  }
   /** Does the subtree reactively read a known accessor (a zero-arg call `acc()`)? */
   const readsAccessor = (root: ts.Node): boolean => {
     let found = false
@@ -327,11 +341,14 @@ export function perfLint(
         if (SUBSCRIBE_CALLS.test(nm)) subscribes = true
         if (ts.isIdentifier(n.expression) && n.expression.text === 'onCleanup') hasCleanup = true
       }
-      // a `return <function>` inside the effect body is a teardown
+      // A `return <function>` OR `return <identifier>` is a teardown: effect() registers ANY returned
+      // function value as cleanup (reactive.ts), so `const t = …; return t` / `return unsub` count.
       if (
         ts.isReturnStatement(n) &&
         n.expression &&
-        (ts.isArrowFunction(n.expression) || ts.isFunctionExpression(n.expression))
+        (ts.isArrowFunction(n.expression) ||
+          ts.isFunctionExpression(n.expression) ||
+          ts.isIdentifier(n.expression))
       )
         hasCleanup = true
       ts.forEachChild(n, look)
@@ -355,13 +372,16 @@ export function perfLint(
     let body: ts.Expression = expr.body
     while (ts.isParenthesizedExpression(body)) body = body.expression // `() => ({...})` parens
     if (!ts.isObjectLiteralExpression(body) && !ts.isArrayLiteralExpression(body)) return
-    // It allocates a reactive binding (an effect) for a value that never changes (no accessor read).
-    if (!readsAccessor(body)) {
+    // Only flag a PROVABLY-STATIC literal — one with NO call expression at all. A body that calls
+    // anything (theme(), props.active(), select()/destructured/param accessors, helpers) may read a
+    // live signal; flagging it and "passing the literal directly" would BREAK reactivity. Erring to
+    // silence here keeps the rule from firing on the #1 styled-component pattern.
+    if (!containsAnyCall(body)) {
       emit(
         node,
         'MDC_PERF_006',
-        'A function-valued prop that returns a constant object/array reads no signal — it allocates ' +
-          'a reactive binding for a value that never changes. Pass the literal directly (style={{…}}).',
+        'A function-valued prop that returns a constant object/array (no reads) allocates a reactive ' +
+          'binding for a value that never changes. Pass the literal directly (style={{…}}).',
       )
     }
   }
