@@ -1,5 +1,14 @@
 # @mindees/cli
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [19b7b50]
+  - @mindees/compiler@0.9.0
+  - @mindees/ai@0.9.0
+  - @mindees/core@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

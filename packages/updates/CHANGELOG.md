@@ -1,5 +1,11 @@
 # @mindees/updates
 
+## 0.9.0
+
+### Patch Changes
+
+- @mindees/core@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes
