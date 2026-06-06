@@ -8,6 +8,7 @@ import {
 } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  Accordion,
   ActivityIndicator,
   Avatar,
   Badge,
@@ -21,8 +22,10 @@ import {
   SafeAreaView,
   Skeleton,
   Switch,
+  Tabs,
 } from './components'
 import { setEnvironment } from './environment'
+import { Text } from './primitives'
 
 function el(node: unknown): MindeesElement {
   if (!isElement(node)) throw new Error('expected an element')
@@ -252,5 +255,57 @@ describe('Checkbox / RadioGroup / Skeleton', () => {
     const node = el(Skeleton({ width: 120, height: 20 }))
     expect(node.props.role).toBe('status')
     expect(node.props['aria-busy']).toBe('true')
+  })
+})
+
+describe('Tabs / Accordion', () => {
+  const collectByRole = (
+    node: unknown,
+    role: string,
+    acc: MindeesElement[] = [],
+  ): MindeesElement[] => {
+    if (isElement(node)) {
+      if ((node.props as Record<string, unknown>).role === role) acc.push(node)
+      for (const c of node.children) collectByRole(c, role, acc)
+    } else if (Array.isArray(node)) {
+      for (const c of node) collectByRole(c, role, acc)
+    }
+    return acc
+  }
+
+  it('Tabs renders a tablist, switches on press, and shows the active panel', () => {
+    const value = signal('a')
+    const node = Tabs({
+      value,
+      onValueChange: (v) => value.set(v),
+      tabs: [
+        { value: 'a', label: 'A', content: createElement(Text, {}, 'Panel A') },
+        { value: 'b', label: 'B', content: createElement(Text, {}, 'Panel B') },
+      ],
+    })
+    const tabs = collectByRole(node, 'tab')
+    expect(tabs).toHaveLength(2)
+    expect(renderToString(node)).toContain('Panel A')
+    ;(tabs[1]?.props.onPress as () => void)()
+    expect(value()).toBe('b')
+    expect(renderToString(node)).toContain('Panel B')
+  })
+
+  it('Accordion toggles sections (single-open by default)', () => {
+    const node = Accordion({
+      sections: [
+        { id: 's1', header: 'One', content: createElement(Text, {}, 'Content 1') },
+        { id: 's2', header: 'Two', content: createElement(Text, {}, 'Content 2') },
+      ],
+    })
+    const headers = collectByRole(node, 'button')
+    expect(headers).toHaveLength(2)
+    expect(renderToString(node)).not.toContain('Content 1') // closed initially
+    ;(headers[0]?.props.onPress as () => void)()
+    expect(renderToString(node)).toContain('Content 1')
+    ;(headers[1]?.props.onPress as () => void)() // single-open → s1 closes
+    const html = renderToString(node)
+    expect(html).toContain('Content 2')
+    expect(html).not.toContain('Content 1')
   })
 })

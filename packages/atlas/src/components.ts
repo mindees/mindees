@@ -10,7 +10,14 @@
  * @module
  */
 
-import { type Accessor, type Component, createElement, type MindeesNode } from '@mindees/core'
+import {
+  type Accessor,
+  type Component,
+  createElement,
+  type MindeesNode,
+  signal,
+  untrack,
+} from '@mindees/core'
 import { useKeyboard, useSafeAreaInsets } from './environment'
 import { type BaseProps, type Reactive, toHostProps } from './host'
 import { Image, Pressable, Text, View } from './primitives'
@@ -613,4 +620,164 @@ export const Skeleton: Component<SkeletonProps> = (props) => {
   if (!host.role) host.role = 'status'
   host['aria-busy'] = 'true'
   return createElement('view', host)
+}
+
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+
+/** One tab: a value, a header label, and its panel content. */
+export interface TabItem {
+  readonly value: string
+  readonly label: MindeesNode
+  readonly content: MindeesNode
+}
+
+/** Props for {@link Tabs}. */
+export interface TabsProps extends Omit<BaseProps, 'style'> {
+  /** Controlled selected tab value (static or reactive). */
+  readonly value: Reactive<string>
+  readonly tabs: readonly TabItem[]
+  readonly onValueChange?: (value: string) => void
+  readonly style?: Reactive<StyleInput>
+}
+
+/** An accessible tab strip + panel (RN ships none built-in). Only the active panel region re-renders. */
+export const Tabs: Component<TabsProps> = (props) => {
+  const theme = useTheme()
+  const { value, tabs, onValueChange, style, ...rest } = props
+  const selected = toAccessor(value, tabs[0]?.value ?? '')
+  const tabBar = createElement(
+    View,
+    {
+      role: 'tablist',
+      style: () => ({
+        display: 'flex',
+        flexDirection: 'row',
+        gap: space.xs,
+        borderBottomWidth: 1,
+        borderColor: theme().color.border,
+      }),
+    },
+    ...tabs.map((t) => {
+      const active = (): boolean => selected() === t.value
+      return createElement(
+        Pressable,
+        {
+          role: 'tab',
+          state: () => ({ selected: active() }),
+          ...(onValueChange ? { onPress: () => onValueChange(t.value) } : {}),
+          style: () => ({
+            paddingTop: space.xs,
+            paddingBottom: space.xs,
+            paddingLeft: space.sm,
+            paddingRight: space.sm,
+            borderBottomWidth: 2,
+            borderColor: active() ? theme().color.primary : 'transparent',
+          }),
+        },
+        typeof t.label === 'string'
+          ? createElement(
+              Text,
+              {
+                style: () => ({
+                  color: active() ? theme().color.primary : theme().color.text,
+                  ...(active() ? { fontWeight: fontWeight.semibold } : {}),
+                }),
+              },
+              t.label,
+            )
+          : t.label,
+      )
+    }),
+  )
+  // The active panel is a reactive region: switching tabs re-runs ONLY this region.
+  const panel = createElement(View, { role: 'tabpanel', style: { padding: space.md } }, () => {
+    const active = tabs.find((t) => t.value === selected())
+    return active ? active.content : null
+  })
+  return createElement(
+    View,
+    {
+      ...toHostProps({ ...rest, style }),
+      style: mergeStyle({ display: 'flex', flexDirection: 'column' }, style),
+    },
+    tabBar,
+    panel,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Accordion
+// ---------------------------------------------------------------------------
+
+/** One collapsible accordion section. */
+export interface AccordionSection {
+  readonly id: string
+  readonly header: MindeesNode
+  readonly content: MindeesNode
+}
+
+/** Props for {@link Accordion}. */
+export interface AccordionProps extends Omit<BaseProps, 'style'> {
+  readonly sections: readonly AccordionSection[]
+  /** Allow more than one section open at once (default: single-open). */
+  readonly multiple?: boolean
+  /** Section ids open on first render. */
+  readonly defaultOpen?: readonly string[]
+  readonly style?: Reactive<StyleInput>
+}
+
+/** Collapsible sections (RN ships none built-in). Each header is `aria-expanded`; panels mount lazily. */
+export const Accordion: Component<AccordionProps> = (props) => {
+  const theme = useTheme()
+  const { sections, multiple, defaultOpen = [], style, ...rest } = props
+  const open = signal<ReadonlySet<string>>(new Set(defaultOpen))
+  const isOpen = (id: string): boolean => open().has(id)
+  const toggle = (id: string): void => {
+    const next = new Set(untrack(open))
+    if (next.has(id)) next.delete(id)
+    else {
+      if (!multiple) next.clear()
+      next.add(id)
+    }
+    open.set(next)
+  }
+  const rows = sections.map((section) => {
+    const header = createElement(
+      Pressable,
+      {
+        role: 'button',
+        state: () => ({ expanded: isOpen(section.id) }),
+        onPress: () => toggle(section.id),
+        style: () => ({
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingTop: space.sm,
+          paddingBottom: space.sm,
+          borderBottomWidth: 1,
+          borderColor: theme().color.border,
+        }),
+      },
+      typeof section.header === 'string' ? createElement(Text, {}, section.header) : section.header,
+      createElement(Text, { style: () => ({ color: theme().color.textMuted }) }, () =>
+        isOpen(section.id) ? '▾' : '▸',
+      ),
+    )
+    // The panel region re-runs only when THIS section toggles.
+    const panel = createElement(View, { style: { padding: space.sm } }, () =>
+      isOpen(section.id) ? section.content : null,
+    )
+    return createElement(View, {}, header, panel)
+  })
+  return createElement(
+    View,
+    {
+      ...toHostProps({ ...rest, style }),
+      style: mergeStyle({ display: 'flex', flexDirection: 'column' }, style),
+    },
+    ...rows,
+  )
 }
