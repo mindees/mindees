@@ -11,7 +11,7 @@ interface NativeCommandSink {
 
 interface MindeesScriptRuntime : Closeable {
     fun start(sink: NativeCommandSink)
-    fun dispatchEvent(handlerId: String)
+    fun dispatchEvent(handlerId: String, value: String?)
 
     /** Advance animations by one vsync frame (time in ms). Drives `MindeesApp.frameTick`. */
     fun frameTick(nowMs: Double)
@@ -45,9 +45,9 @@ class MindeesRuntimeBridge<V>(
         }
     }
 
-    fun dispatchEvent(handlerId: String) {
+    fun dispatchEvent(handlerId: String, value: String?) {
         check(started) { "Mindees runtime bridge has not started" }
-        runtime.dispatchEvent(handlerId)
+        runtime.dispatchEvent(handlerId, value)
     }
 
     /** Forward a vsync frame to the JS animation engine (called by the [FrameDriver]). */
@@ -82,7 +82,7 @@ interface MindeesFrameApi {
 
 interface MindeesAppApi {
     fun start()
-    fun dispatchEvent(handlerId: String)
+    fun dispatchEvent(handlerId: String, value: String?)
     fun frameTick(nowMs: Double)
 }
 
@@ -142,8 +142,8 @@ class QuickJsMindeesRuntime(
         }
     }
 
-    override fun dispatchEvent(handlerId: String) {
-        app?.dispatchEvent(handlerId)
+    override fun dispatchEvent(handlerId: String, value: String?) {
+        app?.dispatchEvent(handlerId, value)
             ?: error("QuickJS MindeesApp has not started")
     }
 

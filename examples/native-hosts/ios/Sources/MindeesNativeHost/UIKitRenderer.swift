@@ -201,15 +201,16 @@ public final class UIKitRenderer: HostRenderer {
 
     // MARK: - Events (tap/press + click)
 
-    public func addEvent(_ view: UIView, eventName: String, handlerId: String, fire: @escaping () -> Void) {
+    public func addEvent(_ view: UIView, eventName: String, handlerId: String, fire: @escaping (_ value: String?) -> Void) {
         switch eventName {
         case "press", "click":
             view.isUserInteractionEnabled = true
+            // Press/click are notify-only → fire(nil). The forwarders stay () -> Void; we adapt here.
             if let control = view as? UIControl {
                 if let existing = objc_getAssociatedObject(control, &ControlForwarder.assocKey) as? ControlForwarder {
                     control.removeTarget(existing, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
                 }
-                let forwarder = ControlForwarder(fire)
+                let forwarder = ControlForwarder { fire(nil) }
                 control.addTarget(forwarder, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
                 objc_setAssociatedObject(control, &ControlForwarder.assocKey, forwarder, .OBJC_ASSOCIATION_RETAIN)
                 return
@@ -217,12 +218,11 @@ public final class UIKitRenderer: HostRenderer {
             if let existing = objc_getAssociatedObject(view, &TapForwarder.assocKey) as? TapForwarder {
                 view.removeGestureRecognizer(existing.recognizer)
             }
-            let forwarder = TapForwarder(fire)
+            let forwarder = TapForwarder { fire(nil) }
             view.addGestureRecognizer(forwarder.recognizer)
             objc_setAssociatedObject(view, &TapForwarder.assocKey, forwarder, .OBJC_ASSOCIATION_RETAIN)
-        // Text change (Atlas onInput→"input", onChange→"change"). NOTE: fire() carries NO value — the
-        // host event channel is handlerId-only; the JS handler is notified but receives no text (same
-        // bridge limit as Android). Value delivery needs a cross-layer bridge widening (follow-up).
+        // Text change (Atlas onInput→"input", onChange→"change"): fire the field's current text, which
+        // the JS host wraps as { target: { value } } so onInput/onChange receive it.
         case "input", "change":
             guard let field = view as? UITextField else { return }
             // Retain the forwarder via an associated object on the FIELD (the same proven mechanism as
@@ -232,7 +232,7 @@ public final class UIKitRenderer: HostRenderer {
             if let existing = store[eventName] as? EditForwarder {
                 field.removeTarget(existing, action: #selector(EditForwarder.handleChange), for: .editingChanged)
             }
-            let forwarder = EditForwarder(fire)
+            let forwarder = EditForwarder { [weak field] in fire(field?.text ?? "") }
             field.addTarget(forwarder, action: #selector(EditForwarder.handleChange), for: .editingChanged)
             store[eventName] = forwarder
             objc_setAssociatedObject(field, &EditForwarder.assocKey, store, .OBJC_ASSOCIATION_RETAIN)

@@ -256,3 +256,60 @@ describe('createNativeApp — on-device engines (P2: smooth by default)', () => 
     ) // reached the host, one tick late (not dropped)
   })
 })
+
+describe('dispatchEvent value delivery', () => {
+  function makeInput() {
+    const seen: Array<string | undefined> = []
+    let calls = 0
+    const App = () =>
+      h('textinput', {
+        onInput: (e: unknown) => {
+          calls += 1
+          seen.push((e as { target?: { value?: string } } | undefined)?.target?.value)
+        },
+      })
+    return { App, seen, getCalls: () => calls }
+  }
+  const handlerIdOf = (emitted: string[]): string =>
+    commandsFrom(emitted).find(
+      (c): c is Extract<NativeCommand, { type: 'registerEvent' }> => c.type === 'registerEvent',
+    )?.handlerId as string
+
+  it('delivers a text value as { target: { value } }', () => {
+    const { App, seen } = makeInput()
+    const emitted: string[] = []
+    const app = createNativeApp(h(App, null), { emit: (j) => emitted.push(j), expose: false })
+    app.start()
+    expect(app.dispatchEvent(handlerIdOf(emitted), 'hello')).toBe(true)
+    expect(seen).toEqual(['hello'])
+  })
+
+  it('delivers an empty string (a cleared field), not swallowed', () => {
+    const { App, seen, getCalls } = makeInput()
+    const emitted: string[] = []
+    const app = createNativeApp(h(App, null), { emit: (j) => emitted.push(j), expose: false })
+    app.start()
+    app.dispatchEvent(handlerIdOf(emitted), '')
+    expect(getCalls()).toBe(1)
+    expect(seen).toEqual([''])
+  })
+
+  it('a no-value (or null) dispatch yields an undefined event — notify-only behavior', () => {
+    const { App, seen } = makeInput()
+    const emitted: string[] = []
+    const app = createNativeApp(h(App, null), { emit: (j) => emitted.push(j), expose: false })
+    app.start()
+    const id = handlerIdOf(emitted)
+    app.dispatchEvent(id) // press-style: no value
+    app.dispatchEvent(id, null) // host may pass null for notify-only
+    expect(seen).toEqual([undefined, undefined])
+  })
+
+  it('returns false for an unknown handler id', () => {
+    const { App } = makeInput()
+    const emitted: string[] = []
+    const app = createNativeApp(h(App, null), { emit: (j) => emitted.push(j), expose: false })
+    app.start()
+    expect(app.dispatchEvent('nope', 'x')).toBe(false)
+  })
+})

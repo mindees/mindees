@@ -15,7 +15,7 @@ final class MindeesNativeHostTests: XCTestCase {
     private func makeHost() -> (MindeesNativeHost<ModelRenderer>, ModelNode) {
         let renderer = ModelRenderer()
         let root = renderer.makeElement("root")
-        let host = MindeesNativeHost(rootId: "host-root", root: root, renderer: renderer, onEvent: { _ in })
+        let host = MindeesNativeHost(rootId: "host-root", root: root, renderer: renderer, onEvent: { _, _ in })
         return (host, root)
     }
 
@@ -86,7 +86,7 @@ final class MindeesNativeHostTests: XCTestCase {
         let renderer = ModelRenderer()
         let root = renderer.makeElement("root")
         let host = MindeesNativeHost(rootId: "host-root", root: root, renderer: renderer,
-                                     onEvent: { fired.append($0) })
+                                     onEvent: { handlerId, _ in fired.append(handlerId) })
         try host.apply([
             .createNode(id: .init("btn"), tag: "button"),
             .insertChild(parentId: .init("host-root"), childId: .init("btn"), index: 0),

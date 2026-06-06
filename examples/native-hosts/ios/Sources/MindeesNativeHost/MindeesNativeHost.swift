@@ -33,8 +33,9 @@ public protocol HostRenderer: AnyObject {
     func removeProp(_ view: View, _ name: String)
     func insert(parent: View, child: View, index: Int)
     func remove(parent: View, child: View)
-    /// Wire a native event. The renderer must call `fire()` when the event occurs.
-    func addEvent(_ view: View, eventName: String, handlerId: String, fire: @escaping () -> Void)
+    /// Wire a native event. The renderer calls `fire(value)` when it occurs, passing an optional value
+    /// (the text for an `input`/`change` event; `nil` for notify-only events like press/click).
+    func addEvent(_ view: View, eventName: String, handlerId: String, fire: @escaping (_ value: String?) -> Void)
     func removeEvent(_ view: View, eventName: String, handlerId: String)
     /// Free a node's resources (it has already been detached from its parent).
     func dispose(_ view: View)
@@ -45,16 +46,17 @@ public protocol HostRenderer: AnyObject {
 /// contract `@mindees/renderer`'s `createReferenceHost()` enforces and tests.
 public final class MindeesNativeHost<R: HostRenderer> {
     private let renderer: R
-    /// Called when a wired native event fires, with its `handlerId`. Forward this to
-    /// the JS runtime's `backend.dispatchEvent(handlerId, event)` over your bridge.
-    private let onEvent: (_ handlerId: String) -> Void
+    /// Called when a wired native event fires, with its `handlerId` and an optional text `value`
+    /// (for input/change events; `nil` for notify-only). Forward this to the JS runtime's
+    /// `MindeesApp.dispatchEvent(handlerId, value)` over your bridge.
+    private let onEvent: (_ handlerId: String, _ value: String?) -> Void
 
     private let rootId: String
     private var views: [String: R.View] = [:]
     private var parentOf: [String: String] = [:]
     private var childrenOf: [String: [String]] = [:]
 
-    public init(rootId: String, root: R.View, renderer: R, onEvent: @escaping (String) -> Void) {
+    public init(rootId: String, root: R.View, renderer: R, onEvent: @escaping (_ handlerId: String, _ value: String?) -> Void) {
         self.rootId = rootId
         self.renderer = renderer
         self.onEvent = onEvent
@@ -132,8 +134,8 @@ public final class MindeesNativeHost<R: HostRenderer> {
 
         case let .registerEvent(id, eventName, handlerId):
             let target = try view(id.raw)
-            renderer.addEvent(target, eventName: eventName, handlerId: handlerId) { [weak self] in
-                self?.onEvent(handlerId)
+            renderer.addEvent(target, eventName: eventName, handlerId: handlerId) { [weak self] value in
+                self?.onEvent(handlerId, value)
             }
 
         case let .unregisterEvent(id, eventName, handlerId):

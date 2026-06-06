@@ -254,23 +254,22 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
 
     // --- Events ---
 
-    override fun addEvent(view: View, eventName: String, handlerId: String, fire: () -> Unit) {
+    override fun addEvent(view: View, eventName: String, handlerId: String, fire: (value: String?) -> Unit) {
         // Atlas's Pressable emits `onClick` → `click`; the older hand-written demo used
         // `press`. Accept both; ignore pointer/keyboard/focus events this host doesn't model.
         when (eventName) {
             "click", "press" -> {
                 view.isClickable = true
-                view.setOnClickListener { fire() }
+                view.setOnClickListener { fire(null) } // notify-only → no value
             }
-            // Text change (Atlas onInput→"input", onChange→"change"). NOTE: fire() carries NO payload —
-            // the host event channel is handlerId-only, so the JS handler is *notified* but receives no
-            // text value (it fires with an empty event). Delivering the typed string needs a cross-layer
-            // bridge widening (fire→fire(value) through onEvent/MindeesRuntimeBridge/MindeesAppApi); follow-up.
+            // Text change (Atlas onInput→"input", onChange→"change"). fire() carries the field's current
+            // text, which the JS host wraps as `{ target: { value } }` so onInput/onChange receive it.
             "input", "change" -> (view as? EditText)?.let { et ->
                 val byEvent = textWatchers.getOrPut(et) { HashMap() }
                 byEvent.remove(eventName)?.let { et.removeTextChangedListener(it) } // replace only THIS event
                 val watcher = object : TextWatcher {
-                    override fun afterTextChanged(s: Editable?) = fire()
+                    // Read the authoritative current field text (not `s`), coalescing null → "".
+                    override fun afterTextChanged(s: Editable?) = fire(et.text?.toString() ?: "")
                     override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) = Unit
                     override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) = Unit
                 }

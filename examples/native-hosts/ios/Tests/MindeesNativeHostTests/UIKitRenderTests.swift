@@ -28,7 +28,7 @@ final class UIKitRenderTests: XCTestCase {
             rootId: "host-root",
             root: container,
             renderer: UIKitRenderer(),
-            onEvent: { fired.append($0) }
+            onEvent: { handlerId, _ in fired.append(handlerId) }
         )
 
         // A <view> (with a press handler) containing a "Hello" label and a button.
@@ -75,7 +75,7 @@ final class UIKitRenderTests: XCTestCase {
     func testInsertOrderMatchesIndices() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         try host.apply(decode("""
         [
@@ -94,7 +94,7 @@ final class UIKitRenderTests: XCTestCase {
     func testAppliesFlexAndVisualStyle() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         try host.apply(decode("""
         [
@@ -120,7 +120,7 @@ final class UIKitRenderTests: XCTestCase {
     func testScrollViewWrapsVerticalContentStack() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         try host.apply(decode("""
         [
@@ -140,7 +140,7 @@ final class UIKitRenderTests: XCTestCase {
     func testHorizontalScrollViewContentIsRowStack() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         try host.apply(decode("""
         [
@@ -156,7 +156,7 @@ final class UIKitRenderTests: XCTestCase {
     func testAppliesTextStyle() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         // A `text` element (UILabel) receives the style. (Text-node composition into the element is a
         // separate pre-existing iOS gap, so we assert the styled label's properties, not its text.)
@@ -181,7 +181,7 @@ final class UIKitRenderTests: XCTestCase {
         let container = UIView()
         var fired: [String] = []
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { fired.append($0) }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { handlerId, _ in fired.append(handlerId) }
         )
         try host.apply(decode("""
         [
@@ -199,7 +199,7 @@ final class UIKitRenderTests: XCTestCase {
         let container = UIView()
         container.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         try host.apply(decode("""
         [
@@ -232,7 +232,7 @@ final class UIKitRenderTests: XCTestCase {
     func testComposesTextNodeChildrenIntoTextElement() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         // Atlas Text renders as a `text` ELEMENT wrapping a text NODE. The element must compose its
         // text-node children into its own .text (not nest a label inside a label).
@@ -255,7 +255,7 @@ final class UIKitRenderTests: XCTestCase {
     func testLoadsBase64DataUriImage() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
         try host.apply(decode("""
@@ -274,7 +274,7 @@ final class UIKitRenderTests: XCTestCase {
     func testTextInputKeyboardSecureAndEditable() throws {
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         try host.apply(decode("""
         [
@@ -303,7 +303,7 @@ final class UIKitRenderTests: XCTestCase {
         // test; the editingChanged→fire dispatch itself is UIKit's contract, exercised on a real device.
         let container = UIView()
         let host = MindeesNativeHost(
-            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
         )
         try host.apply(decode("""
         [

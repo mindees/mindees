@@ -23,7 +23,7 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
             rootId: Self.hostRootId,
             root: root,
             renderer: renderer,
-            onEvent: { handlerId in try? bridge.dispatchEvent(handlerId: handlerId) }
+            onEvent: { handlerId, value in try? bridge.dispatchEvent(handlerId: handlerId, value: value) }
         )
         bridge = MindeesRuntimeBridge(host: host, runtime: runtime)
         return (bridge, root)
@@ -36,7 +36,7 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
     func testDispatchRequiresStartedBridge() {
         let (bridge, _) = makeBridge(runtime: RecordingRuntime())
 
-        XCTAssertThrowsError(try bridge.dispatchEvent(handlerId: "counter.increment")) { error in
+        XCTAssertThrowsError(try bridge.dispatchEvent(handlerId: "counter.increment", value: nil)) { error in
             XCTAssertEqual(error as? MindeesRuntimeBridgeError, .notStarted)
         }
     }
@@ -70,7 +70,7 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
         bridge.close()
         XCTAssertFalse(bridge.isStarted)
         XCTAssertEqual(runtime.closeCount, 1)
-        XCTAssertThrowsError(try bridge.dispatchEvent(handlerId: "counter.increment")) { error in
+        XCTAssertThrowsError(try bridge.dispatchEvent(handlerId: "counter.increment", value: nil)) { error in
             XCTAssertEqual(error as? MindeesRuntimeBridgeError, .notStarted)
         }
     }
@@ -87,7 +87,7 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
         let button = try XCTUnwrap(screen.children.dropFirst().first)
         XCTAssertEqual(button.props["title"], NativePropValue.string("Increment"))
 
-        try bridge.dispatchEvent(handlerId: "counter.increment")
+        try bridge.dispatchEvent(handlerId: "counter.increment", value: nil)
 
         XCTAssertEqual(inner(root), "<view>Count: 1<button></button></view>")
     }
@@ -122,7 +122,7 @@ final class MindeesRuntimeBridgeTests: XCTestCase {
             rootId: Self.hostRootId,
             root: container,
             renderer: renderer,
-            onEvent: { handlerId in try? bridge.dispatchEvent(handlerId: handlerId) }
+            onEvent: { handlerId, value in try? bridge.dispatchEvent(handlerId: handlerId, value: value) }
         )
         bridge = MindeesRuntimeBridge(
             host: host,
@@ -243,7 +243,7 @@ private final class RecordingRuntime: MindeesScriptRuntime {
 
     func start(sink: NativeCommandSink) throws {}
 
-    func dispatchEvent(handlerId: String) throws {
+    func dispatchEvent(handlerId: String, value: String?) throws {
         dispatched.append(handlerId)
     }
 
@@ -259,7 +259,7 @@ private final class FailingRuntime: MindeesScriptRuntime {
         throw TestRuntimeError.startFailed
     }
 
-    func dispatchEvent(handlerId: String) throws {}
+    func dispatchEvent(handlerId: String, value: String?) throws {}
 
     func close() {
         closeCount += 1
@@ -279,7 +279,7 @@ private final class EmittingThenFailingRuntime: MindeesScriptRuntime {
         throw TestRuntimeError.startFailed
     }
 
-    func dispatchEvent(handlerId: String) throws {}
+    func dispatchEvent(handlerId: String, value: String?) throws {}
 
     func close() {
         closeCount += 1

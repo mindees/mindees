@@ -26,8 +26,11 @@ interface HostRenderer<V> {
     fun removeProp(view: V, name: String)
     fun insert(parent: V, child: V, index: Int)
     fun remove(parent: V, child: V)
-    /** Wire a native event; the renderer calls [fire] when it occurs. */
-    fun addEvent(view: V, eventName: String, handlerId: String, fire: () -> Unit)
+    /**
+     * Wire a native event; the renderer calls [fire] when it occurs, passing an optional value
+     * (the text for an `input`/`change` event; `null` for notify-only events like press/click).
+     */
+    fun addEvent(view: V, eventName: String, handlerId: String, fire: (value: String?) -> Unit)
     fun removeEvent(view: V, eventName: String, handlerId: String)
     /** Free a node's resources (already detached from its parent). */
     fun dispose(view: V)
@@ -38,14 +41,15 @@ interface HostRenderer<V> {
  * (throws [NativeHostException] on any malformed/leaking sequence) — the contract
  * `@mindees/renderer`'s `createReferenceHost()` enforces and tests.
  *
- * @param onEvent invoked with a `handlerId` when a wired native event fires;
- *   forward it to the JS runtime's `backend.dispatchEvent(handlerId, event)`.
+ * @param onEvent invoked with a `handlerId` (and an optional text `value` for input/change events,
+ *   `null` for notify-only events) when a wired native event fires; forward it to the JS runtime's
+ *   `MindeesApp.dispatchEvent(handlerId, value)`.
  */
 class MindeesNativeHost<V>(
     private val rootId: String,
     root: V,
     private val renderer: HostRenderer<V>,
-    private val onEvent: (handlerId: String) -> Unit,
+    private val onEvent: (handlerId: String, value: String?) -> Unit,
 ) {
     private val views = HashMap<String, V>()
     private val parentOf = HashMap<String, String>()
@@ -120,7 +124,7 @@ class MindeesNativeHost<V>(
             is NativeCommand.RegisterEvent -> {
                 val target = view(command.id)
                 val handlerId = command.handlerId
-                renderer.addEvent(target, command.eventName, handlerId) { onEvent(handlerId) }
+                renderer.addEvent(target, command.eventName, handlerId) { value -> onEvent(handlerId, value) }
             }
             is NativeCommand.UnregisterEvent ->
                 renderer.removeEvent(view(command.id), command.eventName, command.handlerId)
@@ -157,7 +161,7 @@ class ModelRenderer : HostRenderer<ModelNode> {
     override fun removeProp(view: ModelNode, name: String) { view.props.remove(name) }
     override fun insert(parent: ModelNode, child: ModelNode, index: Int) { parent.children.add(index, child) }
     override fun remove(parent: ModelNode, child: ModelNode) { parent.children.remove(child) }
-    override fun addEvent(view: ModelNode, eventName: String, handlerId: String, fire: () -> Unit) {
+    override fun addEvent(view: ModelNode, eventName: String, handlerId: String, fire: (value: String?) -> Unit) {
         view.events[eventName] = handlerId
     }
     override fun removeEvent(view: ModelNode, eventName: String, handlerId: String) {
