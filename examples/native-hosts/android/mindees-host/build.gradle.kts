@@ -36,6 +36,10 @@ kotlin {
 }
 
 dependencies {
+    // Google FlexboxLayout backs the renderer's flex containers (flex-wrap + space-* + alignSelf).
+    // `api` (not `implementation`) so a host app's root container can be a FlexboxLayout too.
+    api("com.google.android.flexbox:flexbox:3.0.0")
+
     testImplementation("junit:junit:4.13.2") // JUnit 4 = AGP's default unit-test framework
     testImplementation("org.json:json:20231013") // real org.json for codec unit tests
     // Robolectric runs AndroidViewRenderer against real android.view classes on the JVM

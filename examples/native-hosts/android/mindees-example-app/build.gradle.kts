@@ -34,6 +34,9 @@ kotlin {
 dependencies {
     implementation(project(":mindees-host"))
     implementation("app.cash.quickjs:quickjs-android:0.9.2")
+    // FlexboxLayout (used by the renderer + the root container) needs androidx.core (ViewCompat)
+    // on the runtime classpath; this app is otherwise framework-only, so declare it explicitly.
+    implementation("androidx.core:core:1.13.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")

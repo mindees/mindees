@@ -8,7 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
+import com.google.android.flexbox.FlexDirection
+import com.google.android.flexbox.FlexboxLayout
 import dev.mindees.host.AndroidViewRenderer
 import dev.mindees.host.MindeesNativeHost
 
@@ -22,8 +23,8 @@ class MainActivity : Activity() {
         // Fill the window and paint a dark base: the Atlas app controls its own layout and
         // background edge-to-edge, so the host window should match it (no light gaps showing
         // through where content hasn't laid out yet).
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val root = FlexboxLayout(this).apply {
+            flexDirection = FlexDirection.COLUMN
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
