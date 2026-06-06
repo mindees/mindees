@@ -28,9 +28,18 @@ public final class UIKitRenderer: HostRenderer {
     private var scrollContent: [ObjectIdentifier: UIStackView] = [:]
     /// Explicit size constraints per view+key, so re-applying width/height replaces (never stacks).
     private var sizeConstraints: [ObjectIdentifier: [String: NSLayoutConstraint]] = [:]
+    /// Text composition (iOS twin of Android's textParts/textOwner): a `text` ELEMENT (UILabel) can't
+    /// hold child views, so its text-NODE children compose into its `.text` instead of nesting labels.
+    private var textParts: [ObjectIdentifier: [UIView]] = [:]
+    private var textOwner: [ObjectIdentifier: UIView] = [:]
 
     /// The flex container to configure for a node: itself, or a scrollview's inner content stack.
     private func contentFor(_ view: UIView) -> UIView { scrollContent[ObjectIdentifier(view)] ?? view }
+
+    private func recomposeText(_ element: UIView) {
+        guard let label = element as? UILabel, let parts = textParts[ObjectIdentifier(element)] else { return }
+        label.text = parts.map { ($0 as? UILabel)?.text ?? "" }.joined()
+    }
 
     // MARK: - Node creation
 
@@ -88,6 +97,8 @@ public final class UIKitRenderer: HostRenderer {
 
     public func setText(_ view: UIView, _ text: String) {
         (view as? UILabel)?.text = text
+        // If this text node composes into a parent text element, re-compose the parent.
+        if let owner = textOwner[ObjectIdentifier(view)] { recomposeText(owner) }
     }
 
     // MARK: - Props
@@ -105,6 +116,31 @@ public final class UIKitRenderer: HostRenderer {
             }
         case "hidden":
             if case let .bool(b) = value { view.isHidden = b }
+        // Image source (data:/base64 + bundled asset decode synchronously; remote is a follow-up).
+        case "src", "source":
+            if let image = view as? UIImageView { applyImageSource(image, value) }
+        case "resizeMode":
+            if let image = view as? UIImageView, case let .string(m) = value { image.contentMode = contentMode(m) }
+        case "tintColor":
+            if let image = view as? UIImageView, let c = colorValue(value) {
+                image.image = image.image?.withRenderingMode(.alwaysTemplate)
+                image.tintColor = c
+            }
+        // TextInput (UITextField; multiline/UITextView deferred).
+        case "placeholder":
+            if let field = view as? UITextField, case let .string(s) = value { field.placeholder = s }
+        case "value":
+            if let field = view as? UITextField, case let .string(s) = value, field.text != s { field.text = s }
+        case "keyboardType", "inputMode", "type":
+            if let field = view as? UITextField, case let .string(s) = value {
+                if s == "password" { field.isSecureTextEntry = true } else { field.keyboardType = keyboardType(s) }
+            }
+        case "secureTextEntry":
+            if let field = view as? UITextField, case let .bool(b) = value { field.isSecureTextEntry = b }
+        case "editable":
+            if let field = view as? UITextField, case let .bool(b) = value { field.isEnabled = b }
+        case "disabled":
+            if let field = view as? UITextField, case let .bool(b) = value { field.isEnabled = !b }
         default:
             break // unmapped props are ignored
         }
@@ -125,6 +161,14 @@ public final class UIKitRenderer: HostRenderer {
         if let stack = target as? UIStackView {
             let clamped = max(0, min(index, stack.arrangedSubviews.count))
             stack.insertArrangedSubview(child, at: clamped)
+        } else if let label = target as? UILabel {
+            // A text ELEMENT (UILabel leaf): compose text-node children into its text, don't nest views.
+            let id = ObjectIdentifier(label)
+            var parts = textParts[id] ?? []
+            parts.insert(child, at: max(0, min(index, parts.count)))
+            textParts[id] = parts
+            textOwner[ObjectIdentifier(child)] = label
+            recomposeText(label)
         } else {
             let clamped = max(0, min(index, target.subviews.count))
             target.insertSubview(child, at: clamped)
@@ -132,6 +176,12 @@ public final class UIKitRenderer: HostRenderer {
     }
 
     public func remove(parent: UIView, child: UIView) {
+        let childId = ObjectIdentifier(child)
+        if let owner = textOwner.removeValue(forKey: childId) {
+            textParts[ObjectIdentifier(owner)]?.removeAll { $0 === child }
+            recomposeText(owner)
+            return
+        }
         if child.superview != nil { child.removeFromSuperview() } // also leaves arrangedSubviews
     }
 
@@ -140,41 +190,78 @@ public final class UIKitRenderer: HostRenderer {
         let id = ObjectIdentifier(view)
         scrollContent.removeValue(forKey: id)
         sizeConstraints.removeValue(forKey: id)
+        // (Edit forwarders are associated objects on the field — auto-released when it deallocates.)
+        // Detach from any text composition it participated in (as node or as owner).
+        if let owner = textOwner.removeValue(forKey: id) {
+            textParts[ObjectIdentifier(owner)]?.removeAll { $0 === view }
+            recomposeText(owner)
+        }
+        textParts.removeValue(forKey: id)
     }
 
     // MARK: - Events (tap/press + click)
 
     public func addEvent(_ view: UIView, eventName: String, handlerId: String, fire: @escaping () -> Void) {
-        guard eventName == "press" || eventName == "click" else { return }
-        view.isUserInteractionEnabled = true
-        if let control = view as? UIControl {
-            if let existing = objc_getAssociatedObject(control, &ControlForwarder.assocKey) as? ControlForwarder {
-                control.removeTarget(existing, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
+        switch eventName {
+        case "press", "click":
+            view.isUserInteractionEnabled = true
+            if let control = view as? UIControl {
+                if let existing = objc_getAssociatedObject(control, &ControlForwarder.assocKey) as? ControlForwarder {
+                    control.removeTarget(existing, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
+                }
+                let forwarder = ControlForwarder(fire)
+                control.addTarget(forwarder, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
+                objc_setAssociatedObject(control, &ControlForwarder.assocKey, forwarder, .OBJC_ASSOCIATION_RETAIN)
+                return
             }
-            let forwarder = ControlForwarder(fire)
-            control.addTarget(forwarder, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
-            objc_setAssociatedObject(control, &ControlForwarder.assocKey, forwarder, .OBJC_ASSOCIATION_RETAIN)
+            if let existing = objc_getAssociatedObject(view, &TapForwarder.assocKey) as? TapForwarder {
+                view.removeGestureRecognizer(existing.recognizer)
+            }
+            let forwarder = TapForwarder(fire)
+            view.addGestureRecognizer(forwarder.recognizer)
+            objc_setAssociatedObject(view, &TapForwarder.assocKey, forwarder, .OBJC_ASSOCIATION_RETAIN)
+        // Text change (Atlas onInput→"input", onChange→"change"). NOTE: fire() carries NO value — the
+        // host event channel is handlerId-only; the JS handler is notified but receives no text (same
+        // bridge limit as Android). Value delivery needs a cross-layer bridge widening (follow-up).
+        case "input", "change":
+            guard let field = view as? UITextField else { return }
+            // Retain the forwarder via an associated object on the FIELD (the same proven mechanism as
+            // ControlForwarder), keyed per-event so input + change stay independent.
+            let store = (objc_getAssociatedObject(field, &EditForwarder.assocKey) as? NSMutableDictionary)
+                ?? NSMutableDictionary()
+            if let existing = store[eventName] as? EditForwarder {
+                field.removeTarget(existing, action: #selector(EditForwarder.handleChange), for: .editingChanged)
+            }
+            let forwarder = EditForwarder(fire)
+            field.addTarget(forwarder, action: #selector(EditForwarder.handleChange), for: .editingChanged)
+            store[eventName] = forwarder
+            objc_setAssociatedObject(field, &EditForwarder.assocKey, store, .OBJC_ASSOCIATION_RETAIN)
+        default:
             return
         }
-        if let existing = objc_getAssociatedObject(view, &TapForwarder.assocKey) as? TapForwarder {
-            view.removeGestureRecognizer(existing.recognizer)
-        }
-        let forwarder = TapForwarder(fire)
-        view.addGestureRecognizer(forwarder.recognizer)
-        objc_setAssociatedObject(view, &TapForwarder.assocKey, forwarder, .OBJC_ASSOCIATION_RETAIN)
     }
 
     public func removeEvent(_ view: UIView, eventName: String, handlerId: String) {
-        guard eventName == "press" || eventName == "click" else { return }
-        if let control = view as? UIControl,
-           let existing = objc_getAssociatedObject(control, &ControlForwarder.assocKey) as? ControlForwarder {
-            control.removeTarget(existing, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
-            objc_setAssociatedObject(control, &ControlForwarder.assocKey, nil, .OBJC_ASSOCIATION_RETAIN)
+        switch eventName {
+        case "press", "click":
+            if let control = view as? UIControl,
+               let existing = objc_getAssociatedObject(control, &ControlForwarder.assocKey) as? ControlForwarder {
+                control.removeTarget(existing, action: #selector(ControlForwarder.handlePress), for: .touchUpInside)
+                objc_setAssociatedObject(control, &ControlForwarder.assocKey, nil, .OBJC_ASSOCIATION_RETAIN)
+                return
+            }
+            if let existing = objc_getAssociatedObject(view, &TapForwarder.assocKey) as? TapForwarder {
+                view.removeGestureRecognizer(existing.recognizer)
+                objc_setAssociatedObject(view, &TapForwarder.assocKey, nil, .OBJC_ASSOCIATION_RETAIN)
+            }
+        case "input", "change":
+            guard let field = view as? UITextField,
+                  let store = objc_getAssociatedObject(field, &EditForwarder.assocKey) as? NSMutableDictionary,
+                  let existing = store[eventName] as? EditForwarder else { return }
+            field.removeTarget(existing, action: #selector(EditForwarder.handleChange), for: .editingChanged)
+            store.removeObject(forKey: eventName)
+        default:
             return
-        }
-        if let existing = objc_getAssociatedObject(view, &TapForwarder.assocKey) as? TapForwarder {
-            view.removeGestureRecognizer(existing.recognizer)
-            objc_setAssociatedObject(view, &TapForwarder.assocKey, nil, .OBJC_ASSOCIATION_RETAIN)
         }
     }
 
@@ -304,6 +391,52 @@ public final class UIKitRenderer: HostRenderer {
         }
     }
 
+    private func contentMode(_ mode: String) -> UIView.ContentMode {
+        switch mode {
+        case "cover": return .scaleAspectFill
+        case "stretch": return .scaleToFill
+        case "center": return .center
+        default: return .scaleAspectFit // "contain" / default
+        }
+    }
+
+    private func keyboardType(_ type: String) -> UIKeyboardType {
+        switch type {
+        case "number", "numeric", "number-pad": return .numberPad
+        case "decimal", "decimal-pad": return .decimalPad
+        case "phone", "tel": return .phonePad
+        case "email", "email-address": return .emailAddress
+        case "url": return .URL
+        default: return .default
+        }
+    }
+
+    /// Load an image `src`/`source`: data:/base64 + bundled assets decode synchronously; remote
+    /// http(s) is a deliberate follow-up. Any unresolvable source is ignored (never crashes).
+    private func applyImageSource(_ image: UIImageView, _ value: NativePropValue) {
+        var uri: String?
+        if case let .string(s) = value {
+            uri = s
+        } else if case let .object(object) = value, case let .string(s)? = object["uri"] {
+            uri = s
+        }
+        guard let src = uri else { return }
+        image.clipsToBounds = true
+        if src.hasPrefix("data:") {
+            let payload = src.components(separatedBy: "base64,").last ?? ""
+            if let data = Data(base64Encoded: payload), let decoded = UIImage(data: data) {
+                image.image = decoded
+            }
+        } else if src.hasPrefix("http://") || src.hasPrefix("https://") {
+            // Remote loading is a follow-up (needs an off-main fetch + lifecycle hook) — leave unset.
+        } else {
+            let name = src
+                .replacingOccurrences(of: "asset:///", with: "")
+                .replacingOccurrences(of: "file:///android_asset/", with: "")
+            if let bundled = UIImage(named: name) { image.image = bundled }
+        }
+    }
+
     private func number(_ value: NativePropValue?) -> Double? {
         if case let .number(n)? = value { return n }
         return nil
@@ -375,5 +508,18 @@ private final class ControlForwarder: NSObject {
     }
 
     @objc func handlePress() { fire() }
+}
+
+/// Bridges a UITextField `.editingChanged` to the `input`/`change` callback (notify-only, no value).
+private final class EditForwarder: NSObject {
+    static var assocKey: UInt8 = 0
+    private let fire: () -> Void
+
+    init(_ fire: @escaping () -> Void) {
+        self.fire = fire
+        super.init()
+    }
+
+    @objc func handleChange() { fire() }
 }
 #endif
