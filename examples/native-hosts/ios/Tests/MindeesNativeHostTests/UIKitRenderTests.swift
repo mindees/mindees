@@ -228,5 +228,93 @@ final class UIKitRenderTests: XCTestCase {
         XCTAssertLessThanOrEqual(a.frame.maxX, b.frame.minX) // a is left of b
         XCTAssertEqual(b.frame.minX, a.frame.maxX + 8, accuracy: 0.5) // gap respected
     }
+
+    func testComposesTextNodeChildrenIntoTextElement() throws {
+        let container = UIView()
+        let host = MindeesNativeHost(
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+        )
+        // Atlas Text renders as a `text` ELEMENT wrapping a text NODE. The element must compose its
+        // text-node children into its own .text (not nest a label inside a label).
+        try host.apply(decode("""
+        [
+          {"type":"createNode","id":"label","tag":"text"},
+          {"type":"createText","id":"s","text":"Hello"},
+          {"type":"insertChild","parentId":"label","childId":"s","index":0},
+          {"type":"insertChild","parentId":"host-root","childId":"label","index":0}
+        ]
+        """))
+        let label = try XCTUnwrap(container.subviews.first as? UILabel)
+        XCTAssertEqual(label.text, "Hello") // composed, not nested
+        XCTAssertTrue(label.subviews.isEmpty) // the text node is NOT a subview
+        // updateText on the node re-composes the owning element.
+        try host.apply(decode("[{\"type\":\"updateText\",\"id\":\"s\",\"text\":\"Bye\"}]"))
+        XCTAssertEqual(label.text, "Bye")
+    }
+
+    func testLoadsBase64DataUriImage() throws {
+        let container = UIView()
+        let host = MindeesNativeHost(
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+        )
+        let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        try host.apply(decode("""
+        [
+          {"type":"createNode","id":"img","tag":"image"},
+          {"type":"setProp","id":"img","name":"src","value":"\(png)"},
+          {"type":"setProp","id":"img","name":"resizeMode","value":"cover"},
+          {"type":"insertChild","parentId":"host-root","childId":"img","index":0}
+        ]
+        """))
+        let image = try XCTUnwrap(container.subviews.first as? UIImageView)
+        XCTAssertNotNil(image.image) // real UIImage(data:) decodes on a simulator
+        XCTAssertEqual(image.contentMode, .scaleAspectFill) // resizeMode:'cover'
+    }
+
+    func testTextInputKeyboardSecureAndEditable() throws {
+        let container = UIView()
+        let host = MindeesNativeHost(
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _ in }
+        )
+        try host.apply(decode("""
+        [
+          {"type":"createNode","id":"a","tag":"textinput"},
+          {"type":"setProp","id":"a","name":"keyboardType","value":"email"},
+          {"type":"setProp","id":"a","name":"placeholder","value":"Email"},
+          {"type":"createNode","id":"b","tag":"textinput"},
+          {"type":"setProp","id":"b","name":"secureTextEntry","value":true},
+          {"type":"setProp","id":"b","name":"editable","value":false},
+          {"type":"insertChild","parentId":"host-root","childId":"a","index":0},
+          {"type":"insertChild","parentId":"host-root","childId":"b","index":1}
+        ]
+        """))
+        let a = try XCTUnwrap(container.subviews[0] as? UITextField)
+        XCTAssertEqual(a.keyboardType, .emailAddress)
+        XCTAssertEqual(a.placeholder, "Email")
+        let b = try XCTUnwrap(container.subviews[1] as? UITextField)
+        XCTAssertTrue(b.isSecureTextEntry)
+        XCTAssertFalse(b.isEnabled)
+    }
+
+    func testWiresTextChangeEvent() throws {
+        let container = UIView()
+        var fired: [String] = []
+        let host = MindeesNativeHost(
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { fired.append($0) }
+        )
+        try host.apply(decode("""
+        [
+          {"type":"createNode","id":"a","tag":"textinput"},
+          {"type":"registerEvent","id":"a","eventName":"input","handlerId":"ch1"},
+          {"type":"insertChild","parentId":"host-root","childId":"a","index":0}
+        ]
+        """))
+        let field = try XCTUnwrap(container.subviews.first as? UITextField)
+        field.sendActions(for: .editingChanged)
+        XCTAssertEqual(fired, ["ch1"])
+        try host.apply(decode("[{\"type\":\"unregisterEvent\",\"id\":\"a\",\"eventName\":\"input\",\"handlerId\":\"ch1\"}]"))
+        field.sendActions(for: .editingChanged)
+        XCTAssertEqual(fired, ["ch1"]) // detached → no further dispatch
+    }
 }
 #endif
