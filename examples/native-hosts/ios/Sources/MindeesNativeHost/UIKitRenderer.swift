@@ -274,6 +274,10 @@ public final class UIKitRenderer: HostRenderer {
         let id = ObjectIdentifier(view)
         var byKey = sizeConstraints[id] ?? [:]
         byKey[key]?.isActive = false
+        // An explicit width/height on an arranged subview must yield to a `.fill` stack's REQUIRED
+        // cross-axis stretch (else the pair is unsatisfiable). .defaultHigh (999) still beats
+        // hugging/compression so the explicit size wins whenever nothing forces a stretch.
+        if key == "width" || key == "height" { constraint.priority = .defaultHigh }
         constraint.isActive = true
         byKey[key] = constraint
         sizeConstraints[id] = byKey
