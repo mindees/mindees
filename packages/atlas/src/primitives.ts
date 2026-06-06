@@ -295,5 +295,8 @@ export const ScrollView: Component<ScrollViewProps> = (props) => {
   })
   if (onScroll) host.onScroll = onScroll
   if (horizontal) host['data-orientation'] = 'horizontal' // extra hint for native hosts
-  return createElement('scrollview', host, children)
+  // Orientation is fixed at creation, so emit a distinct tag a native host can branch on in
+  // makeElement (a vertical ScrollView and a HorizontalScrollView are different widgets). Web
+  // maps both to <div> and derives orientation from the style above.
+  return createElement(horizontal ? 'horizontalscrollview' : 'scrollview', host, children)
 }

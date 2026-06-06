@@ -16,10 +16,16 @@ package dev.mindees.host
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.PorterDuff
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.Editable
+import android.text.InputType
 import android.text.TextUtils
+import android.text.TextWatcher
+import android.util.Base64
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -27,6 +33,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.ScrollView
@@ -70,6 +77,17 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     private val scrollContent = HashMap<View, FlexboxLayout>()
     private fun contentFor(view: View): View = scrollContent[view] ?: view
 
+    /** Per-EditText keyboard/secure/multiline intent, recomputed into inputType (compose any order). */
+    private class InputSpec {
+        var keyboard = "text"
+        var secure = false
+        var multiline = false
+    }
+    private val inputSpecs = HashMap<View, InputSpec>()
+    private fun inputSpecOf(view: View): InputSpec = inputSpecs.getOrPut(view) { InputSpec() }
+    /** Active text-change watchers, so removeEvent/dispose can detach them (no leaks). */
+    private val textWatchers = HashMap<View, TextWatcher>()
+
     /**
      * Text composition. A leaf widget (TextView/Button/EditText) can't hold child views,
      * but the element model nests text *nodes* inside a `text` *element* (e.g. Atlas's
@@ -112,6 +130,19 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             scrollContent[this] = content
             layoutOf(content)
         }
+        // 'horizontalscrollview' → a HorizontalScrollView wrapping a ROW content host. Mirror of the
+        // vertical case: content is WRAP width / MATCH height so the row can grow past the viewport on X.
+        "horizontalscrollview" -> HorizontalScrollView(context).apply {
+            isFillViewport = true
+            val content = FlexboxLayout(context).apply { flexDirection = FlexDirection.ROW }
+            content.layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            addView(content)
+            scrollContent[this] = content
+            layoutOf(content).horizontal = true // gaps go on the X axis even before any style arrives
+        }
         // 'view' / unknown → a real flex container (FlexboxLayout): full
         // flexDirection / justifyContent (incl. space-*) / alignItems / flexWrap / alignSelf.
         else -> FlexboxLayout(context).apply {
@@ -138,6 +169,24 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             "placeholder" -> (view as? EditText)?.hint = strOf(value)
             "value" -> (view as? EditText)?.let { if (it.text.toString() != strOf(value)) it.setText(strOf(value)) }
             "hidden" -> view.visibility = if (boolOf(value)) View.GONE else View.VISIBLE
+            // Image source (data:/base64 + bundled asset load synchronously; remote is a follow-up).
+            "src", "source" -> (view as? ImageView)?.let { applyImageSource(it, value) }
+            "resizeMode" -> (view as? ImageView)?.let { it.scaleType = scaleTypeFor(strOf(value) ?: "contain") }
+            "tintColor" -> (view as? ImageView)?.let { iv ->
+                val c = color(value)
+                if (c != null) iv.setColorFilter(c, PorterDuff.Mode.SRC_IN) else iv.clearColorFilter()
+            }
+            // TextInput: keyboard / multiline / secure / enabled / focus. `type`="password" → secure.
+            "keyboardType", "inputMode", "type" -> (view as? EditText)?.let {
+                val s = strOf(value) ?: "text"
+                if (s == "password") inputSpecOf(it).secure = true else inputSpecOf(it).keyboard = s
+                applyInputType(it)
+            }
+            "multiline" -> (view as? EditText)?.let { inputSpecOf(it).multiline = boolOf(value); applyInputType(it) }
+            "secureTextEntry" -> (view as? EditText)?.let { inputSpecOf(it).secure = boolOf(value); applyInputType(it) }
+            "editable" -> (view as? EditText)?.let { it.isEnabled = boolOf(value) }
+            "disabled" -> (view as? EditText)?.let { it.isEnabled = !boolOf(value) }
+            "autoFocus" -> (view as? EditText)?.let { if (boolOf(value)) it.requestFocus() }
             // a11y/meta hints the DOM backend also emits — no-ops on this host.
             else -> Unit
         }
@@ -147,6 +196,10 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         when (name) {
             "accessibilityLabel", "aria-label", "label" -> view.contentDescription = null
             "hidden" -> view.visibility = View.VISIBLE
+            "editable", "disabled" -> (view as? EditText)?.isEnabled = true
+            "secureTextEntry" -> (view as? EditText)?.let { inputSpecOf(it).secure = false; applyInputType(it) }
+            "multiline" -> (view as? EditText)?.let { inputSpecOf(it).multiline = false; applyInputType(it) }
+            "tintColor" -> (view as? ImageView)?.clearColorFilter()
             else -> Unit
         }
     }
@@ -185,6 +238,9 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         layouts.remove(view)
         // A scrollview owns an inner content host — drop both.
         scrollContent.remove(view)?.let { layouts.remove(it) }
+        // TextInput state: detach the watcher + drop the input spec (no View leaks).
+        textWatchers.remove(view)?.let { (view as? EditText)?.removeTextChangedListener(it) }
+        inputSpecs.remove(view)
         // Detach from any text composition it participated in (as child or as owner).
         textOwner.remove(view)?.let { owner ->
             textParts[owner]?.remove(view)
@@ -203,12 +259,31 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
                 view.isClickable = true
                 view.setOnClickListener { fire() }
             }
+            // Text change (Atlas onInput→"input", onChange→"change"). NOTE: fire() carries no payload —
+            // the host event channel is handlerId-only, so JS reads the new text via the controlled
+            // `value` round-trip. A value-carrying onChangeText needs a cross-layer bridge widening.
+            "input", "change" -> (view as? EditText)?.let { et ->
+                textWatchers[et]?.let { et.removeTextChangedListener(it) } // replace any prior watcher
+                val watcher = object : TextWatcher {
+                    override fun afterTextChanged(s: Editable?) = fire()
+                    override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) = Unit
+                    override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) = Unit
+                }
+                et.addTextChangedListener(watcher)
+                textWatchers[et] = watcher
+            }
             else -> Unit
         }
     }
 
     override fun removeEvent(view: View, eventName: String, handlerId: String) {
-        if (eventName == "click" || eventName == "press") view.setOnClickListener(null)
+        when (eventName) {
+            "click", "press" -> view.setOnClickListener(null)
+            "input", "change" -> (view as? EditText)?.let { et ->
+                textWatchers.remove(et)?.let { et.removeTextChangedListener(it) }
+            }
+            else -> Unit
+        }
     }
 
     // --- Style application ---
@@ -320,6 +395,77 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
                 text.ellipsize = TextUtils.TruncateAt.END
             }
         }
+    }
+
+    // --- Image + TextInput ---
+
+    /**
+     * Load an image `src`/`source` into an ImageView. `data:`/base64 + bundled assets decode
+     * synchronously (deterministic, no I/O on the network); remote http(s) is a deliberate follow-up
+     * (it needs an off-main fetch executor + a renderer lifecycle hook to reclaim it). Any
+     * unresolvable/garbage source is ignored — never crashes the host.
+     */
+    private fun applyImageSource(iv: ImageView, value: NativeProp) {
+        val uri = strOf(value)
+            ?: (value as? NativeProp.Obj)?.value?.get("uri")?.let { strOf(it) }
+            ?: return
+        try {
+            val bitmap = when {
+                uri.startsWith("data:") -> {
+                    val payload = uri.substringAfter("base64,", "")
+                    if (payload.isEmpty()) {
+                        null
+                    } else {
+                        val bytes = Base64.decode(payload, Base64.DEFAULT)
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    }
+                }
+                // Remote loading is a follow-up (see KDoc) — leave the image unset, don't crash.
+                uri.startsWith("http://") || uri.startsWith("https://") -> null
+                else -> {
+                    val name = uri.removePrefix("asset:///").removePrefix("file:///android_asset/")
+                    context.assets.open(name).use { BitmapFactory.decodeStream(it) }
+                }
+            }
+            bitmap?.let { iv.setImageBitmap(it) }
+        } catch (_: Throwable) {
+            // ignore: an unresolvable/garbage src must never crash the host
+        }
+    }
+
+    private fun scaleTypeFor(mode: String): ImageView.ScaleType = when (mode) {
+        "cover" -> ImageView.ScaleType.CENTER_CROP
+        "stretch" -> ImageView.ScaleType.FIT_XY
+        "center" -> ImageView.ScaleType.CENTER
+        else -> ImageView.ScaleType.FIT_CENTER // "contain" / default
+    }
+
+    /** Recompute an EditText's inputType from its {keyboard, secure, multiline} spec (order-independent). */
+    private fun applyInputType(et: EditText) {
+        val spec = inputSpecs[et] ?: return
+        var type = when (spec.keyboard) {
+            "number", "numeric", "number-pad" -> InputType.TYPE_CLASS_NUMBER
+            "decimal", "decimal-pad" -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            "phone", "tel" -> InputType.TYPE_CLASS_PHONE
+            "email", "email-address" ->
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            "url" -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            else -> InputType.TYPE_CLASS_TEXT
+        }
+        if (spec.multiline) {
+            et.isSingleLine = false // set before inputType (singleLine mutates inputType)
+            et.gravity = Gravity.TOP or Gravity.START
+            type = type or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        if (spec.secure) {
+            type = type or
+                if ((type and InputType.TYPE_CLASS_NUMBER) != 0) {
+                    InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                } else {
+                    InputType.TYPE_TEXT_VARIATION_PASSWORD
+                }
+        }
+        et.inputType = type
     }
 
     // --- LayoutParams + gaps ---
