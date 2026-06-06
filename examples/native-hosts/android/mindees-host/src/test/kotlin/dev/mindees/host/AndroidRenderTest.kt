@@ -19,6 +19,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import com.google.android.flexbox.AlignItems
 import com.google.android.flexbox.AlignSelf
@@ -193,6 +194,32 @@ class AndroidRenderTest {
         // gap → leading margin on every child but the first (along the row axis).
         assertEquals(0, (row.getChildAt(0).layoutParams as FlexboxLayout.LayoutParams).leftMargin)
         assertTrue((row.getChildAt(1).layoutParams as FlexboxLayout.LayoutParams).leftMargin > 0)
+    }
+
+    @Test
+    fun rendersScrollViewWrappingFlexContent() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"sv","tag":"scrollview"},
+                  {"type":"setProp","id":"sv","name":"style","value":{"flexDirection":"column","gap":8,"height":"100%"}},
+                  {"type":"createText","id":"a","text":"Row A"},
+                  {"type":"insertChild","parentId":"sv","childId":"a","index":0},
+                  {"type":"insertChild","parentId":"host-root","childId":"sv","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val sv = container.getChildAt(0) as ScrollView
+        val content = sv.getChildAt(0) as FlexboxLayout
+        // Children route into the inner content host, not the ScrollView (which holds one child).
+        assertEquals(1, content.childCount)
+        assertEquals("Row A", (content.getChildAt(0) as TextView).text.toString())
+        // Flex style targets the content; height:'100%' sizes the ScrollView viewport.
+        assertEquals(FlexDirection.COLUMN, content.flexDirection)
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, sv.layoutParams.height)
     }
 
     @Test

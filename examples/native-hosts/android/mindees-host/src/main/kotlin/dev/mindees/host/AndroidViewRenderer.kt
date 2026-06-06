@@ -25,8 +25,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import com.google.android.flexbox.AlignItems
 import com.google.android.flexbox.AlignSelf
@@ -61,6 +63,13 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     private fun layoutOf(view: View): Layout = layouts.getOrPut(view) { Layout() }
 
     /**
+     * A `scrollview` node is a ScrollView whose ONE child is a FlexboxLayout "content" host. Children
+     * and flex/layout styles route to that content; the ScrollView itself is just the viewport.
+     */
+    private val scrollContent = HashMap<View, FlexboxLayout>()
+    private fun contentFor(view: View): View = scrollContent[view] ?: view
+
+    /**
      * Text composition. A leaf widget (TextView/Button/EditText) can't hold child views,
      * but the element model nests text *nodes* inside a `text` *element* (e.g. Atlas's
      * `Text` → `<text>"hello"</text>`). So we compose a text element's text-node children
@@ -89,7 +98,20 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             isIndeterminate = true
             layoutOf(this)
         }
-        // 'view' / 'scrollview' / unknown → a real flex container (FlexboxLayout): full
+        // 'scrollview' → a real vertical ScrollView wrapping a FlexboxLayout content host.
+        // Children/styles route to the inner content (see contentFor); the ScrollView is the viewport.
+        "scrollview" -> ScrollView(context).apply {
+            isFillViewport = true
+            val content = FlexboxLayout(context).apply { flexDirection = FlexDirection.COLUMN }
+            content.layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            addView(content)
+            scrollContent[this] = content
+            layoutOf(content)
+        }
+        // 'view' / unknown → a real flex container (FlexboxLayout): full
         // flexDirection / justifyContent (incl. space-*) / alignItems / flexWrap / alignSelf.
         else -> FlexboxLayout(context).apply {
             flexDirection = FlexDirection.COLUMN
@@ -131,10 +153,11 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     // --- Tree structure ---
 
     override fun insert(parent: View, child: View, index: Int) {
-        if (parent is ViewGroup) {
+        val target = contentFor(parent) // route scrollview children into its content host
+        if (target is ViewGroup) {
             applyLayoutParams(child) // carry the child width/height/grow/alignSelf into FlexboxLayout params
-            parent.addView(child, index.coerceIn(0, parent.childCount))
-            reapplyGaps(parent)
+            target.addView(child, index.coerceIn(0, target.childCount))
+            reapplyGaps(target)
             return
         }
         // Leaf (e.g. a `text` element): compose text-node children into its text.
@@ -145,9 +168,10 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     }
 
     override fun remove(parent: View, child: View) {
-        if (parent is ViewGroup) {
-            parent.removeView(child)
-            reapplyGaps(parent)
+        val target = contentFor(parent)
+        if (target is ViewGroup) {
+            target.removeView(child)
+            reapplyGaps(target)
             return
         }
         textOwner.remove(child)
@@ -158,6 +182,8 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     override fun dispose(view: View) {
         (view.parent as? ViewGroup)?.removeView(view)
         layouts.remove(view)
+        // A scrollview owns an inner content host — drop both.
+        scrollContent.remove(view)?.let { layouts.remove(it) }
         // Detach from any text composition it participated in (as child or as owner).
         textOwner.remove(view)?.let { owner ->
             textParts[owner]?.remove(view)
@@ -187,17 +213,20 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     // --- Style application ---
 
     private fun applyStyle(view: View, style: Map<String, NativeProp>) {
-        val container = view as? FlexboxLayout
+        // The flex container is `view` itself, OR a scrollview's inner content host. Sizing/visual
+        // props stay on `view` (the viewport for a scrollview); flex props target the container.
+        val container = contentFor(view) as? FlexboxLayout
         val text = view as? TextView // Button/EditText are TextView subclasses
-        val lay = layoutOf(view)
+        val selfLay = layoutOf(view) // this view's own size/grow/alignSelf as a child of its parent
+        val contentLay = container?.let { layoutOf(it) } ?: selfLay // the flex container's direction/gap
 
         // Flex container: direction, justify (incl. space-*), align, wrap.
         (style["flexDirection"] as? NativeProp.Str)?.value?.let { dir ->
-            lay.horizontal = dir.startsWith("row")
+            contentLay.horizontal = dir.startsWith("row")
             container?.flexDirection = flexDirectionFor(dir)
         }
         (dimen(style["gap"]) ?: dimen(style["rowGap"]) ?: dimen(style["columnGap"]))?.let {
-            lay.gapPx = it
+            contentLay.gapPx = it
             reapplyGaps(container)
         }
         strOf(style["justifyContent"])?.let { container?.justifyContent = justifyContentFor(it) }
@@ -205,17 +234,17 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         strOf(style["flexWrap"])?.let { container?.flexWrap = flexWrapFor(it) }
         // Per-child cross-axis override (applied via the child's FlexboxLayout.LayoutParams on insert).
         strOf(style["alignSelf"])?.let {
-            lay.alignSelf = alignSelfFor(it)
+            selfLay.alignSelf = alignSelfFor(it)
             applyLayoutParams(view)
         }
         (numOf(style["flexGrow"]) ?: numOf(style["flex"]))?.let {
-            lay.grow = it.toFloat()
+            selfLay.grow = it.toFloat()
             applyLayoutParams(view)
         }
 
         // Box model.
-        sizeOf(style["width"])?.let { lay.widthSpec = it; applyLayoutParams(view) }
-        sizeOf(style["height"])?.let { lay.heightSpec = it; applyLayoutParams(view) }
+        sizeOf(style["width"])?.let { selfLay.widthSpec = it; applyLayoutParams(view) }
+        sizeOf(style["height"])?.let { selfLay.heightSpec = it; applyLayoutParams(view) }
         dimen(style["minWidth"])?.let { view.minimumWidth = it }
         dimen(style["minHeight"])?.let { view.minimumHeight = it }
         applyPadding(view, style)
