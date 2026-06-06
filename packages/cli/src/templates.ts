@@ -133,10 +133,47 @@ if (root) render(App, {}, createDomBackend(), root)
   },
 }
 
+/**
+ * The `app` template: a polished starter showing the batteries — Atlas components,
+ * a standard hook, and theming — so an ordinary developer has a real screen in seconds.
+ */
+const app: Template = {
+  name: 'app',
+  description: 'A polished starter — Atlas components, hooks, and theming (batteries included).',
+  files: {
+    'package.json': appPackageJson('{{appName}}', { '@mindees/atlas': PKG_VERSION }),
+    '.gitignore': GITIGNORE,
+    'tsconfig.json': TSCONFIG,
+    'README.md': `# {{appName}}\n\nA MindeesNative app using the Atlas UI kit. Run \`mindees dev\`.\n`,
+    'src/App.tsx': `import { createElement } from '@mindees/core'
+import { Button, Card, Switch, Text, useToggle } from '@mindees/atlas'
+
+export function App() {
+  const dark = useToggle(false)
+  return (
+    <Card style={{ gap: 12, maxWidth: 360 }}>
+      <Text style={{ fontSize: 24, fontWeight: 700 }}>Welcome to {{appName}} ✨</Text>
+      <Text>Signals, native UI, and batteries included — from one TypeScript codebase.</Text>
+      <Switch value={dark.value} onValueChange={dark.set} />
+      <Button title="Get started" onPress={() => console.log('Let us build!')} />
+    </Card>
+  )
+}
+`,
+    'src/main.tsx': `import { createDomBackend, render } from '@mindees/renderer'
+import { App } from './App'
+
+const root = document.getElementById('app')
+if (root) render(App, {}, createDomBackend(), root)
+`,
+  },
+}
+
 /** All built-in templates, keyed by name. */
 export const TEMPLATES: Record<string, Template> = {
   blank,
   counter,
+  app,
 }
 
 /** The default template name used when none is specified. */
