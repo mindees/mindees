@@ -1,5 +1,32 @@
 # @mindees/atlas
 
+## 0.8.0
+
+### Minor Changes
+
+- f85bbec: Add **`Checkbox`**, **`RadioGroup`**, and **`Skeleton`** components — common UI building blocks RN
+  ships none of built-in. All compose from existing primitives (so they render on web + native today),
+  are accessible (`role="checkbox"`/`"radio"`/`"radiogroup"`/`"status"` with reactive `aria-checked`),
+  and stay fine-grained (reactive accessor styles). `Checkbox` (controlled, optional label), `RadioGroup`
+  (single-select string options), `Skeleton` (aria-busy loading placeholder).
+- 49a0317: Add **`useForm`** — a built-in form-state hook with **Standard Schema** validation (Zod/Valibot/
+  ArkType/…), the thing RN and Flutter make you reach for react-hook-form / formik to get. Signal-backed
+  `values`/`errors`/`touched` (a field binding re-renders only itself), `field(name)` bindings
+  (value/error/touched/set/onBlur), `validate()`, `handleSubmit()` (validates, marks all touched, calls
+  `onSubmit` only if valid), `reset()`, and reactive `isValid`/`isSubmitting`. Validation is synchronous
+  (an async schema is rejected, mirroring the router) and maps each issue to its field by path.
+- f85bbec: Add **standard utility hooks** — the batteries RN and Flutter make you reach for a library to get,
+  built in and renderer-agnostic (web + native): `useToggle` (boolean with toggle/on/off),
+  `useCounter` (bounded inc/dec/reset with min/max/step), `usePrevious` (the value before the latest
+  change), `useReducer` (signal-backed reducer), and `useAsync` (run a fetcher into reactive
+  `data`/`error`/`loading`, newest-run-wins with stale-result + dispose safety). Pure wrappers over the
+  reactive core — no extra dependencies.
+
+### Patch Changes
+
+- @mindees/core@0.8.0
+- @mindees/router@0.8.0
+
 ## 0.7.0
 
 ### Patch Changes
