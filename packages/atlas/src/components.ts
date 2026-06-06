@@ -451,13 +451,13 @@ export const ActivityIndicator: Component<ActivityIndicatorProps> = (props) => {
 // Checkbox
 // ---------------------------------------------------------------------------
 
-/** Props for {@link Checkbox}. */
-export interface CheckboxProps extends Omit<BaseProps, 'style'> {
+/** Props for {@link Checkbox}. (`label` is omitted from a11y to repurpose it as the visible label.) */
+export interface CheckboxProps extends Omit<BaseProps, 'style' | 'label'> {
   /** Controlled checked state (static or reactive). */
   readonly value: Reactive<boolean>
   readonly onValueChange?: (value: boolean) => void
   readonly disabled?: boolean
-  /** Optional label rendered beside the box (a string becomes a `Text`). */
+  /** Optional visible label rendered beside the box (a string becomes a `Text`). */
   readonly label?: MindeesNode
   readonly style?: Reactive<StyleInput>
 }
