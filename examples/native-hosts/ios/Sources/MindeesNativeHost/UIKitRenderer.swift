@@ -26,7 +26,7 @@ public final class UIKitRenderer: HostRenderer {
             return UIButton(type: .system)
         case "image":
             return UIImageView()
-        case "scrollview":
+        case "scrollview", "horizontalscrollview":
             return UIScrollView()
         default:
             // view / unknown tags → a plain container with a vertical stack default.

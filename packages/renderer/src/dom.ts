@@ -44,6 +44,7 @@ const TAG_ALIASES: Record<string, string> = {
   text: 'span',
   image: 'img',
   scrollview: 'div',
+  horizontalscrollview: 'div',
   textinput: 'input',
   button: 'button',
 }

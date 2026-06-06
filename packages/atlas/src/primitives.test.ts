@@ -227,12 +227,15 @@ describe('layout primitives', () => {
 
   it('ScrollView horizontal lays children in a row and scrolls (not a no-op)', () => {
     const node = el(ScrollView({ horizontal: true }))
+    // Distinct tag at creation so a native host can pick HorizontalScrollView vs ScrollView.
+    expect(node.type).toBe('horizontalscrollview')
     const style = node.props.style as Record<string, unknown>
     expect(style.display).toBe('flex') // without display:flex the flexDirection is inert
     expect(style.flexDirection).toBe('row') // real horizontal layout via the style channel
     expect(style.flexWrap).toBe('nowrap')
     expect(style.overflow).toBe('auto')
-    const vertical = el(ScrollView({})).props.style as Record<string, unknown>
-    expect(vertical.flexDirection).toBeUndefined() // vertical default unchanged
+    const vertical = el(ScrollView({}))
+    expect(vertical.type).toBe('scrollview') // vertical keeps the plain tag
+    expect((vertical.props.style as Record<string, unknown>).flexDirection).toBeUndefined()
   })
 })

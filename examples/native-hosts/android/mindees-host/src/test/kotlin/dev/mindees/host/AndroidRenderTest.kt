@@ -14,10 +14,14 @@ package dev.mindees.host
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
+import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
@@ -28,6 +32,8 @@ import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.flexbox.JustifyContent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -327,5 +333,176 @@ class AndroidRenderTest {
         )
         container.getChildAt(0).performClick()
         assertEquals(listOf("inc"), fired)
+    }
+
+    @Test
+    fun loadsBase64DataUriImageWithScaleTypeAndTint() {
+        val (host, container) = newHost()
+        val png =
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"img","tag":"image"},
+                  {"type":"setProp","id":"img","name":"src","value":"$png"},
+                  {"type":"setProp","id":"img","name":"resizeMode","value":"cover"},
+                  {"type":"setProp","id":"img","name":"tintColor","value":"#ff0000"},
+                  {"type":"insertChild","parentId":"host-root","childId":"img","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val img = container.getChildAt(0) as ImageView
+        // resizeMode + tintColor are deterministic View state (the mappings we own). The actual base64
+        // bitmap decode is platform BitmapFactory behavior (verified on real devices) — Robolectric's
+        // ShadowBitmapFactory does not faithfully decode raw byte arrays, so we assert our mappings here,
+        // and that the data-URI path ran without throwing (a non-image/garbage case is covered below).
+        assertEquals(ImageView.ScaleType.CENTER_CROP, img.scaleType) // resizeMode:'cover'
+        assertNotNull(img.colorFilter) // tintColor applied
+    }
+
+    @Test
+    fun ignoresGarbageImageSourceWithoutCrashing() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"img","tag":"image"},
+                  {"type":"setProp","id":"img","name":"src","value":"data:image/png;base64,@@not-valid@@"},
+                  {"type":"insertChild","parentId":"host-root","childId":"img","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        assertTrue(container.getChildAt(0) is ImageView) // no exception thrown is the assertion
+    }
+
+    @Test
+    fun mapsTextInputKeyboardSecureAndMultiline() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"a","tag":"textinput"},
+                  {"type":"setProp","id":"a","name":"keyboardType","value":"email"},
+                  {"type":"createNode","id":"b","tag":"textinput"},
+                  {"type":"setProp","id":"b","name":"keyboardType","value":"number"},
+                  {"type":"setProp","id":"b","name":"multiline","value":true},
+                  {"type":"createNode","id":"c","tag":"textinput"},
+                  {"type":"setProp","id":"c","name":"secureTextEntry","value":true},
+                  {"type":"setProp","id":"c","name":"editable","value":false},
+                  {"type":"insertChild","parentId":"host-root","childId":"a","index":0},
+                  {"type":"insertChild","parentId":"host-root","childId":"b","index":1},
+                  {"type":"insertChild","parentId":"host-root","childId":"c","index":2}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val a = container.getChildAt(0) as EditText
+        assertEquals(
+            InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+            a.inputType and InputType.TYPE_MASK_VARIATION,
+        )
+        val b = container.getChildAt(1) as EditText
+        assertEquals(InputType.TYPE_CLASS_NUMBER, b.inputType and InputType.TYPE_MASK_CLASS)
+        assertTrue((b.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0) // multiline flag
+        val c = container.getChildAt(2) as EditText
+        assertTrue((c.inputType and InputType.TYPE_TEXT_VARIATION_PASSWORD) != 0) // secure
+        assertFalse(c.isEnabled) // editable:false
+    }
+
+    @Test
+    fun wiresTextChangeWatcherThatDispatchesAndDetaches() {
+        val fired = mutableListOf<String>()
+        val context = RuntimeEnvironment.getApplication()
+        val container = FlexboxLayout(context)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
+            fired.add(it)
+        }
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"a","tag":"textinput"},
+                  {"type":"registerEvent","id":"a","eventName":"input","handlerId":"ch1"},
+                  {"type":"insertChild","parentId":"host-root","childId":"a","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val et = container.getChildAt(0) as EditText
+        et.setText("abc") // Robolectric runs the TextWatcher synchronously
+        assertEquals(listOf("ch1"), fired)
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """[{"type":"unregisterEvent","id":"a","eventName":"input","handlerId":"ch1"}]""",
+            ),
+        )
+        et.setText("def")
+        assertEquals(listOf("ch1"), fired) // detached → no further dispatch
+    }
+
+    @Test
+    fun rendersHorizontalScrollViewWrappingRowContent() {
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"row","tag":"horizontalscrollview"},
+                  {"type":"setProp","id":"row","name":"style","value":{"gap":10}},
+                  {"type":"createText","id":"a","text":"A"},
+                  {"type":"createText","id":"b","text":"B"},
+                  {"type":"insertChild","parentId":"row","childId":"a","index":0},
+                  {"type":"insertChild","parentId":"row","childId":"b","index":1},
+                  {"type":"insertChild","parentId":"host-root","childId":"row","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val sv = container.getChildAt(0) as HorizontalScrollView
+        val content = sv.getChildAt(0) as FlexboxLayout
+        assertEquals(FlexDirection.ROW, content.flexDirection)
+        assertEquals(2, content.childCount) // children route into the content host
+        // gap → leading LEFT margin on the 2nd child (X axis), 0 on the first.
+        assertEquals(0, (content.getChildAt(0).layoutParams as FlexboxLayout.LayoutParams).leftMargin)
+        assertTrue((content.getChildAt(1).layoutParams as FlexboxLayout.LayoutParams).leftMargin > 0)
+    }
+
+    @Test
+    fun supportsBothInputAndChangeWatchersIndependently() {
+        val fired = mutableListOf<String>()
+        val context = RuntimeEnvironment.getApplication()
+        val container = FlexboxLayout(context)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
+            fired.add(it)
+        }
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"a","tag":"textinput"},
+                  {"type":"registerEvent","id":"a","eventName":"input","handlerId":"in1"},
+                  {"type":"registerEvent","id":"a","eventName":"change","handlerId":"ch1"},
+                  {"type":"insertChild","parentId":"host-root","childId":"a","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val et = container.getChildAt(0) as EditText
+        et.setText("x") // both watchers fire
+        assertTrue(fired.contains("in1"))
+        assertTrue(fired.contains("ch1"))
+        fired.clear()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """[{"type":"unregisterEvent","id":"a","eventName":"input","handlerId":"in1"}]""",
+            ),
+        )
+        et.setText("y") // input detached; change still fires
+        assertEquals(listOf("ch1"), fired)
     }
 }
