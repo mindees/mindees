@@ -7,6 +7,13 @@ export {
   isSerializable,
   type SerializableBackend,
 } from './backend'
+/** Helix Canvas strand — a 2D scene graph driven by the reconciler, painted to a 2D context (§6.2). */
+export {
+  type Canvas2DBackend,
+  createCanvas2DBackend,
+  type Scene2DContext,
+  type SceneNode,
+} from './canvas'
 /** DOM (web) backend. */
 export {
   createDomBackend,
