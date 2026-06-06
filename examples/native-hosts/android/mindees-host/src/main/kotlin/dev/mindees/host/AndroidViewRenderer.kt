@@ -85,8 +85,9 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     }
     private val inputSpecs = HashMap<View, InputSpec>()
     private fun inputSpecOf(view: View): InputSpec = inputSpecs.getOrPut(view) { InputSpec() }
-    /** Active text-change watchers, so removeEvent/dispose can detach them (no leaks). */
-    private val textWatchers = HashMap<View, TextWatcher>()
+    /** Active text-change watchers keyed by view then eventName, so onInput and onChange are
+     *  independent (both can be registered) and removeEvent/dispose detach precisely (no leaks). */
+    private val textWatchers = HashMap<View, HashMap<String, TextWatcher>>()
 
     /**
      * Text composition. A leaf widget (TextView/Button/EditText) can't hold child views,
@@ -238,8 +239,10 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         layouts.remove(view)
         // A scrollview owns an inner content host — drop both.
         scrollContent.remove(view)?.let { layouts.remove(it) }
-        // TextInput state: detach the watcher + drop the input spec (no View leaks).
-        textWatchers.remove(view)?.let { (view as? EditText)?.removeTextChangedListener(it) }
+        // TextInput state: detach every watcher + drop the input spec (no View leaks).
+        textWatchers.remove(view)?.let { byEvent ->
+            (view as? EditText)?.let { et -> byEvent.values.forEach { et.removeTextChangedListener(it) } }
+        }
         inputSpecs.remove(view)
         // Detach from any text composition it participated in (as child or as owner).
         textOwner.remove(view)?.let { owner ->
@@ -259,18 +262,20 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
                 view.isClickable = true
                 view.setOnClickListener { fire() }
             }
-            // Text change (Atlas onInput→"input", onChange→"change"). NOTE: fire() carries no payload —
-            // the host event channel is handlerId-only, so JS reads the new text via the controlled
-            // `value` round-trip. A value-carrying onChangeText needs a cross-layer bridge widening.
+            // Text change (Atlas onInput→"input", onChange→"change"). NOTE: fire() carries NO payload —
+            // the host event channel is handlerId-only, so the JS handler is *notified* but receives no
+            // text value (it fires with an empty event). Delivering the typed string needs a cross-layer
+            // bridge widening (fire→fire(value) through onEvent/MindeesRuntimeBridge/MindeesAppApi); follow-up.
             "input", "change" -> (view as? EditText)?.let { et ->
-                textWatchers[et]?.let { et.removeTextChangedListener(it) } // replace any prior watcher
+                val byEvent = textWatchers.getOrPut(et) { HashMap() }
+                byEvent.remove(eventName)?.let { et.removeTextChangedListener(it) } // replace only THIS event
                 val watcher = object : TextWatcher {
                     override fun afterTextChanged(s: Editable?) = fire()
                     override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) = Unit
                     override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) = Unit
                 }
                 et.addTextChangedListener(watcher)
-                textWatchers[et] = watcher
+                byEvent[eventName] = watcher
             }
             else -> Unit
         }
@@ -280,7 +285,10 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         when (eventName) {
             "click", "press" -> view.setOnClickListener(null)
             "input", "change" -> (view as? EditText)?.let { et ->
-                textWatchers.remove(et)?.let { et.removeTextChangedListener(it) }
+                textWatchers[et]?.let { byEvent ->
+                    byEvent.remove(eventName)?.let { et.removeTextChangedListener(it) }
+                    if (byEvent.isEmpty()) textWatchers.remove(et)
+                }
             }
             else -> Unit
         }
@@ -458,12 +466,13 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             type = type or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         }
         if (spec.secure) {
+            // Clear any existing variation (email/url/phone) and apply ONLY the password variation —
+            // OR-ing onto a non-default variation yields a combined value Android won't mask.
+            val isNumber = (type and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_NUMBER
+            type = type and InputType.TYPE_MASK_VARIATION.inv()
             type = type or
-                if ((type and InputType.TYPE_CLASS_NUMBER) != 0) {
-                    InputType.TYPE_NUMBER_VARIATION_PASSWORD
-                } else {
-                    InputType.TYPE_TEXT_VARIATION_PASSWORD
-                }
+                if (isNumber) InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                else InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
         et.inputType = type
     }

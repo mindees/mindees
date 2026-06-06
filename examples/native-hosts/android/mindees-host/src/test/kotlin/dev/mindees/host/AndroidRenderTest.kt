@@ -468,4 +468,38 @@ class AndroidRenderTest {
         assertEquals(0, (content.getChildAt(0).layoutParams as FlexboxLayout.LayoutParams).leftMargin)
         assertTrue((content.getChildAt(1).layoutParams as FlexboxLayout.LayoutParams).leftMargin > 0)
     }
+
+    @Test
+    fun supportsBothInputAndChangeWatchersIndependently() {
+        val fired = mutableListOf<String>()
+        val context = RuntimeEnvironment.getApplication()
+        val container = FlexboxLayout(context)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
+            fired.add(it)
+        }
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"a","tag":"textinput"},
+                  {"type":"registerEvent","id":"a","eventName":"input","handlerId":"in1"},
+                  {"type":"registerEvent","id":"a","eventName":"change","handlerId":"ch1"},
+                  {"type":"insertChild","parentId":"host-root","childId":"a","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val et = container.getChildAt(0) as EditText
+        et.setText("x") // both watchers fire
+        assertTrue(fired.contains("in1"))
+        assertTrue(fired.contains("ch1"))
+        fired.clear()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """[{"type":"unregisterEvent","id":"a","eventName":"input","handlerId":"in1"}]""",
+            ),
+        )
+        et.setText("y") // input detached; change still fires
+        assertEquals(listOf("ch1"), fired)
+    }
 }
