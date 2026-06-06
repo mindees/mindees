@@ -1,5 +1,18 @@
 # @mindees/compiler
 
+## 0.10.0
+
+### Minor Changes
+
+- 2cbad54: Add build-time **performance budgets** (spec §12) — `compileChecked(src, { budget: { maxBytes, maxElements } })`
+  emits an **error** that refuses to emit when a module exceeds its budget, so "100% performance
+  optimized" is _enforced at build time_, not aspirational. Neither React Native nor Flutter fails a
+  build on a perf budget. (`MDC_BUDGET_BYTES` / `MDC_BUDGET_ELEMENTS`; exported `checkBudget`.)
+
+### Patch Changes
+
+- @mindees/core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes

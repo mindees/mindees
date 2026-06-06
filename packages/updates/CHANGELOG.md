@@ -1,5 +1,24 @@
 # @mindees/updates
 
+## 0.10.0
+
+### Minor Changes
+
+- 9ecadab: Export the **Server-Driven UI** API from the package entry (it was implemented + tested but not
+  surfaced): `compileSdui` (allowlisted, schema-versioned JSON → live MindeesNode tree; no `eval`,
+  pre-registered components + actions), plus `applyMergePatch` (RFC 7396) and `applyJsonPatch` (RFC 6902)
+  for incremental UI deltas, and the `SduiRegistry`/`SduiLimits`/`SduiError` types. Pulse spec §10.
+- 61a821d: **Pulse sandboxed WASM modules are now implemented** (spec §10) — `createWasmModuleRuntime()` returns
+  a real runtime whose `instantiate(bytes, capabilities)` runs a signed feature module in its own linear
+  memory, reachable **only** through the capabilities you grant (capability-secure by construction — no
+  ambient JS/network/DOM access). Validates + size-caps modules (`MODULE_INVALID`). Core WebAssembly
+  (runs on Hermes/RN, Node, web); the full WASM Component Model (WASI 0.2/0.3) is a follow-up behind the
+  same `instantiate` seam. Previously a `NotImplementedError` research-track throw.
+
+### Patch Changes
+
+- @mindees/core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
