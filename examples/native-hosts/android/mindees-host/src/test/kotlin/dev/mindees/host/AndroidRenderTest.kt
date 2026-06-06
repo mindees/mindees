@@ -18,9 +18,14 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import com.google.android.flexbox.AlignItems
+import com.google.android.flexbox.AlignSelf
+import com.google.android.flexbox.FlexDirection
+import com.google.android.flexbox.FlexWrap
+import com.google.android.flexbox.FlexboxLayout
+import com.google.android.flexbox.JustifyContent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,9 +37,9 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34]) // pin a Robolectric-supported SDK, independent of compileSdk
 class AndroidRenderTest {
-    private fun newHost(): Pair<MindeesNativeHost<View>, LinearLayout> {
+    private fun newHost(): Pair<MindeesNativeHost<View>, FlexboxLayout> {
         val context = RuntimeEnvironment.getApplication()
-        val container = LinearLayout(context)
+        val container = FlexboxLayout(context)
         val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {}
         return host to container
     }
@@ -107,7 +112,7 @@ class AndroidRenderTest {
     fun wiresClickHandlerThatDispatches() {
         val fired = mutableListOf<String>()
         val context = RuntimeEnvironment.getApplication()
-        val container = LinearLayout(context)
+        val container = FlexboxLayout(context)
         val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
             fired.add(it)
         }
@@ -175,18 +180,47 @@ class AndroidRenderTest {
                 """.trimIndent(),
             ),
         )
-        val row = container.getChildAt(0) as LinearLayout
-        // flexDirection:'row' → HORIZONTAL; justify+align center → Gravity.CENTER.
-        assertEquals(LinearLayout.HORIZONTAL, row.orientation)
-        assertEquals(Gravity.CENTER, row.gravity)
+        val row = container.getChildAt(0) as FlexboxLayout
+        // flexDirection:'row' → ROW; justify center; align center.
+        assertEquals(FlexDirection.ROW, row.flexDirection)
+        assertEquals(JustifyContent.CENTER, row.justifyContent)
+        assertEquals(AlignItems.CENTER, row.alignItems)
         // backgroundColor/borderRadius → a GradientDrawable background; padding applied.
         assertTrue(row.background is GradientDrawable)
         assertTrue(row.paddingTop > 0)
         // width:'100%' → MATCH_PARENT layout param.
         assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, row.layoutParams.width)
         // gap → leading margin on every child but the first (along the row axis).
-        assertEquals(0, (row.getChildAt(0).layoutParams as LinearLayout.LayoutParams).leftMargin)
-        assertTrue((row.getChildAt(1).layoutParams as LinearLayout.LayoutParams).leftMargin > 0)
+        assertEquals(0, (row.getChildAt(0).layoutParams as FlexboxLayout.LayoutParams).leftMargin)
+        assertTrue((row.getChildAt(1).layoutParams as FlexboxLayout.LayoutParams).leftMargin > 0)
+    }
+
+    @Test
+    fun appliesFullFlexParity() {
+        // What LinearLayout couldn't do: space-between distribution, flex-wrap, and per-child alignSelf.
+        val (host, container) = newHost()
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"row","tag":"view"},
+                  {"type":"setProp","id":"row","name":"style","value":{
+                    "flexDirection":"row","justifyContent":"space-between","flexWrap":"wrap"
+                  }},
+                  {"type":"createNode","id":"a","tag":"view"},
+                  {"type":"setProp","id":"a","name":"style","value":{"alignSelf":"center","flexGrow":2}},
+                  {"type":"insertChild","parentId":"row","childId":"a","index":0},
+                  {"type":"insertChild","parentId":"host-root","childId":"row","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        val row = container.getChildAt(0) as FlexboxLayout
+        assertEquals(JustifyContent.SPACE_BETWEEN, row.justifyContent)
+        assertEquals(FlexWrap.WRAP, row.flexWrap)
+        val childLp = row.getChildAt(0).layoutParams as FlexboxLayout.LayoutParams
+        assertEquals(AlignSelf.CENTER, childLp.alignSelf)
+        assertEquals(2f, childLp.flexGrow, 0.001f)
     }
 
     @Test
@@ -220,7 +254,7 @@ class AndroidRenderTest {
         // styled 'view' (how Atlas Button renders) must still be tappable.
         val fired = mutableListOf<String>()
         val context = RuntimeEnvironment.getApplication()
-        val container = LinearLayout(context)
+        val container = FlexboxLayout(context)
         val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) {
             fired.add(it)
         }

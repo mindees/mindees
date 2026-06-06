@@ -3,12 +3,10 @@
  * the MindeesNative command stream, mapping Atlas's curated cross-platform `StyleObject`
  * onto native layout + visuals.
  *
- * Layout uses LinearLayout (built-in, no extra dependency): Atlas's flex subset —
- * flexDirection, justifyContent/alignItems (→ gravity), gap (→ child margins),
- * flex/flexGrow (→ weight) — plus the box model, background/radius/border, opacity,
- * and text styling. It is deliberately a faithful-but-pragmatic subset (no wrap /
- * space-* distribution); a FlexboxLayout backend can replace it behind this same
- * interface later.
+ * Layout uses Google FlexboxLayout for full flex parity: flexDirection,
+ * justifyContent (incl. space-between/around/evenly), alignItems, flexWrap, alignSelf,
+ * gap (→ child margins), flex/flexGrow (→ FlexboxLayout.LayoutParams.flexGrow) — plus
+ * the box model, background/radius/border, opacity, and text styling.
  *
  * Device-facing, but JVM-testable via Robolectric (AndroidRenderTest) and on-device
  * by the native Android workflow. See the module README.
@@ -28,9 +26,14 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import com.google.android.flexbox.AlignItems
+import com.google.android.flexbox.AlignSelf
+import com.google.android.flexbox.FlexDirection
+import com.google.android.flexbox.FlexWrap
+import com.google.android.flexbox.FlexboxLayout
+import com.google.android.flexbox.JustifyContent
 
 /** Builds Android views from the command stream. Pair with [MindeesNativeHost]. */
 class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
@@ -51,6 +54,7 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
         var widthSpec = ViewGroup.LayoutParams.WRAP_CONTENT
         var heightSpec = ViewGroup.LayoutParams.WRAP_CONTENT
         var grow = 0f
+        var alignSelf = AlignSelf.AUTO
     }
 
     private val layouts = HashMap<View, Layout>()
@@ -85,10 +89,10 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             isIndeterminate = true
             layoutOf(this)
         }
-        // 'view' / 'scrollview' / unknown → a flex container. (Real scrolling can wrap
-        // this in a ScrollView later; the common case is a plain column/row.)
-        else -> LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+        // 'view' / 'scrollview' / unknown → a real flex container (FlexboxLayout): full
+        // flexDirection / justifyContent (incl. space-*) / alignItems / flexWrap / alignSelf.
+        else -> FlexboxLayout(context).apply {
+            flexDirection = FlexDirection.COLUMN
             layoutOf(this)
         }
     }
@@ -128,7 +132,7 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
 
     override fun insert(parent: View, child: View, index: Int) {
         if (parent is ViewGroup) {
-            applyLayoutParams(child) // carry the child's width/height/grow into LinearLayout params
+            applyLayoutParams(child) // carry the child width/height/grow/alignSelf into FlexboxLayout params
             parent.addView(child, index.coerceIn(0, parent.childCount))
             reapplyGaps(parent)
             return
@@ -183,23 +187,26 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     // --- Style application ---
 
     private fun applyStyle(view: View, style: Map<String, NativeProp>) {
-        val container = view as? LinearLayout
+        val container = view as? FlexboxLayout
         val text = view as? TextView // Button/EditText are TextView subclasses
         val lay = layoutOf(view)
 
-        // Flex container axis + content alignment.
+        // Flex container: direction, justify (incl. space-*), align, wrap.
         (style["flexDirection"] as? NativeProp.Str)?.value?.let { dir ->
             lay.horizontal = dir.startsWith("row")
-            container?.orientation =
-                if (lay.horizontal) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            container?.flexDirection = flexDirectionFor(dir)
         }
         (dimen(style["gap"]) ?: dimen(style["rowGap"]) ?: dimen(style["columnGap"]))?.let {
             lay.gapPx = it
             reapplyGaps(container)
         }
-        if (container != null && (style.containsKey("justifyContent") || style.containsKey("alignItems"))) {
-            container.gravity =
-                gravityFor(lay.horizontal, strOf(style["justifyContent"]), strOf(style["alignItems"]))
+        strOf(style["justifyContent"])?.let { container?.justifyContent = justifyContentFor(it) }
+        strOf(style["alignItems"])?.let { container?.alignItems = alignItemsFor(it) }
+        strOf(style["flexWrap"])?.let { container?.flexWrap = flexWrapFor(it) }
+        // Per-child cross-axis override (applied via the child's FlexboxLayout.LayoutParams on insert).
+        strOf(style["alignSelf"])?.let {
+            lay.alignSelf = alignSelfFor(it)
+            applyLayoutParams(view)
         }
         (numOf(style["flexGrow"]) ?: numOf(style["flex"]))?.let {
             lay.grow = it.toFloat()
@@ -266,21 +273,22 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
 
     private fun applyLayoutParams(view: View) {
         val lay = layoutOf(view)
-        val lp = (view.layoutParams as? LinearLayout.LayoutParams)
-            ?: LinearLayout.LayoutParams(lay.widthSpec, lay.heightSpec)
+        val lp = (view.layoutParams as? FlexboxLayout.LayoutParams)
+            ?: FlexboxLayout.LayoutParams(lay.widthSpec, lay.heightSpec)
         lp.width = lay.widthSpec
         lp.height = lay.heightSpec
-        lp.weight = lay.grow
+        lp.flexGrow = lay.grow
+        lp.alignSelf = lay.alignSelf
         view.layoutParams = lp
     }
 
-    /** Recreate gaps as leading margins on every child (all but the first along the axis). */
+    /** Recreate gaps as leading margins on every child (all but the first along the main axis). */
     private fun reapplyGaps(parent: View?) {
-        val container = parent as? LinearLayout ?: return
+        val container = parent as? FlexboxLayout ?: return
         val lay = layouts[container] ?: return
         for (i in 0 until container.childCount) {
             val child = container.getChildAt(i)
-            val lp = child.layoutParams as? LinearLayout.LayoutParams ?: continue
+            val lp = child.layoutParams as? FlexboxLayout.LayoutParams ?: continue
             val lead = if (i == 0) 0 else lay.gapPx
             if (lay.horizontal) {
                 lp.leftMargin = lead
@@ -291,6 +299,47 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             }
             child.layoutParams = lp
         }
+    }
+
+    // --- Flex enum mappings (Atlas/CSS strings → FlexboxLayout constants) ---
+
+    private fun flexDirectionFor(dir: String): Int = when (dir) {
+        "row" -> FlexDirection.ROW
+        "row-reverse" -> FlexDirection.ROW_REVERSE
+        "column-reverse" -> FlexDirection.COLUMN_REVERSE
+        else -> FlexDirection.COLUMN
+    }
+
+    private fun justifyContentFor(justify: String): Int = when (justify) {
+        "flex-end", "end" -> JustifyContent.FLEX_END
+        "center" -> JustifyContent.CENTER
+        "space-between" -> JustifyContent.SPACE_BETWEEN
+        "space-around" -> JustifyContent.SPACE_AROUND
+        "space-evenly" -> JustifyContent.SPACE_EVENLY
+        else -> JustifyContent.FLEX_START
+    }
+
+    private fun alignItemsFor(align: String): Int = when (align) {
+        "flex-end", "end" -> AlignItems.FLEX_END
+        "center" -> AlignItems.CENTER
+        "baseline" -> AlignItems.BASELINE
+        "flex-start", "start" -> AlignItems.FLEX_START
+        else -> AlignItems.STRETCH
+    }
+
+    private fun flexWrapFor(wrap: String): Int = when (wrap) {
+        "wrap" -> FlexWrap.WRAP
+        "wrap-reverse" -> FlexWrap.WRAP_REVERSE
+        else -> FlexWrap.NOWRAP
+    }
+
+    private fun alignSelfFor(align: String): Int = when (align) {
+        "flex-end", "end" -> AlignSelf.FLEX_END
+        "center" -> AlignSelf.CENTER
+        "baseline" -> AlignSelf.BASELINE
+        "stretch" -> AlignSelf.STRETCH
+        "flex-start", "start" -> AlignSelf.FLEX_START
+        else -> AlignSelf.AUTO
     }
 
     // --- Value coercion (defensive: unknown/ill-typed values are ignored, never crash) ---
@@ -337,19 +386,4 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     }
 
     /** main axis ← justifyContent, cross axis ← alignItems. `space-*` falls back to center. */
-    private fun gravityFor(horizontal: Boolean, justify: String?, align: String?): Int {
-        val main = when (justify) {
-            "flex-end" -> if (horizontal) Gravity.END else Gravity.BOTTOM
-            "center", "space-between", "space-around", "space-evenly" ->
-                if (horizontal) Gravity.CENTER_HORIZONTAL else Gravity.CENTER_VERTICAL
-            else -> if (horizontal) Gravity.START else Gravity.TOP
-        }
-        val cross = when (align) {
-            "flex-end" -> if (horizontal) Gravity.BOTTOM else Gravity.END
-            "center" -> if (horizontal) Gravity.CENTER_VERTICAL else Gravity.CENTER_HORIZONTAL
-            "flex-start" -> if (horizontal) Gravity.TOP else Gravity.START
-            else -> 0 // stretch / baseline / auto → LinearLayout default
-        }
-        return main or cross
-    }
 }
