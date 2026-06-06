@@ -1,5 +1,11 @@
 # @mindees/ai
 
+## 0.7.0
+
+### Patch Changes
+
+- @mindees/core@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

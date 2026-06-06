@@ -1,5 +1,14 @@
 # @mindees/cli
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [aad716b]
+  - @mindees/compiler@0.7.0
+  - @mindees/ai@0.7.0
+  - @mindees/core@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
