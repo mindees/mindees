@@ -97,9 +97,14 @@ describe('useAsync', () => {
       () => Promise.resolve(2),
     ]
     let i = 0
+    const nextFetcher = (): Promise<number> => {
+      const fn = fetchers[i++]
+      if (!fn) throw new Error('no more fetchers')
+      return fn()
+    }
     let st!: AsyncState<number>
     createRoot(() => {
-      st = useAsync(() => fetchers[i++](), { immediate: false })
+      st = useAsync(nextFetcher, { immediate: false })
     })
     st.run() // run #0: pending
     st.run() // run #1: resolves 2 (supersedes #0)
