@@ -14,6 +14,7 @@ import dev.mindees.host.MindeesNativeHost
 
 class MainActivity : Activity() {
     private var bridge: MindeesRuntimeBridge<View>? = null
+    private var frameDriver: FrameDriver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,9 +49,19 @@ class MainActivity : Activity() {
         // emits the native command stream this host materializes — not hand-written commands.
         val appJs = assets.open(APP_BUNDLE_ASSET).bufferedReader().use { it.readText() }
 
+        // Drives JS animation frames from vsync; constructed on the UI thread. `bridge` is assigned
+        // just below and is non-null by the time the first frame callback fires (next vsync).
+        val driver = FrameDriver { nowMs -> bridge?.frameTick(nowMs) }
+        frameDriver = driver
+
         bridge = MindeesRuntimeBridge(
             host = host,
-            runtime = QuickJsMindeesRuntime(appJs, environmentJson()),
+            // The JS engine arms/sleeps the vsync loop through setFrameLoopActive → FrameDriver.
+            runtime = QuickJsMindeesRuntime(
+                appJs,
+                environmentJson(),
+                onFrameLoopActive = { active -> driver.setActive(active) },
+            ),
             applyOnHostThread = { action ->
                 if (Looper.myLooper() == Looper.getMainLooper()) {
                     action()
@@ -64,6 +75,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        frameDriver?.setActive(false) // stop vsync before tearing down the engine
+        frameDriver = null
         bridge?.close()
         bridge = null
         super.onDestroy()

@@ -15,13 +15,16 @@ import {
   useColorScheme,
   useTheme,
   useWindowDimensions,
+  View,
 } from '@mindees/atlas'
-import { signal } from '@mindees/core'
+import { animate, signal, spring } from '@mindees/core'
 import { useRouter } from '@mindees/router'
 import { buttonShape } from '../theme'
 
 /** Module-scoped state survives navigation. */
 const done = signal(0)
+/** An animated bar width — springs on press, driven by vsync on a native host (see FrameDriver). */
+const barWidth = animate(48)
 
 export default function Home() {
   const router = useRouter()
@@ -61,6 +64,24 @@ export default function Home() {
           })}
         />
       </Row>
+      <View
+        testID="pulse-bar"
+        style={() => ({
+          width: barWidth(),
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: theme().color.primary,
+        })}
+      />
+      <Button
+        title="Animate ✨"
+        onPress={() => spring(barWidth, { to: barWidth() > 160 ? 48 : 240 })}
+        style={() => ({
+          ...buttonShape,
+          backgroundColor: theme().color.surfaceVariant,
+          color: theme().color.text,
+        })}
+      />
       <Text style={() => ({ fontSize: fontSize.footnote, color: theme().color.textMuted })}>
         {() =>
           `Screen ${Math.round(dimensions().width)}×${Math.round(dimensions().height)} · ${colorScheme()}`

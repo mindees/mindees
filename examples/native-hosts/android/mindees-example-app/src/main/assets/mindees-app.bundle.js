@@ -20,9 +20,20 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 //#endregion
 
 //#region ../../../../../packages/atlas/dist/a11y.js
-/**
-	* Lower {@link A11yProps} to a host prop bag of `role` + `aria-*` (only keys that are defined,
-	* so omitted props stay omitted — exactOptionalPropertyTypes-safe).
+/** The boolean state keys, paired with their `aria-*` attribute. */
+	const STATE_ARIA = [
+		["disabled", "aria-disabled"],
+		["selected", "aria-selected"],
+		["checked", "aria-checked"],
+		["pressed", "aria-pressed"],
+		["expanded", "aria-expanded"],
+		["busy", "aria-busy"],
+		["hidden", "aria-hidden"]
+	];
+	/**
+	* Lower {@link A11yProps} to a host prop bag of `role` + `aria-*` (only defined keys, so omitted
+	* props stay omitted). Accessor-valued `state`/`valueNow` lower to **reactive** attribute bindings
+	* (the renderer re-applies them via `setProp`), so accessibility tracks state changes.
 	*/
 	function toA11yProps(a11y) {
 		const out = {};
@@ -32,14 +43,23 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		if (a11y.describedBy !== void 0) out["aria-describedby"] = a11y.describedBy;
 		if (a11y.live !== void 0) out["aria-live"] = a11y.live;
 		const s = a11y.state;
-		if (s) {
-			if (s.disabled !== void 0) out["aria-disabled"] = String(s.disabled);
-			if (s.selected !== void 0) out["aria-selected"] = String(s.selected);
-			if (s.checked !== void 0) out["aria-checked"] = String(s.checked);
-			if (s.expanded !== void 0) out["aria-expanded"] = String(s.expanded);
-			if (s.busy !== void 0) out["aria-busy"] = String(s.busy);
-			if (s.hidden !== void 0) out["aria-hidden"] = String(s.hidden);
+		if (typeof s === "function") {
+			const initial = s();
+			for (const [key, attr] of STATE_ARIA) {
+				if (initial[key] === void 0) continue;
+				out[attr] = () => {
+					const v = s()[key];
+					return v === void 0 ? void 0 : String(v);
+				};
+			}
+		} else if (s) {
+			for (const [key, attr] of STATE_ARIA) if (s[key] !== void 0) out[attr] = String(s[key]);
 		}
+		if (a11y.valueMin !== void 0) out["aria-valuemin"] = String(a11y.valueMin);
+		if (a11y.valueMax !== void 0) out["aria-valuemax"] = String(a11y.valueMax);
+		const vn = a11y.valueNow;
+		if (typeof vn === "function") out["aria-valuenow"] = () => String(vn());
+		else if (vn !== void 0) out["aria-valuenow"] = String(vn);
 		return out;
 	}
 
@@ -62,6 +82,26 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	let flushing = false;
 	/** Safety valve against accidental infinite reactive loops. */
 	const MAX_FLUSH_ITERATIONS = 1e5;
+	/**
+	* The scheduler that `'normal'`-lane effects defer through. `null` by default — and while it is null
+	* EVERY effect (including `priority: 'normal'`) flushes synchronously, so the sync default is
+	* unchanged for all of SSR + tests until a host opts in. Set once at app bootstrap.
+	*/
+	let reactiveScheduler = null;
+	/** Monotonic counter for default `'normal'`-lane dedup keys. */
+	let effectKeySeq = 0;
+	/** >0 while inside a {@link startTransition}; effects staled during it defer (when a scheduler exists). */
+	let transitionDepth = 0;
+	/** Sync effects staled inside the current transition — treated as deferred for THIS drain only. */
+	const transitionTagged = /* @__PURE__ */ new Set();
+	/**
+	* Inject (or clear) the {@link Scheduler} that `effect(fn, { priority: 'normal' })` defers through.
+	* With no scheduler (the default), `'normal'`-lane effects flush synchronously — so behavior is
+	* identical to today until a host wires one in. Pass `null` to detach.
+	*/
+	function setReactiveScheduler(scheduler) {
+		reactiveScheduler = scheduler;
+	}
 	/** @internal Test-only handle to a node behind an accessor. Not public API. */
 	const NODE = Symbol("mindees.reactive.node");
 	var Computation = class {
@@ -70,6 +110,8 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			this.observers = null;
 			this.owned = null;
 			this.cleanups = null;
+			this.lane = "sync";
+			this.pendingTask = null;
 			this.running = false;
 			this.restaleRequested = false;
 			this.value = value;
@@ -103,7 +145,10 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			if (this.state < state) {
 				const wasClean = this.state === CLEAN;
 				this.state = state;
-				if (this.isEffect && wasClean) effectQueue.push(this);
+				if (this.isEffect && wasClean) {
+					effectQueue.push(this);
+					if (transitionDepth > 0 && reactiveScheduler && this.lane === "sync") transitionTagged.add(this);
+				}
 				if (this.observers) for (const o of this.observers) o.markStale(CHECK);
 			}
 		}
@@ -231,6 +276,10 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			unlinkSources(node);
 			node.observers = null;
 			node.state = DISPOSED;
+			if (node.pendingTask) {
+				node.pendingTask.cancel();
+				node.pendingTask = null;
+			}
 		}
 	}
 	function adopt(node) {
@@ -252,7 +301,18 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 				}
 				const e = effectQueue[i];
 				i++;
-				if (e && e.state !== CLEAN && e.state !== DISPOSED) try {
+				if (e && e.state !== CLEAN && e.state !== DISPOSED) if (reactiveScheduler && (e.lane === "normal" || transitionTagged.has(e))) {
+					const node = e;
+					const sched = reactiveScheduler;
+					if (node.schedKey === void 0) node.schedKey = `mindees:effect:${effectKeySeq++}`;
+					node.pendingTask = sched.schedule(() => {
+						node.pendingTask = null;
+						if (node.state !== CLEAN && node.state !== DISPOSED) node.updateIfNecessary();
+					}, {
+						priority: "normal",
+						key: node.schedKey
+					});
+				} else try {
 					e.updateIfNecessary();
 				} catch (err) {
 					errors.push(err);
@@ -260,6 +320,7 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			}
 		} finally {
 			effectQueue.length = 0;
+			transitionTagged.clear();
 			flushing = false;
 		}
 		if (errors.length === 1) throw errors[0];
@@ -304,35 +365,32 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		};
 		return attachNode(accessor, node);
 	}
-	/**
-	* Run a side effect that re-runs whenever its reactive dependencies change.
-	* Runs once immediately to establish dependencies.
-	*
-	* To clean up before each re-run and on disposal, either return a cleanup
-	* function from the effect, or call {@link onCleanup}. Any non-function return
-	* value is ignored (so expression-bodied effects like `() => list.push(x())`
-	* are fine).
-	*
-	* @returns A disposer that stops the effect and runs its cleanups.
-	*
-	* @example
-	* const stop = effect(() => console.log(count()))
-	* stop() // unsubscribe
-	*
-	* @example
-	* effect(() => {
-	*   const id = setInterval(tick, 1000)
-	*   return () => clearInterval(id) // cleanup
-	* })
-	*/
-	function effect(fn) {
+	function effect(fn, options) {
 		const node = new Computation(void 0, () => {
 			const result = fn();
 			if (typeof result === "function") onCleanup(result);
 		}, false, true);
+		if (options?.priority === "normal") {
+			node.lane = "normal";
+			node.schedKey = `mindees:effect:${effectKeySeq++}`;
+		}
 		adopt(node);
 		node.updateIfNecessary();
 		return () => disposeComputation(node);
+	}
+	/**
+	* Batch multiple writes so dependent effects run once, after the batch. Reads
+	* inside a batch still observe the latest written values synchronously.
+	*/
+	function batch(fn) {
+		if (batchDepth > 0) return fn();
+		batchDepth++;
+		try {
+			return fn();
+		} finally {
+			batchDepth--;
+			flushEffects();
+		}
 	}
 	/** Read reactive values without subscribing the current computation to them. */
 	function untrack(fn) {
@@ -380,6 +438,203 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			currentOwner = prevOwner;
 		}
 	}
+	/** The current owner scope, or `null` outside any reactive scope. */
+	function getOwner() {
+		return currentOwner;
+	}
+
+//#endregion
+//#region ../../../../../packages/core/dist/animation/animation.js
+/**
+	* The animation engine — RN `Animated`/Reanimated + Flutter `AnimationController` parity, built
+	* entirely on the reactive core. An {@link AnimatedValue} **is a signal**, so reading it inside a
+	* `style` accessor re-renders only that node (no renderer surface). One injected {@link FrameSource}
+	* (mirroring `setReactiveScheduler`) drives a single loop that ticks every active driver inside one
+	* `batch()` per frame — so a style reading several animated values recomputes once (glitch-free).
+	*
+	* With no frame source (SSR / headless / tests until one is wired) animations **jump to their final
+	* value** synchronously: deterministic, never a hang, server output shows the end state.
+	*
+	* @module
+	*/
+	const MAX_DT = .064;
+	const SPRING_MAX_FRAMES = 600;
+	const internals = /* @__PURE__ */ new WeakMap();
+	const active$1 = /* @__PURE__ */ new Set();
+	let frameSource = null;
+	let unsubscribe = null;
+	let lastNow = -1;
+	/** Inject (or clear) the frame source that drives animations. `null` (default) → jump-to-final. */
+	function setFrameSource(src) {
+		if (src === frameSource) return;
+		if (unsubscribe) {
+			unsubscribe();
+			unsubscribe = null;
+		}
+		frameSource = src;
+		if (src === null) batch(() => {
+			for (const d of [...active$1]) {
+				writeValue(d.av, d.target);
+				active$1.delete(d);
+				const st = internals.get(d.av);
+				if (st) st.driver = null;
+				d.settle(true);
+			}
+		});
+		else if (active$1.size > 0) ensureLoop();
+	}
+	function writeValue(av, v) {
+		untrack(() => internals.get(av)?.signal.set(v));
+	}
+	function maybeSleep() {
+		if (active$1.size === 0 && unsubscribe) {
+			unsubscribe();
+			unsubscribe = null;
+		}
+	}
+	function ensureLoop() {
+		if (unsubscribe === null && frameSource !== null) {
+			lastNow = -1;
+			unsubscribe = frameSource(onFrame);
+		}
+	}
+	function onFrame(now) {
+		if (lastNow < 0) lastNow = now;
+		const dt = Math.min(Math.max(0, (now - lastNow) / 1e3), MAX_DT);
+		batch(() => {
+			for (const d of [...active$1]) {
+				if (!active$1.has(d)) continue;
+				let running;
+				try {
+					running = d.tick(now, dt);
+				} catch {
+					running = false;
+				}
+				if (!running) {
+					active$1.delete(d);
+					const st = internals.get(d.av);
+					if (st) st.driver = null;
+					d.settle(true);
+				}
+			}
+		});
+		lastNow = now;
+		maybeSleep();
+	}
+	/** Create an {@link AnimatedValue} (a reactive number you can drive with {@link timing}/{@link spring}). */
+	function animate(initial) {
+		const s = signal(initial);
+		const state = {
+			signal: s,
+			vel: { v: 0 },
+			driver: null
+		};
+		const av = Object.assign(() => s(), {
+			set(v) {
+				stopDriver(av);
+				untrack(() => s.set(v));
+			},
+			velocity: () => state.vel.v,
+			stop() {
+				stopDriver(av);
+			}
+		});
+		internals.set(av, state);
+		return av;
+	}
+	function stopDriver(av) {
+		const st = internals.get(av);
+		if (st?.driver) {
+			const d = st.driver;
+			active$1.delete(d);
+			st.driver = null;
+			d.settle(false);
+			maybeSleep();
+		}
+	}
+	/**
+	* Begin a driver on `av`: settle any prior driver (last-write-wins), capture the current value as
+	* the start, and either jump-to-final (no frame source) or join the loop. Returns the handle.
+	*/
+	function start(av, opts, build) {
+		const st = internals.get(av);
+		if (!st) throw new TypeError("animation driver: value was not created with animate()");
+		stopDriver(av);
+		let settled = false;
+		let resolveDone;
+		const done = new Promise((r) => {
+			resolveDone = r;
+		});
+		const settle = (finished) => {
+			if (settled) return;
+			settled = true;
+			resolveDone(finished);
+			opts.onComplete?.(finished);
+		};
+		const from = untrack(av);
+		if (frameSource === null) {
+			writeValue(av, opts.to);
+			settle(true);
+			return {
+				stop: () => settle(false),
+				done
+			};
+		}
+		const tick = build(from, settle);
+		const driver = {
+			av,
+			target: opts.to,
+			tick,
+			settle
+		};
+		st.driver = driver;
+		active$1.add(driver);
+		if (getOwner() !== null) onCleanup(() => {
+			if (st.driver === driver) stopDriver(av);
+		});
+		ensureLoop();
+		return {
+			stop: () => stopDriver(av),
+			done
+		};
+	}
+	/** Animate `av` to `to` with spring physics (RN/Reanimated `withSpring`, Flutter `SpringSimulation`). */
+	function spring(av, opts) {
+		const stiffness = Math.max(0, opts.stiffness ?? 170);
+		const damping = Math.max(0, opts.damping ?? 26);
+		const mass = Math.max(1e-4, opts.mass ?? 1);
+		const restDelta = opts.restDelta ?? .01;
+		const restVelocity = opts.restVelocity ?? .01;
+		const omega = Math.sqrt(stiffness / mass);
+		return start(av, opts, (from) => {
+			let x = from;
+			let v = opts.velocity ?? internals.get(av).vel.v;
+			let frames = 0;
+			return (_now, dt) => {
+				frames++;
+				const steps = Math.max(1, Math.ceil(dt * omega / 1.5));
+				const sub = dt / steps;
+				for (let i = 0; i < steps; i++) {
+					const a = (-stiffness * (x - opts.to) - damping * v) / mass;
+					v += a * sub;
+					x += v * sub;
+				}
+				if (!Number.isFinite(x)) {
+					internals.get(av).vel.v = 0;
+					writeValue(av, opts.to);
+					return false;
+				}
+				internals.get(av).vel.v = v;
+				if (Math.abs(x - opts.to) < restDelta && Math.abs(v) < restVelocity || frames > SPRING_MAX_FRAMES) {
+					internals.get(av).vel.v = 0;
+					writeValue(av, opts.to);
+					return false;
+				}
+				writeValue(av, x);
+				return true;
+			};
+		});
+	}
 
 //#endregion
 //#region ../../../../../packages/core/dist/component/component.js
@@ -401,6 +656,18 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	*/
 	/** Brand so a renderer can reliably distinguish elements from plain objects. */
 	const ELEMENT_TYPE = Symbol.for("mindees.element");
+	/** Brand identifying a keyed list region (reconciled by key, not full-rebuilt). */
+	const KEYED_REGION = Symbol.for("mindees.keyed-region");
+	/** Type guard: is `value` a {@link KeyedRegion}? */
+	function isKeyedRegion(value) {
+		return typeof value === "object" && value !== null && value.$$keyed === KEYED_REGION;
+	}
+	/** Brand identifying a portal region (children relocated to an overlay target above the tree). */
+	const PORTAL = Symbol.for("mindees.portal");
+	/** Type guard: is `value` a {@link PortalRegion}? */
+	function isPortal(value) {
+		return typeof value === "object" && value !== null && value.$$portal === PORTAL;
+	}
 	/**
 	* Create a virtual element. `type` is a host-component string or a component
 	* function; `Fragment` groups children without a wrapper.
@@ -418,6 +685,133 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			children: Object.freeze(resolved),
 			key
 		};
+	}
+
+//#endregion
+//#region ../../../../../packages/core/dist/scheduler/scheduler.js
+/** Safety valve: a single {@link Scheduler.flushSync} that drains more than this many tasks is
+	*  treated as a runaway re-scheduling loop and aborted (mirrors the reactive flush guard). */
+	const MAX_DRAIN_ITERATIONS = 1e5;
+	const defaultScheduleMicrotask = typeof queueMicrotask === "function" ? queueMicrotask : (cb) => {
+		Promise.resolve().then(cb);
+	};
+	/**
+	* A deterministic two-lane priority scheduler. Create one with {@link createScheduler}.
+	*/
+	var Scheduler = class {
+		constructor(options) {
+			this.sync = [];
+			this.normal = [];
+			this.keyed = /* @__PURE__ */ new Map();
+			this.microtaskQueued = false;
+			this.flushing = false;
+			this.onError = options?.onError;
+			this.scheduleMicrotask = options?.scheduleMicrotask ?? defaultScheduleMicrotask;
+		}
+		/** Schedule `task`. Returns a handle to cancel it or check its status. */
+		schedule(task, options) {
+			const priority = options?.priority ?? "normal";
+			const key = options?.key ?? null;
+			if (key !== null) {
+				const existing = this.keyed.get(key);
+				if (existing && existing.fn !== null) {
+					existing.fn = task;
+					return this.makeHandle(existing);
+				}
+			}
+			const entry = {
+				key,
+				fn: task
+			};
+			if (key !== null) this.keyed.set(key, entry);
+			(priority === "sync" ? this.sync : this.normal).push(entry);
+			this.requestFlush();
+			return this.makeHandle(entry);
+		}
+		/** Run all pending tasks right now (sync lane first), draining both lanes. */
+		flushSync() {
+			if (this.flushing) return;
+			this.flushing = true;
+			try {
+				let iterations = 0;
+				while (this.sync.length > 0 || this.normal.length > 0) {
+					if (++iterations > MAX_DRAIN_ITERATIONS) {
+						this.sync.length = 0;
+						this.normal.length = 0;
+						this.keyed.clear();
+						this.run(() => {
+							throw new Error("MindeesNative: potential infinite scheduler loop — a task kept re-scheduling itself.");
+						});
+						return;
+					}
+					const entry = this.sync.length > 0 ? this.sync.shift() : this.normal.shift();
+					if (!entry) continue;
+					this.clearKey(entry);
+					const fn = entry.fn;
+					entry.fn = null;
+					if (fn) this.run(fn);
+				}
+			} finally {
+				this.flushing = false;
+				this.microtaskQueued = false;
+			}
+		}
+		/** Number of pending tasks across both lanes (cancelled tasks excluded). */
+		get size() {
+			let n = 0;
+			for (const e of this.sync) if (e.fn !== null) n++;
+			for (const e of this.normal) if (e.fn !== null) n++;
+			return n;
+		}
+		requestFlush() {
+			if (this.microtaskQueued || this.flushing) return;
+			this.microtaskQueued = true;
+			this.scheduleMicrotask(() => {
+				this.microtaskQueued = false;
+				this.flushSync();
+			});
+		}
+		run(fn) {
+			try {
+				fn();
+			} catch (error) {
+				if (this.onError) try {
+					this.onError(error);
+				} catch (hookError) {
+					this.scheduleMicrotask(() => {
+						throw hookError;
+					});
+				}
+				else this.scheduleMicrotask(() => {
+					throw error;
+				});
+			}
+		}
+		/**
+		* Remove an entry's dedup-key mapping, but only if the map still points at THIS
+		* entry. Keys are reused over time (a 'render' key is scheduled, runs, then
+		* scheduled again), so a stale handle or an already-dequeued entry must never
+		* evict a newer live entry's mapping — doing so would break dedup and let two
+		* same-key tasks both run.
+		*/
+		clearKey(entry) {
+			if (entry.key !== null && this.keyed.get(entry.key) === entry) this.keyed.delete(entry.key);
+		}
+		makeHandle(entry) {
+			return {
+				cancel: () => {
+					entry.fn = null;
+					this.clearKey(entry);
+				},
+				get pending() {
+					return entry.fn !== null;
+				}
+			};
+		}
+	};
+	/** Create a new {@link Scheduler}. */
+	function createScheduler(options) {
+		return new Scheduler(options);
 	}
 
 //#endregion
@@ -919,10 +1313,10 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		return createElement(Pressable, {
 			...rest,
 			role: rest.role ?? "switch",
-			state: {
-				...rest.state ?? {},
+			state: () => ({
+				...typeof rest.state === "function" ? rest.state() : rest.state ?? {},
 				checked: isOn()
-			},
+			}),
 			...disabled ? { disabled: true } : {},
 			...handlePress ? { onPress: handlePress } : {},
 			style: mergeStyle(track, style)
@@ -948,6 +1342,9 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		return createElement(View, {
 			...rest,
 			role: rest.role ?? "progressbar",
+			valueMin: 0,
+			valueMax: 1,
+			valueNow: () => Math.max(0, Math.min(1, progress())),
 			style: mergeStyle(track, style)
 		}, createElement(View, { style: fill }));
 	};
@@ -970,9 +1367,390 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	};
 
 //#endregion
+//#region ../../../../../packages/renderer/dist/for.js
+/**
+	* Keyed list reconciliation — the renderer side of core's {@link KeyedRegion}.
+	*
+	* Materializes a keyed list so rows keep host-node identity (focus, caret, scroll, input state)
+	* across reorders, instead of the full teardown+rebuild a plain `() => items().map(...)` causes.
+	* On each change: existing rows are **reused** (their item/index signals patched in place), new
+	* keys **created** (each in its own reactive root), removed keys **disposed**, and host nodes
+	* **moved** via a longest-increasing-subsequence pass so the minimum number move (append → 0,
+	* adjacent swap → 1, full reverse → n−1). See ADR-0024.
+	*
+	* @module
+	*/
+	/**
+	* Indices (into `seq`) forming a longest strictly-increasing subsequence — the rows already in
+	* correct relative order, which therefore must NOT move. Standard O(n log n) patience sort.
+	*/
+	function longestIncreasingSubsequence(seq) {
+		const n = seq.length;
+		const result = /* @__PURE__ */ new Set();
+		if (n === 0) return result;
+		const tails = [];
+		const prev = new Array(n).fill(-1);
+		for (let i = 0; i < n; i++) {
+			const value = seq[i];
+			let lo = 0;
+			let hi = tails.length;
+			while (lo < hi) {
+				const mid = lo + hi >> 1;
+				if (seq[tails[mid]] < value) lo = mid + 1;
+				else hi = mid;
+			}
+			if (lo > 0) prev[i] = tails[lo - 1];
+			tails[lo] = i;
+		}
+		let k = tails[tails.length - 1];
+		while (k !== -1) {
+			result.add(k);
+			k = prev[k];
+		}
+		return result;
+	}
+	/**
+	* Materialize a {@link KeyedRegion} into `parent` before `anchor`, reconciling by key on every
+	* change. Returns a stable live array (current content followed by a slot marker), the same
+	* contract as the renderer's reactive-child binding. Must run inside an owner (an enclosing
+	* `createRoot`/region) so its cleanup is scoped.
+	*/
+	function bindKeyedChild(region, backend, parent, initialAnchor) {
+		const marker = backend.createText("");
+		backend.insert(parent, marker, initialAnchor);
+		const nodes = [marker];
+		let cache = /* @__PURE__ */ new Map();
+		let fallbackNodes = [];
+		let fallbackDispose = null;
+		const keyOf = region.key ?? ((item) => item);
+		const removeNodes = (toRemove) => {
+			for (const node of toRemove) if (backend.parentOf(node) === parent) backend.remove(parent, node);
+		};
+		const clearFallback = () => {
+			if (fallbackDispose) {
+				fallbackDispose();
+				fallbackDispose = null;
+			}
+			removeNodes(fallbackNodes);
+			fallbackNodes = [];
+		};
+		const disposeEntry = (entry) => {
+			entry.dispose();
+			removeNodes(entry.nodes);
+		};
+		const rebuildLiveNodes = (order) => {
+			nodes.length = 0;
+			for (const entry of order) nodes.push(...entry.nodes);
+			nodes.push(marker);
+		};
+		onCleanup(() => {
+			for (const entry of cache.values()) disposeEntry(entry);
+			cache.clear();
+			clearFallback();
+			if (backend.parentOf(marker)) backend.remove(parent, marker);
+		});
+		effect(() => {
+			const items = region.each();
+			untrack(() => {
+				batch(() => {
+					const n = items.length;
+					const keys = new Array(n);
+					const seen = /* @__PURE__ */ new Set();
+					for (let i = 0; i < n; i++) {
+						const k = keyOf(items[i], i);
+						if (k === null || k === void 0) throw new Error("For: key must not be null or undefined");
+						if (seen.has(k)) throw new Error(`For: duplicate key ${String(k)}`);
+						seen.add(k);
+						keys[i] = k;
+					}
+					if (n === 0) {
+						for (const entry of cache.values()) disposeEntry(entry);
+						cache.clear();
+						const fallback = region.fallback;
+						if (fallback && !fallbackDispose) try {
+							fallbackNodes = createRoot((dispose) => {
+								fallbackDispose = dispose;
+								return mountNode(fallback(), backend, parent, marker);
+							});
+						} catch (error) {
+							clearFallback();
+							throw error;
+						}
+						rebuildLiveNodes([]);
+						return;
+					}
+					clearFallback();
+					const oldPos = /* @__PURE__ */ new Map();
+					let p = 0;
+					for (const entry of cache.values()) oldPos.set(entry, p++);
+					const newCache = /* @__PURE__ */ new Map();
+					const order = new Array(n);
+					const reused = /* @__PURE__ */ new Set();
+					const created = [];
+					try {
+						for (let i = 0; i < n; i++) {
+							const k = keys[i];
+							const existing = cache.get(k);
+							if (existing) {
+								existing.itemSig.set(items[i]);
+								existing.indexSig.set(i);
+								reused.add(k);
+								newCache.set(k, existing);
+								order[i] = existing;
+							} else {
+								const item = items[i];
+								const captured = i;
+								const entry = createRoot((dispose) => {
+									const itemSig = signal(item);
+									const indexSig = signal(captured);
+									return {
+										nodes: mountNode(region.mapFn(() => itemSig(), () => indexSig()), backend, parent, marker),
+										itemSig,
+										indexSig,
+										dispose
+									};
+								});
+								created.push(entry);
+								newCache.set(k, entry);
+								order[i] = entry;
+							}
+						}
+					} catch (error) {
+						for (const entry of created) disposeEntry(entry);
+						throw error;
+					}
+					for (const [k, entry] of cache) if (!reused.has(k)) disposeEntry(entry);
+					const survivorOldPositions = [];
+					const survivorTargetIndex = [];
+					for (let i = 0; i < n; i++) {
+						const op = oldPos.get(order[i]);
+						if (op !== void 0) {
+							survivorOldPositions.push(op);
+							survivorTargetIndex.push(i);
+						}
+					}
+					const lis = longestIncreasingSubsequence(survivorOldPositions);
+					const stable = /* @__PURE__ */ new Set();
+					for (const idx of lis) stable.add(survivorTargetIndex[idx]);
+					let anchor = marker;
+					for (let i = n - 1; i >= 0; i--) {
+						const entry = order[i];
+						if (!stable.has(i) && entry.nodes.length > 0) {
+							const last = entry.nodes[entry.nodes.length - 1];
+							if (backend.nextSibling(last) !== anchor) for (const node of entry.nodes) backend.insert(parent, node, anchor);
+						}
+						if (entry.nodes.length > 0) anchor = entry.nodes[0];
+					}
+					cache = newCache;
+					rebuildLiveNodes(order);
+				});
+			});
+		});
+		return nodes;
+	}
+
+//#endregion
+//#region ../../../../../packages/renderer/dist/render.js
+/**
+	* Helix reconciler — turns a MindeesNative element tree into host nodes via a
+	* {@link HostBackend}, with **fine-grained reactive bindings**.
+	*
+	* There is no virtual-DOM diff. Instead:
+	* - A dynamic prop (a function value) becomes an `effect` that patches exactly
+	*   that one attribute when its signals change.
+	* - A dynamic child (a function returning nodes) becomes an `effect` that
+	*   replaces exactly that region of the host tree.
+	* - Everything created during render is owned by a reactive scope, so unmounting
+	*   disposes every binding — no leaks.
+	*
+	* This is the Phase 1/2 reactivity paying off: updates are O(what-changed), not
+	* O(tree).
+	*
+	* @module
+	*/
+	function isElementLike(value) {
+		return typeof value === "object" && value !== null && value.$$typeof === ELEMENT_TYPE;
+	}
+	function isEventProp$1(key) {
+		return key.length > 2 && key[0] === "o" && key[1] === "n" && key[2] === (key[2] ?? "").toUpperCase();
+	}
+	function render(a, b, c, d) {
+		const isComponentForm = d !== void 0;
+		const backend = isComponentForm ? c : b;
+		const container = isComponentForm ? d : c;
+		let nodes = [];
+		let dispose;
+		try {
+			createRoot((d) => {
+				dispose = d;
+				nodes = mountNode(isComponentForm ? a(b) : a, backend, container, null);
+			});
+		} catch (err) {
+			dispose?.();
+			throw err;
+		}
+		return {
+			nodes,
+			dispose() {
+				for (const n of nodes) {
+					const parent = backend.parentOf(n);
+					if (parent) backend.remove(parent, n);
+				}
+				dispose();
+			}
+		};
+	}
+	/**
+	* Mount a node into `parent` before `anchor`. Returns the top-level host nodes
+	* created (for fragments / arrays this can be more than one).
+	*/
+	function mountNode(node, backend, parent, anchor) {
+		if (node === null || node === void 0 || typeof node === "boolean") return [];
+		if (isKeyedRegion(node)) return bindKeyedChild(node, backend, parent, anchor);
+		if (isPortal(node)) return bindPortalChild(node, backend, parent, anchor);
+		if (typeof node === "function") return bindReactiveChild(node, backend, parent, anchor);
+		if (typeof node === "string" || typeof node === "number") {
+			const text = backend.createText(String(node));
+			backend.insert(parent, text, anchor);
+			return [text];
+		}
+		if (Array.isArray(node)) {
+			const out = [];
+			for (const child of node) out.push(...mountNode(child, backend, parent, anchor));
+			return out;
+		}
+		if (isElementLike(node)) {
+			const { type } = node;
+			if (typeof type === "function") return mountNode(type({
+				...node.props,
+				children: node.children
+			}), backend, parent, anchor);
+			const el = backend.createElement(type);
+			for (const [key, value] of Object.entries(node.props)) {
+				if (key === "ref") continue;
+				bindProp(backend, el, key, value);
+			}
+			mountChildren(node.children, backend, el);
+			backend.insert(parent, el, anchor);
+			const ref = node.props.ref;
+			if (typeof ref === "function") ref(el);
+			return [el];
+		}
+		return [];
+	}
+	/** Mount a list of children into `parent`, appending in order. */
+	function mountChildren(children, backend, parent) {
+		for (const child of children) mountNode(child, backend, parent, null);
+	}
+	/**
+	* Apply a prop. A function value is a **reactive binding**: an effect re-applies
+	* exactly this attribute when its dependencies change. Event props (`onX`) are
+	* applied once (the handler itself can close over signals).
+	*/
+	function bindProp(backend, el, key, value) {
+		if (key === "children") return;
+		if (isEventProp$1(key)) {
+			backend.setProp(el, key, value, void 0);
+			onCleanup(() => backend.setProp(el, key, void 0, value));
+			return;
+		}
+		if (typeof value === "function") {
+			let prev;
+			effect(() => {
+				const next = value();
+				backend.setProp(el, key, next, prev);
+				prev = next;
+			});
+			return;
+		}
+		backend.setProp(el, key, value, void 0);
+	}
+	/**
+	* Bind a reactive child region: an effect that, when the accessor changes,
+	* unmounts the previous nodes and mounts the new ones at the same position. A
+	* stable text-only fast path patches the text node in place.
+	*
+	* The effect runs synchronously on creation, so `current` is populated before
+	* we return it — letting the caller report the region's initial host nodes.
+	*/
+	function bindReactiveChild(accessor, backend, parent, initialAnchor) {
+		const marker = backend.createText("");
+		backend.insert(parent, marker, initialAnchor);
+		const nodes = [marker];
+		let content = [];
+		onCleanup(() => {
+			for (const n of content) if (backend.parentOf(n)) backend.remove(parent, n);
+			if (backend.parentOf(marker)) backend.remove(parent, marker);
+		});
+		effect(() => {
+			const value = accessor();
+			untrack(() => {
+				if (content.length === 1 && content[0] !== void 0 && backend.isText(content[0]) && (typeof value === "string" || typeof value === "number")) {
+					backend.setText(content[0], String(value));
+					return;
+				}
+				for (const n of content) if (backend.parentOf(n)) backend.remove(parent, n);
+				content = mountNode(value, backend, parent, marker);
+				nodes.length = 0;
+				nodes.push(...content, marker);
+			});
+		});
+		return nodes;
+	}
+
+//#endregion
+//#region ../../../../../packages/renderer/dist/portal.js
+/**
+	* Portal reconciliation — the renderer side of core's {@link PortalRegion}.
+	*
+	* A portal's children render into an **overlay target** (`backend.overlayRoot()`, e.g. a layer on
+	* `document.body`) instead of their position in the tree, so a modal/tooltip escapes parent
+	* clipping and stacking. A marker in the LOGICAL parent pins the portal's slot (siblings stay
+	* ordered); a content marker in the TARGET anchors the relocated content. Reactive ownership is
+	* untouched — `onCleanup` binds to the current owner, not the host parent — so closing/unmounting
+	* tears the overlay content down and (via Atlas) restores focus. With no overlay (headless/SSR),
+	* the target falls back to the local parent: content mounts in place and stays crawlable.
+	*
+	* @module
+	*/
+	/**
+	* Materialize a {@link PortalRegion}: mount its children into the overlay target, return only the
+	* logical-tree slot marker. Must run inside an owner (it does, via `mountNode`) so its cleanup is
+	* scoped — the portaled content is NOT in the returned array, so the owner's cleanup is the only
+	* thing that unmounts it.
+	*/
+	function bindPortalChild(region, backend, parent, initialAnchor) {
+		const target = region.mount ?? backend.overlayRoot?.() ?? parent;
+		const marker = backend.createText("");
+		backend.insert(parent, marker, initialAnchor);
+		const contentMarker = backend.createText("");
+		backend.insert(target, contentMarker, null);
+		let content = [];
+		const removeContent = () => {
+			for (const n of content) {
+				const p = backend.parentOf(n);
+				if (p) backend.remove(p, n);
+			}
+		};
+		onCleanup(() => {
+			removeContent();
+			if (backend.parentOf(contentMarker)) backend.remove(target, contentMarker);
+			if (backend.parentOf(marker)) backend.remove(parent, marker);
+		});
+		effect(() => {
+			const value = region.children();
+			untrack(() => {
+				removeContent();
+				content = mountNode(value, backend, target, contentMarker);
+			});
+		});
+		return [marker];
+	}
+
+//#endregion
 //#region ../../../../../packages/renderer/dist/headless.js
 /** Whether a prop key is an event handler (`onClick`, `onPress`, …). */
-	function isEventProp$1(key) {
+	function isEventProp(key) {
 		return key.length > 2 && key[0] === "o" && key[1] === "n" && key[2] === (key[2] ?? "").toUpperCase();
 	}
 
@@ -1083,6 +1861,7 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			parent: null,
 			children: []
 		};
+		let overlay = null;
 		const pending = [];
 		/** handlerId → handler function. The function never enters the command stream. */
 		const handlers = /* @__PURE__ */ new Map();
@@ -1181,7 +1960,7 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 				return node;
 			},
 			setProp(node, key, value, prev) {
-				if (isEventProp$1(key)) {
+				if (isEventProp(key)) {
 					applyEvent(node, eventNameFor(key), value);
 					return;
 				}
@@ -1236,6 +2015,24 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 					childId: node.id,
 					index
 				});
+				if (parent === root && node !== overlay && overlay !== null && root.children[root.children.length - 1] !== overlay) {
+					const at = root.children.indexOf(overlay);
+					if (at >= 0) {
+						root.children.splice(at, 1);
+						root.children.push(overlay);
+						emit({
+							type: "removeChild",
+							parentId: root.id,
+							childId: overlay.id
+						});
+						emit({
+							type: "insertChild",
+							parentId: root.id,
+							childId: overlay.id,
+							index: root.children.length - 1
+						});
+					}
+				}
 			},
 			remove(parent, node) {
 				const at = parent.children.indexOf(node);
@@ -1260,6 +2057,37 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			isText(node) {
 				return node.kind === "text";
 			},
+			overlayRoot() {
+				if (overlay) return overlay;
+				const node = {
+					id: nextId(),
+					kind: "element",
+					tag: "overlay",
+					text: "",
+					parent: root,
+					children: []
+				};
+				emit({
+					type: "createNode",
+					id: node.id,
+					tag: "overlay"
+				});
+				emit({
+					type: "setProp",
+					id: node.id,
+					name: "data-mindees-overlay",
+					value: "true"
+				});
+				root.children.push(node);
+				emit({
+					type: "insertChild",
+					parentId: root.id,
+					childId: node.id,
+					index: root.children.length - 1
+				});
+				overlay = node;
+				return overlay;
+			},
 			getCommands() {
 				return pending.slice();
 			},
@@ -1282,153 +2110,43 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	}
 
 //#endregion
-//#region ../../../../../packages/renderer/dist/render.js
+//#region ../../../../../packages/renderer/dist/native-app.js
 /**
-	* Helix reconciler — turns a MindeesNative element tree into host nodes via a
-	* {@link HostBackend}, with **fine-grained reactive bindings**.
+	* `createNativeApp` — the one-call entry point for a MindeesNative app on an embedded
+	* native host. It hides the wiring an app author should never have to write: creating
+	* the {@link createNativeCommandBackend}, rendering the root, flushing the command
+	* batch to the host, and exposing the start/dispatch/frame contract the host calls.
 	*
-	* There is no virtual-DOM diff. Instead:
-	* - A dynamic prop (a function value) becomes an `effect` that patches exactly
-	*   that one attribute when its signals change.
-	* - A dynamic child (a function returning nodes) becomes an `effect` that
-	*   replaces exactly that region of the host tree.
-	* - Everything created during render is owned by a reactive scope, so unmounting
-	*   disposes every binding — no leaks.
+	* ```tsx
+	* import { createNativeApp } from '@mindees/renderer'
+	* import { App } from './App'
 	*
-	* This is the Phase 1/2 reactivity paying off: updates are O(what-changed), not
-	* O(tree).
+	* createNativeApp(<App />)
+	* ```
+	*
+	* That's the whole entry file. The native host (see `examples/native-hosts/`) injects a
+	* `MindeesHost.emit(json)` global and calls `MindeesApp.start()` once, then
+	* `MindeesApp.dispatchEvent(handlerId)` per native event — both of which this wires.
+	*
+	* On a host it also makes animations + concurrency **work by default**: it installs a
+	* reactive {@link Scheduler} (so `startTransition`/`deferred`/normal-lane effects run) and a
+	* vsync-driven {@link FrameSource} (so `timing`/`spring`/gesture animations advance). The host
+	* drives frames by calling `MindeesApp.frameTick(nowMs)` each vsync, and the engine signals when
+	* to start/stop that loop through a `MindeesHostFrame.setFrameLoopActive(boolean)` global — so the
+	* vsync loop runs **only while something is animating** (battery-friendly), tied to the animation
+	* engine's own arm/sleep. With no host (SSR / Node / tests) nothing is installed and animations
+	* jump straight to their final value, exactly as before.
 	*
 	* @module
 	*/
-	function isElementLike(value) {
-		return typeof value === "object" && value !== null && value.$$typeof === ELEMENT_TYPE;
-	}
-	function isEventProp(key) {
-		return key.length > 2 && key[0] === "o" && key[1] === "n" && key[2] === (key[2] ?? "").toUpperCase();
-	}
-	function render(a, b, c, d) {
-		const isComponentForm = d !== void 0;
-		const backend = isComponentForm ? c : b;
-		const container = isComponentForm ? d : c;
-		let nodes = [];
-		let dispose;
-		try {
-			createRoot((d) => {
-				dispose = d;
-				nodes = mountNode(isComponentForm ? a(b) : a, backend, container, null);
-			});
-		} catch (err) {
-			dispose?.();
-			throw err;
-		}
-		return {
-			nodes,
-			dispose() {
-				for (const n of nodes) {
-					const parent = backend.parentOf(n);
-					if (parent) backend.remove(parent, n);
-				}
-				dispose();
-			}
-		};
-	}
-	/**
-	* Mount a node into `parent` before `anchor`. Returns the top-level host nodes
-	* created (for fragments / arrays this can be more than one).
-	*/
-	function mountNode(node, backend, parent, anchor) {
-		if (node === null || node === void 0 || typeof node === "boolean") return [];
-		if (typeof node === "function") return bindReactiveChild(node, backend, parent, anchor);
-		if (typeof node === "string" || typeof node === "number") {
-			const text = backend.createText(String(node));
-			backend.insert(parent, text, anchor);
-			return [text];
-		}
-		if (Array.isArray(node)) {
-			const out = [];
-			for (const child of node) out.push(...mountNode(child, backend, parent, anchor));
-			return out;
-		}
-		if (isElementLike(node)) {
-			const { type } = node;
-			if (typeof type === "function") return mountNode(type({
-				...node.props,
-				children: node.children
-			}), backend, parent, anchor);
-			const el = backend.createElement(type);
-			for (const [key, value] of Object.entries(node.props)) bindProp(backend, el, key, value);
-			mountChildren(node.children, backend, el);
-			backend.insert(parent, el, anchor);
-			return [el];
-		}
-		return [];
-	}
-	/** Mount a list of children into `parent`, appending in order. */
-	function mountChildren(children, backend, parent) {
-		for (const child of children) mountNode(child, backend, parent, null);
-	}
-	/**
-	* Apply a prop. A function value is a **reactive binding**: an effect re-applies
-	* exactly this attribute when its dependencies change. Event props (`onX`) are
-	* applied once (the handler itself can close over signals).
-	*/
-	function bindProp(backend, el, key, value) {
-		if (key === "children") return;
-		if (isEventProp(key)) {
-			backend.setProp(el, key, value, void 0);
-			onCleanup(() => backend.setProp(el, key, void 0, value));
-			return;
-		}
-		if (typeof value === "function") {
-			let prev;
-			effect(() => {
-				const next = value();
-				backend.setProp(el, key, next, prev);
-				prev = next;
-			});
-			return;
-		}
-		backend.setProp(el, key, value, void 0);
-	}
-	/**
-	* Bind a reactive child region: an effect that, when the accessor changes,
-	* unmounts the previous nodes and mounts the new ones at the same position. A
-	* stable text-only fast path patches the text node in place.
-	*
-	* The effect runs synchronously on creation, so `current` is populated before
-	* we return it — letting the caller report the region's initial host nodes.
-	*/
-	function bindReactiveChild(accessor, backend, parent, initialAnchor) {
-		const marker = backend.createText("");
-		backend.insert(parent, marker, initialAnchor);
-		const nodes = [marker];
-		let content = [];
-		onCleanup(() => {
-			for (const n of content) if (backend.parentOf(n)) backend.remove(parent, n);
-			if (backend.parentOf(marker)) backend.remove(parent, marker);
-		});
-		effect(() => {
-			const value = accessor();
-			untrack(() => {
-				if (content.length === 1 && content[0] !== void 0 && backend.isText(content[0]) && (typeof value === "string" || typeof value === "number")) {
-					backend.setText(content[0], String(value));
-					return;
-				}
-				for (const n of content) if (backend.parentOf(n)) backend.remove(parent, n);
-				content = mountNode(value, backend, parent, marker);
-				nodes.length = 0;
-				nodes.push(...content, marker);
-			});
-		});
-		return nodes;
-	}
-
-//#endregion
-//#region ../../../../../packages/renderer/dist/native-app.js
+	let enginesWired = false;
 	function defaultEmit(json) {
 		const host = globalThis.MindeesHost;
 		if (!host || typeof host.emit !== "function") throw new Error("createNativeApp: no `emit` was provided and globalThis.MindeesHost.emit is unavailable");
 		host.emit(json);
+	}
+	function hostIsPresent() {
+		return typeof globalThis.MindeesHost?.emit === "function";
 	}
 	/**
 	* Wire a root node to a native command host. Returns the {@link NativeApp} handle and
@@ -1441,6 +2159,51 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			const batch = backend.flushCommands();
 			if (batch.length > 0) emit(JSON.stringify(batch));
 		};
+		const expose = options.expose ?? true;
+		const wireEngines = options.wireEngines ?? (expose !== false && hostIsPresent());
+		let storedTick = null;
+		if (wireEngines) {
+			if (enginesWired) throw new Error("createNativeApp: the reactive engines are already wired by another app instance. Create one app per runtime, or pass `wireEngines: false` (and wire the scheduler/frame source yourself).");
+			enginesWired = true;
+			if (options.scheduler !== false) {
+				let flushQueued = false;
+				const trailingFlush = () => {
+					if (flushQueued) return;
+					flushQueued = true;
+					queueMicrotask(() => {
+						flushQueued = false;
+						flush();
+					});
+				};
+				setReactiveScheduler(createScheduler({
+					scheduleMicrotask: (cb) => queueMicrotask(() => {
+						cb();
+						trailingFlush();
+					}),
+					onError: (error) => {
+						queueMicrotask(() => {
+							throw error;
+						});
+					}
+				}));
+			}
+			const hostFrame = globalThis.MindeesHostFrame;
+			if (hostFrame) {
+				const frameSource = (tick) => {
+					storedTick = tick;
+					try {
+						hostFrame.setFrameLoopActive?.(true);
+					} catch {}
+					return () => {
+						storedTick = null;
+						try {
+							hostFrame.setFrameLoopActive?.(false);
+						} catch {}
+					};
+				};
+				setFrameSource(frameSource);
+			}
+		}
 		const app = {
 			start() {
 				render(root, backend, backend.root);
@@ -1450,9 +2213,12 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 				const handled = backend.dispatchEvent(handlerId, event);
 				flush();
 				return handled;
+			},
+			frameTick(nowMs) {
+				if (storedTick) storedTick(nowMs);
+				flush();
 			}
 		};
-		const expose = options.expose ?? true;
 		if (expose !== false) {
 			const name = typeof expose === "string" ? expose : "MindeesApp";
 			globalThis[name] = app;
@@ -1853,6 +2619,14 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	function getActiveRouter() {
 		return active;
 	}
+	/**
+	* Clear the active router IF it is `router` (called by `dispose()`), so a disposed router
+	* no longer leaks through `useRouter()`/`<Link>`. Guarded by identity so disposing an old
+	* router doesn't clobber a newer active one.
+	*/
+	function clearActiveRouter(router) {
+		if (active === router) active = null;
+	}
 
 //#endregion
 //#region ../../../../../packages/router/dist/data.js
@@ -2046,9 +2820,36 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		}
 		return out;
 	}
-	/** Flatten + sort a route tree most-specific first (static > dynamic > catch-all). */
+	/** Dev-only warning (silent in production). */
+	function warnDev(message) {
+		const g = globalThis;
+		if (g.process?.env?.NODE_ENV === "production") return;
+		g.console?.warn?.(`[router] ${message}`);
+	}
+	/** Shallow record equality — params/search only "change" when an entry actually changes. */
+	function shallowEqualRecord(a, b) {
+		if (a === b) return true;
+		const ak = Object.keys(a);
+		if (ak.length !== Object.keys(b).length) return false;
+		for (const k of ak) if (a[k] !== b[k]) return false;
+		return true;
+	}
+	/**
+	* Flatten + sort a route tree most-specific first (static > dynamic > catch-all). Routes whose
+	* synthesized pattern is invalid (a catch-all parent with children would place a catch-all
+	* segment before a literal one) are dropped with a dev warning rather than thrown — one bad
+	* route must not poison all router state.
+	*/
 	function compileRoutes(routes) {
-		return flattenRouteTree(routes, "", []).sort((a, b) => compareSpecificity(a.fullPath, b.fullPath));
+		return flattenRouteTree(routes, "", []).filter((fr) => {
+			try {
+				parsePattern(fr.fullPath);
+				return true;
+			} catch (error) {
+				warnDev(`ignoring invalid route pattern ${fr.fullPath}: ${error.message}`);
+				return false;
+			}
+		}).sort((a, b) => compareSpecificity(a.fullPath, b.fullPath));
 	}
 	/**
 	* Match a location against the compiled route table, returning the matched chain
@@ -2141,6 +2942,8 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 		let flatMemo;
 		let locationSig;
 		let stateMemo;
+		let paramsMemo;
+		let searchMemo;
 		let loaders;
 		const dispose = createRoot((disposeRoot) => {
 			routesSig = signal(options.routes, { equals: false });
@@ -2160,6 +2963,8 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 					search: leaf ? leaf.search : EMPTY_SEARCH
 				};
 			});
+			paramsMemo = computed(() => stateMemo().params, { equals: shallowEqualRecord });
+			searchMemo = computed(() => stateMemo().search, { equals: shallowEqualRecord });
 			const dataVersion = signal(0, { equals: false });
 			loaders = createLoaderManager({
 				location: () => locationSig(),
@@ -2214,8 +3019,8 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			location: () => locationSig(),
 			matches: () => stateMemo().matches,
 			match: () => stateMemo().match,
-			params: () => stateMemo().params,
-			search: () => stateMemo().search,
+			params: () => paramsMemo(),
+			search: () => searchMemo(),
 			select: (selector, equals = Object.is) => computed(() => selector(stateMemo()), { equals }),
 			navigate,
 			loaderData: (match) => loaders.read(match),
@@ -2224,7 +3029,10 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 			setRoutes: (routes) => routesSig.set(routes),
 			routes: () => routesSig(),
 			history,
-			dispose
+			dispose: () => {
+				dispose();
+				clearActiveRouter(router);
+			}
 		};
 		setActiveRouter(router);
 		return router;
@@ -2538,6 +3346,8 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 	var app_exports = /* @__PURE__ */ __exportAll({ default: () => Home });
 	/** Module-scoped state survives navigation. */
 	const done = signal(0);
+	/** An animated bar width — springs on press, driven by vsync on a native host (see FrameDriver). */
+	const barWidth = animate(48);
 	function Home() {
 		const router = useRouter();
 		const theme = useTheme();
@@ -2595,6 +3405,24 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'f
 							color: theme().color.text
 						})
 					})]
+				}),
+				/* @__PURE__ */ jsx(View, {
+					testID: "pulse-bar",
+					style: () => ({
+						width: barWidth(),
+						height: 8,
+						borderRadius: 4,
+						backgroundColor: theme().color.primary
+					})
+				}),
+				/* @__PURE__ */ jsx(Button, {
+					title: "Animate ✨",
+					onPress: () => spring(barWidth, { to: barWidth() > 160 ? 48 : 240 }),
+					style: () => ({
+						...buttonShape,
+						backgroundColor: theme().color.surfaceVariant,
+						color: theme().color.text
+					})
 				}),
 				/* @__PURE__ */ jsx(Text, {
 					style: () => ({

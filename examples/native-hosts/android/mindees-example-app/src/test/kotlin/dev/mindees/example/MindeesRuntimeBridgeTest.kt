@@ -47,6 +47,33 @@ class MindeesRuntimeBridgeTest {
     }
 
     @Test
+    fun frameTickRoundTripsToRuntime() {
+        val runtime = RecordingRuntime()
+        val renderer = ModelRenderer()
+        val root = renderer.makeElement("root")
+        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val bridge = MindeesRuntimeBridge(host, runtime)
+
+        bridge.start()
+        bridge.frameTick(16.0)
+        bridge.frameTick(32.0)
+
+        assertEquals(listOf(16.0, 32.0), runtime.frameTicks)
+    }
+
+    @Test
+    fun frameTickBeforeStartIsIgnored() {
+        val runtime = RecordingRuntime()
+        val renderer = ModelRenderer()
+        val root = renderer.makeElement("root")
+        val host = MindeesNativeHost("host-root", root, renderer) {}
+        val bridge = MindeesRuntimeBridge(host, runtime)
+
+        bridge.frameTick(16.0) // not started yet → no-op, no throw
+        assertEquals(emptyList<Double>(), runtime.frameTicks)
+    }
+
+    @Test
     fun rejectsDispatchBeforeStart() {
         val runtime = RecordingRuntime()
         val renderer = ModelRenderer()
@@ -101,6 +128,7 @@ class MindeesRuntimeBridgeTest {
 
     private class RecordingRuntime : MindeesScriptRuntime {
         val dispatched = mutableListOf<String>()
+        val frameTicks = mutableListOf<Double>()
         private var sink: NativeCommandSink? = null
 
         override fun start(sink: NativeCommandSink) {
@@ -139,6 +167,10 @@ class MindeesRuntimeBridgeTest {
             }
         }
 
+        override fun frameTick(nowMs: Double) {
+            frameTicks.add(nowMs)
+        }
+
         override fun close() {
             sink = null
         }
@@ -155,6 +187,8 @@ class MindeesRuntimeBridgeTest {
             throw AssertionError("dispatchEvent should not be called after failed startup")
         }
 
+        override fun frameTick(nowMs: Double) = Unit
+
         override fun close() {
             closeCount += 1
         }
@@ -168,6 +202,8 @@ class MindeesRuntimeBridgeTest {
         override fun dispatchEvent(handlerId: String) {
             throw AssertionError("dispatchEvent should not be called after failed close")
         }
+
+        override fun frameTick(nowMs: Double) = Unit
 
         override fun close() {
             closeCount += 1
