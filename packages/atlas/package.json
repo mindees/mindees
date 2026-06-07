@@ -1,6 +1,6 @@
 {
   "name": "@mindees/atlas",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "MindeesNative Atlas - accessible, signals-native UI primitives + a virtualized recycling list. Renderer-agnostic (web real, native research track).",
   "license": "MIT OR Apache-2.0",
   "type": "module",

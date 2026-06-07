@@ -1,5 +1,11 @@
 # @mindees/example-data-sync-server
 
+## 0.16.0
+
+### Patch Changes
+
+- @mindees/data@0.16.0
+
 ## 0.15.0
 
 ### Patch Changes

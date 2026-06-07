@@ -1,5 +1,19 @@
 # @mindees/atlas
 
+## 0.16.0
+
+### Minor Changes
+
+- 7ce23b5: Add **`ErrorBoundary`** — catch errors thrown while rendering a subtree and show a `fallback(error, reset)`
+  instead of failing the whole app (RN/React's `<ErrorBoundary>`, signals-native). `reset()` retries; a
+  tracked signal read before the throw also re-runs the boundary when it changes. Catches synchronous
+  render-time errors.
+
+### Patch Changes
+
+- @mindees/core@0.16.0
+- @mindees/router@0.16.0
+
 ## 0.15.0
 
 ### Minor Changes
