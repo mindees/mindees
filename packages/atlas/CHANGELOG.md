@@ -1,5 +1,13 @@
 # @mindees/atlas
 
+## 0.22.3
+
+### Patch Changes
+
+- Updated dependencies [7a7d7b7]
+  - @mindees/router@0.22.3
+  - @mindees/core@0.22.3
+
 ## 0.22.2
 
 ### Patch Changes
