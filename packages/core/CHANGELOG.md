@@ -1,5 +1,7 @@
 # @mindees/core
 
+## 0.20.0
+
 ## 0.19.0
 
 ### Minor Changes
