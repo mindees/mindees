@@ -331,17 +331,27 @@ function shallowEqualRecord(a: Record<string, unknown>, b: Record<string, unknow
  * route must not poison all router state.
  */
 function compileRoutes(routes: readonly RouteRecord[]): FlatRoute[] {
-  return flattenRouteTree(routes, '', [])
-    .filter((fr) => {
-      try {
-        parsePattern(fr.fullPath)
-        return true
-      } catch (error) {
-        warnDev(`ignoring invalid route pattern ${fr.fullPath}: ${(error as Error).message}`)
-        return false
-      }
-    })
-    .sort((a, b) => compareSpecificity(a.fullPath, b.fullPath))
+  const valid = flattenRouteTree(routes, '', []).filter((fr) => {
+    try {
+      parsePattern(fr.fullPath)
+      return true
+    } catch (error) {
+      warnDev(`ignoring invalid route pattern ${fr.fullPath}: ${(error as Error).message}`)
+      return false
+    }
+  })
+  // Warn on duplicate effective paths: matchLocation returns the FIRST match and the sort is stable,
+  // so a second route at the same fullPath (e.g. `users.tsx` + `users/index.tsx`, or two `(group)`
+  // indexes) is permanently unreachable — surface it instead of silently dropping it.
+  const seen = new Set<string>()
+  for (const fr of valid) {
+    if (seen.has(fr.fullPath)) {
+      warnDev(`duplicate route path "${fr.fullPath || '/'}" — only the first match is reachable`)
+    } else {
+      seen.add(fr.fullPath)
+    }
+  }
+  return valid.sort((a, b) => compareSpecificity(a.fullPath, b.fullPath))
 }
 
 /**

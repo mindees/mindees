@@ -330,4 +330,18 @@ describe('resolvePath', () => {
     expect(resolvePath('../', '/posts/1')).toBe('/posts')
     expect(resolvePath('../../x', '/a/b/c')).toBe('/a/x')
   })
+
+  it('warns on duplicate route paths (only the first is reachable)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const r = createRouter({
+        routes: [{ path: '/dup' }, { path: '/dup' }],
+        history: createMemoryHistory({ initialEntries: ['/dup'] }),
+      })
+      expect(warn.mock.calls.some((c) => String(c[0]).includes('duplicate route path'))).toBe(true)
+      r.dispose()
+    } finally {
+      warn.mockRestore()
+    }
+  })
 })

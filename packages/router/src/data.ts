@@ -11,6 +11,7 @@
  * @module
  */
 
+import { RouterError } from './errors'
 import type { RouterLocation } from './history'
 import type { RouteMatch, RouteRecord } from './router'
 
@@ -152,6 +153,20 @@ export function createLoaderManager(options: LoaderManagerOptions): LoaderManage
     const route = match.route
     const loader = route.loader
     if (!loader) return
+
+    // If THIS route declared a `searchSchema` and the URL's search FAILED to validate, never run its
+    // loader on the raw, unvalidated (attacker-controlled) search — `LoaderContext.search` is the
+    // "validated" value by contract. Surface the validation error deterministically instead. (`issues`
+    // ride on every chain match, so gate on `route.searchSchema` to skip only schema-declaring routes.)
+    if (route.searchSchema && match.issues && match.issues.length > 0) {
+      setEntry(route, innerKey(route, match), {
+        status: 'error',
+        error: new RouterError('VALIDATE_SEARCH', 'Search params failed validation', match.issues),
+        loadedAt: now(),
+      })
+      options.onChange()
+      return
+    }
 
     const key = innerKey(route, match)
     const gkey = `${idOf(route)}:${key}`

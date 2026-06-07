@@ -235,4 +235,16 @@ describe('gesture hardening (adversarial findings)', () => {
     g.handlers.onPointerMove(ev(2, 260, 200, 48))
     expect(g.state.active()).toBe(true)
   })
+
+  it('resets translation/velocity/position state on release (no stuck offset)', () => {
+    const g = pan({})
+    g.handlers.onPointerDown(ev(1, 0, 0, 0))
+    g.handlers.onPointerMove(ev(1, 50, 30, 16))
+    expect(g.state.translationX()).toBe(50) // mid-drag
+    g.handlers.onPointerUp(ev(1, 50, 30, 32))
+    expect(g.state.translationX()).toBe(0) // snapped to rest on the final up
+    expect(g.state.translationY()).toBe(0)
+    expect(g.state.x()).toBe(0)
+    expect(g.state.active()).toBe(false)
+  })
 })

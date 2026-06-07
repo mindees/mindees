@@ -215,4 +215,11 @@ describe('perf-lint — For/List row callback-param accessors (003/004)', () => 
       expect(codes(src)).not.toContain('MDC_PERF_008')
     })
   })
+
+  it('a trailing mdc-perf-ignore does not bleed onto the next line finding', () => {
+    const src = `const a = (xs: number[]) => <view>{xs.map((x) => <text>{x}</text>)}</view> // mdc-perf-ignore
+const b = (xs: number[]) => <view>{xs.map((x) => <text>{x}</text>)}</view>`
+    const found = perfLint(src, 'm.tsx', {}).filter((d) => d.code === 'MDC_PERF_001')
+    expect(found.length).toBe(1) // line 1 suppressed (trailing), line 2 still flagged — no bleed
+  })
 })
