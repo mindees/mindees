@@ -150,6 +150,22 @@ describe('swipe', () => {
     expect(onSwipe).toHaveBeenCalledTimes(1)
     expect(onSwipe.mock.calls[0]?.[0].direction).toBe('right')
   })
+
+  it('reports direction consistent with the release velocity on a reversing flick', () => {
+    const onSwipe = vi.fn()
+    const g = swipe({ onSwipe })
+    g.handlers.onPointerDown(ev(1, 0, 0, 0))
+    g.handlers.onPointerMove(ev(1, 200, 0, 300)) // drift far right → net displacement is rightward
+    g.handlers.onPointerMove(ev(1, 190, 0, 308)) // then flick back LEFT, fast
+    g.handlers.onPointerMove(ev(1, 150, 0, 316))
+    g.handlers.onPointerMove(ev(1, 110, 0, 324))
+    g.handlers.onPointerMove(ev(1, 70, 0, 332))
+    g.handlers.onPointerUp(ev(1, 60, 0, 340))
+    expect(onSwipe).toHaveBeenCalledTimes(1)
+    const e = onSwipe.mock.calls[0]?.[0]
+    expect(e.velocityX).toBeLessThan(0) // flung left at release
+    expect(e.direction).toBe('left') // agrees with velocity (net displacement was right → was 'right' before)
+  })
 })
 
 describe('composeGestures', () => {

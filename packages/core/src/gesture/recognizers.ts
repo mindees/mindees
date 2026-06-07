@@ -564,10 +564,17 @@ export function swipe(config: {
     active$.set(false)
   }
   const dominant = (p: Tracked): SwipeDirection => {
-    const dx = p.x - p.startX
-    const dy = p.y - p.startY
-    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left'
-    return dy >= 0 ? 'down' : 'up'
+    // Direction from RELEASE VELOCITY (the flick intent) so it always agrees with the sign of the
+    // reported velocityX/velocityY — a reversing flick (drag one way, fling back) reports the way it was
+    // flung, not net travel. Fall back to net displacement only when release velocity is exactly zero.
+    let ax = p.vx
+    let ay = p.vy
+    if (ax === 0 && ay === 0) {
+      ax = p.x - p.startX
+      ay = p.y - p.startY
+    }
+    if (Math.abs(ax) >= Math.abs(ay)) return ax >= 0 ? 'right' : 'left'
+    return ay >= 0 ? 'down' : 'up'
   }
   return {
     state: { active: () => active$() },
