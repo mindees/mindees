@@ -1,4 +1,4 @@
-import { createElement as h, signal } from '@mindees/core'
+import { createElement as h, keyedRegion, signal } from '@mindees/core'
 import { describe, expect, it } from 'vitest'
 import { createCanvas2DBackend, type Scene2DContext } from './canvas'
 import { render } from './render'
@@ -111,5 +111,30 @@ describe('createCanvas2DBackend', () => {
     expect(calls.some((c) => c.includes('fill=b'))).toBe(true)
     expect(calls).toContain('save') // opacity wrapped in save/restore
     expect(calls).toContain('restore')
+  })
+
+  it('reordering a keyed list moves nodes (no duplicate in the scene graph)', () => {
+    const backend = createCanvas2DBackend()
+    const items = signal([
+      { id: 1, c: 'red' },
+      { id: 2, c: 'blue' },
+    ])
+    render(
+      keyedRegion<{ id: number; c: string }>({
+        each: () => items(),
+        key: (it) => it.id,
+        children: (it) => h('canvas-rect', { x: 0, y: 0, width: 1, height: 1, fill: it().c }),
+      }),
+      backend,
+      backend.root,
+    )
+    items.set([
+      { id: 2, c: 'blue' },
+      { id: 1, c: 'red' },
+    ]) // reverse → the surviving nodes MOVE, not rebuild
+    const { ctx, calls } = mockCtx()
+    backend.paint(ctx, 10, 10)
+    const fills = calls.filter((c) => c.startsWith('fillRect('))
+    expect(fills.length).toBe(2) // exactly two rects — not three (moved node duplicated by a non-move insert)
   })
 })

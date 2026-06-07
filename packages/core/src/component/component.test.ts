@@ -36,6 +36,11 @@ describe('createElement', () => {
     expect(el.children).toEqual(['kept'])
   })
 
+  it('uses an array children prop as-is (no double-wrap)', () => {
+    const el = h('view', { children: ['a', 'b'] })
+    expect(el.children).toEqual(['a', 'b']) // not [['a', 'b']]
+  })
+
   it('accepts a component function as type and Fragment', () => {
     const Comp: Component<{ n: number }> = (p) => h('text', null, String(p.n))
     const el = h(Comp as unknown as string, { n: 1 } as Record<string, unknown>)

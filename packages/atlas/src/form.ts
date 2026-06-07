@@ -107,6 +107,9 @@ export function useForm<T extends object>(options: UseFormOptions<T>): FormApi<T
   })
 
   const handleSubmit = async (): Promise<void> => {
+    // Guard against double submission (double-tap, or a re-entrant call before a slow onSubmit
+    // settles) — the documented `isSubmitting` state now actually prevents a second concurrent submit.
+    if (untrack(submitting)) return
     // mark every field touched so all errors show
     const allTouched: Partial<Record<keyof T, boolean>> = {}
     for (const k of Object.keys(untrack(values)) as (keyof T)[]) allTouched[k] = true
@@ -131,7 +134,9 @@ export function useForm<T extends object>(options: UseFormOptions<T>): FormApi<T
   return {
     values: () => values(),
     errors: () => errors(),
-    isValid: () => Object.keys(errors()).length === 0,
+    // Derive validity from the schema against CURRENT values (reactive), not the last-written `errors`
+    // signal — so a fresh form with invalid initialValues reports invalid before any validate() runs.
+    isValid: () => Object.keys(computeErrors(values())).length === 0,
     isSubmitting: () => submitting(),
     field,
     setValue,

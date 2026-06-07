@@ -113,4 +113,29 @@ describe('useForm', () => {
     })
     expect(() => form.validate()).toThrow(/async/)
   })
+
+  it('does not double-submit when a submit is already in flight', async () => {
+    let release: (() => void) | undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          release = r
+        }),
+    )
+    const form = useForm<Values>({ initialValues: { name: 'Ada', age: 36 }, onSubmit })
+    const p1 = form.handleSubmit() // in flight (onSubmit unresolved)
+    const p2 = form.handleSubmit() // re-entrant → must be ignored
+    release?.()
+    await Promise.all([p1, p2])
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('isValid() reflects invalid initialValues before any validate() runs', () => {
+    const form = useForm<Values>({
+      initialValues: { name: '', age: -1 },
+      schema,
+      onSubmit: vi.fn(),
+    })
+    expect(form.isValid()).toBe(false) // schema-derived, not the stale empty errors map
+  })
 })

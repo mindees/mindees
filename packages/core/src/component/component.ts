@@ -180,9 +180,17 @@ export function createElement(
   ...children: MindeesNode[]
 ): MindeesElement {
   const { key = null, children: propsChildren, ...rest } = props ?? {}
-  // Children passed as args win over a `children` prop; otherwise fall back to it.
+  // Children passed as args win over a `children` prop; otherwise fall back to it. An array `children`
+  // prop is used as-is (not re-wrapped), so `element.children` has one consistent shape regardless of
+  // how children were supplied — matching the JSX runtime's array-spreading normalization.
   const resolved: MindeesNode[] =
-    children.length > 0 ? children : propsChildren !== undefined ? [propsChildren] : []
+    children.length > 0
+      ? children
+      : propsChildren === undefined
+        ? []
+        : Array.isArray(propsChildren)
+          ? propsChildren
+          : [propsChildren]
   return {
     $$typeof: ELEMENT_TYPE,
     type: type as ElementType,

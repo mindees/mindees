@@ -342,4 +342,35 @@ describe('sync — convergence + migration hardening', () => {
     await a.sync(signal)
     expect(a.pending()).toHaveLength(0)
   })
+
+  it('a per-field set newer than a migrated whole-value supersedes it (no masked write)', () => {
+    const log = createMutationLog<Record<string, unknown>>([
+      ['r1', { stamp: hlc2(5), op: 'set', value: 'hello' }], // legacy primitive whole-value
+      ['r2', { stamp: hlc2(5), op: 'set', value: [1, 2, 3] }], // legacy array whole-value
+    ] as never)
+    log.apply(setOp(1, 6, 'r1', { name: 'X' })) // strictly newer per-field
+    log.apply(setOp(2, 6, 'r2', { name: 'Y' }))
+    expect(log.get('r1')).toEqual({ name: 'X' }) // newer write wins (was masked as 'hello')
+    expect(log.get('r2')).toEqual({ name: 'Y' }) // (was masked as [1,2,3])
+  })
+
+  it('a migrated whole-value still wins over an OLDER per-field set', () => {
+    const log = createMutationLog<Record<string, unknown>>([
+      ['r1', { stamp: hlc2(5), op: 'set', value: 'hello' }],
+    ] as never)
+    log.apply(setOp(1, 3, 'r1', { name: 'X' })) // older than the whole-value → shadowed by it
+    expect(log.get('r1')).toBe('hello')
+  })
+
+  it('a migrated replica and a fresh replica converge on the same newer op', () => {
+    const migrated = createMutationLog<Record<string, unknown>>([
+      ['r1', { stamp: hlc2(5), op: 'set', value: 'hello' }],
+    ] as never)
+    const fresh = createMutationLog<Record<string, unknown>>()
+    const op = setOp(1, 6, 'r1', { name: 'X' }) // strictly newer than the migrated whole-value
+    migrated.apply(op)
+    fresh.apply(op)
+    expect(migrated.get('r1')).toEqual(fresh.get('r1')) // CvRDT convergence holds
+    expect(migrated.get('r1')).toEqual({ name: 'X' })
+  })
 })

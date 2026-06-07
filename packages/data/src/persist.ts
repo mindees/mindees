@@ -196,7 +196,7 @@ export function createIndexedDbPersistence(options: IndexedDbPersistenceOptions 
   let dbPromise: Promise<IdbDatabaseLike> | undefined
   const openDb = (): Promise<IdbDatabaseLike> => {
     if (!dbPromise) {
-      dbPromise = new Promise<IdbDatabaseLike>((resolve, reject) => {
+      const pending = new Promise<IdbDatabaseLike>((resolve, reject) => {
         const request = factory.open(dbName, 1)
         request.onupgradeneeded = () => {
           const db = request.result
@@ -205,6 +205,13 @@ export function createIndexedDbPersistence(options: IndexedDbPersistenceOptions 
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'))
       })
+      // Never memoize a REJECTED open — a transient failure (blocked upgrade, a concurrent-tab version
+      // change, a one-off InvalidStateError) must not brick the handle for the whole session. Clear the
+      // cache so the next load/save retries `factory.open`; guard against clobbering a newer attempt.
+      pending.catch(() => {
+        if (dbPromise === pending) dbPromise = undefined
+      })
+      dbPromise = pending
     }
     return dbPromise
   }

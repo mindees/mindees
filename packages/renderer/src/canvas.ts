@@ -167,6 +167,14 @@ export function createCanvas2DBackend(options: { onDirty?: () => void } = {}): C
       markDirty()
     },
     insert(parent, node, anchor) {
+      // Move-semantics (matches the headless/native/DOM backends): if the node is already mounted,
+      // detach it from its old parent FIRST so a keyed-list reorder MOVES it rather than duplicating
+      // it in the scene graph. The anchor index is read AFTER the detach (it can shift on removal).
+      if (node.parent) {
+        const prev = node.parent.children
+        const at = prev.indexOf(node)
+        if (at >= 0) prev.splice(at, 1)
+      }
       node.parent = parent
       const idx = anchor ? parent.children.indexOf(anchor) : -1
       if (idx >= 0) parent.children.splice(idx, 0, node)
