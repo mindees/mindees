@@ -1,5 +1,26 @@
 # @mindees/cli
 
+## 0.21.0
+
+### Minor Changes
+
+- 8f37cf4: The `android` template now derives a unique Android `applicationId` (`com.example.<app>`) and Gradle
+  `rootProject.name` from the app name, so two scaffolded MindeesNative Android apps install side-by-side
+  on a device (the compile `namespace` stays `dev.mindees.example` — Android keys install identity on
+  `applicationId`). Closes the documented namespace limitation.
+
+### Patch Changes
+
+- e6d3fd0: The `mindees create` / `create-mindees` next-steps hint is now template-aware: the `android` template
+  prints its real two-phase native build flow (build the app-js bundle, then `gradle assembleDebug`)
+  instead of the web-only `pnpm install && mindees dev`.
+- 63a15d9: Regenerate the `android` template's vendored module so its scaffolded `app-js` pins `@mindees/*` to the
+  current release, and run `gen:android-template` as part of `version-packages` so the pin tracks every
+  future version bump automatically (the drift guard was catching the post-0.20.0 lag).
+  - @mindees/ai@0.21.0
+  - @mindees/compiler@0.21.0
+  - @mindees/core@0.21.0
+
 ## 0.20.0
 
 ### Minor Changes
