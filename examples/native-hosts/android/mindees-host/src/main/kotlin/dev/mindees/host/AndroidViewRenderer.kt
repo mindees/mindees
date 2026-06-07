@@ -44,11 +44,27 @@ import com.google.android.flexbox.FlexDirection
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.flexbox.JustifyContent
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+
+/** Loads bytes for a remote image `url`, invoking `onResult` with the bytes (or null on failure). */
+typealias ImageLoader = (url: String, onResult: (ByteArray?) -> Unit) -> Unit
 
 /** Builds Android views from the command stream. Pair with [MindeesNativeHost]. */
-class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
+class AndroidViewRenderer(
+    private val context: Context,
+    /** Override how remote (`http(s)`) images are fetched (e.g. to inject a cache or a test stub). */
+    private val imageLoader: ImageLoader? = null,
+) : HostRenderer<View> {
 
     private val density: Float = context.resources.displayMetrics.density
+
+    /** Off-main fetch pool for remote images (created lazily; one idle thread for the renderer's life). */
+    private val imageExecutor: ExecutorService by lazy { Executors.newSingleThreadExecutor() }
+    /** Per-ImageView load generation, so a slow/stale fetch never overwrites a newer src or a disposed view. */
+    private val imageGen = HashMap<View, Long>()
 
     /** dp → px (Atlas numeric style values are density-independent pixels on native). */
     private fun dp(value: Double): Int = Math.round(value * density).toInt()
@@ -247,6 +263,7 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
     override fun dispose(view: View) {
         (view.parent as? ViewGroup)?.removeView(view)
         layouts.remove(view)
+        imageGen.remove(view) // invalidate any in-flight remote image fetch for this view
         // A scrollview owns an inner content host — drop both.
         scrollContent.remove(view)?.let { layouts.remove(it) }
         // TextInput state: detach every watcher + drop the input spec (no View leaks).
@@ -437,8 +454,19 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
                         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                     }
                 }
-                // Remote loading is a follow-up (see KDoc) — leave the image unset, don't crash.
-                uri.startsWith("http://") || uri.startsWith("https://") -> null
+                // Remote: fetch off-main (via imageLoader, default HTTP), decode, set on the main thread —
+                // guarded by a generation token so a stale/slow fetch never clobbers a newer src/disposed view.
+                uri.startsWith("http://") || uri.startsWith("https://") -> {
+                    val token = (imageGen[iv] ?: 0L) + 1
+                    imageGen[iv] = token
+                    (imageLoader ?: ::defaultImageLoad)(uri) { bytes ->
+                        val bmp = bytes?.let {
+                            runCatching { BitmapFactory.decodeByteArray(it, 0, it.size) }.getOrNull()
+                        }
+                        if (bmp != null) iv.post { if (imageGen[iv] == token) iv.setImageBitmap(bmp) }
+                    }
+                    null // async — nothing to set synchronously
+                }
                 else -> {
                     val name = uri.removePrefix("asset:///").removePrefix("file:///android_asset/")
                     context.assets.open(name).use { BitmapFactory.decodeStream(it) }
@@ -447,6 +475,25 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             bitmap?.let { iv.setImageBitmap(it) }
         } catch (_: Throwable) {
             // ignore: an unresolvable/garbage src must never crash the host
+        }
+    }
+
+    /** Default remote loader: fetch the URL off the main thread via HttpURLConnection. */
+    private fun defaultImageLoad(url: String, onResult: (ByteArray?) -> Unit) {
+        imageExecutor.execute {
+            val bytes = runCatching {
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10_000
+                    readTimeout = 10_000
+                    doInput = true
+                }
+                try {
+                    conn.inputStream.use { it.readBytes() }
+                } finally {
+                    conn.disconnect()
+                }
+            }.getOrNull()
+            onResult(bytes)
         }
     }
 

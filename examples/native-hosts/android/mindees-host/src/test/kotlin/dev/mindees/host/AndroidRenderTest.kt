@@ -534,4 +534,31 @@ class AndroidRenderTest {
         assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, overlay.layoutParams.height) // fills the screen
         assertEquals(1, overlay.childCount) // the scrim routed into the overlay layer
     }
+    @Test
+    fun routesRemoteImageSrcToTheInjectedLoader() {
+        val context = RuntimeEnvironment.getApplication()
+        var requested: String? = null
+        val loader: ImageLoader = { url, onResult ->
+            requested = url
+            onResult(null) // no bytes → no decode/post; we only assert the http(s) routing here
+        }
+        val container = FlexboxLayout(context)
+        val host =
+            MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context, loader)) { _, _ -> }
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"img","tag":"image"},
+                  {"type":"setProp","id":"img","name":"src","value":"https://example.com/a.png"},
+                  {"type":"insertChild","parentId":"host-root","childId":"img","index":0}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        // The renderer routed the remote src to the injected loader (data-URI/asset stay synchronous;
+        // the actual decode is platform BitmapFactory behavior, exercised on a real device).
+        assertEquals("https://example.com/a.png", requested)
+        assertTrue(container.getChildAt(0) is ImageView)
+    }
 }
