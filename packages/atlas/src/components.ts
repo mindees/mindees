@@ -781,3 +781,159 @@ export const Accordion: Component<AccordionProps> = (props) => {
     ...rows,
   )
 }
+
+// ---------------------------------------------------------------------------
+// Stepper
+// ---------------------------------------------------------------------------
+
+/** Props for {@link Stepper}. */
+export interface StepperProps extends Omit<BaseProps, 'style'> {
+  /** Controlled numeric value (static or reactive). */
+  readonly value: Reactive<number>
+  readonly min?: number
+  readonly max?: number
+  /** Increment/decrement amount (default 1). */
+  readonly step?: number
+  readonly onValueChange?: (value: number) => void
+  readonly disabled?: boolean
+  readonly style?: Reactive<StyleInput>
+}
+
+/** A −/+ number stepper (RN ships none built-in). Flex-only, so it renders on web + native alike. */
+export const Stepper: Component<StepperProps> = (props) => {
+  const theme = useTheme()
+  const {
+    value,
+    min = Number.NEGATIVE_INFINITY,
+    max = Number.POSITIVE_INFINITY,
+    step = 1,
+    onValueChange,
+    disabled,
+    style,
+    ...rest
+  } = props
+  const current = toAccessor(value, 0)
+  const clamp = (v: number): number => Math.min(max, Math.max(min, v))
+  const button = (label: string, delta: number, enabled: () => boolean) =>
+    createElement(
+      Pressable,
+      {
+        role: 'button',
+        state: () => ({ disabled: disabled === true || !enabled() }),
+        ...(disabled
+          ? {}
+          : { onPress: () => enabled() && onValueChange?.(clamp(current() + delta)) }),
+        style: () => ({
+          width: 36,
+          height: 36,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: theme().color.border,
+          borderRadius: radiusScale.md,
+        }),
+      },
+      createElement(
+        Text,
+        {
+          style: () => ({
+            fontSize: 20,
+            color: enabled() && disabled !== true ? theme().color.text : theme().color.textMuted,
+          }),
+        },
+        label,
+      ),
+    )
+  return createElement(
+    View,
+    {
+      ...toHostProps({ ...rest, style }),
+      role: rest.role ?? 'group',
+      style: mergeStyle(
+        { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: space.sm },
+        style,
+      ),
+    },
+    button('−', -step, () => current() > min), // minus
+    createElement(
+      Text,
+      { style: () => ({ minWidth: 32, textAlign: 'center', color: theme().color.text }) },
+      () => String(current()),
+    ),
+    button('+', step, () => current() < max),
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SegmentedControl
+// ---------------------------------------------------------------------------
+
+/** One segment: a value + a label. */
+export interface Segment {
+  readonly value: string
+  readonly label: MindeesNode
+}
+
+/** Props for {@link SegmentedControl}. */
+export interface SegmentedControlProps extends Omit<BaseProps, 'style'> {
+  readonly value: Reactive<string>
+  readonly segments: readonly Segment[]
+  readonly onValueChange?: (value: string) => void
+  readonly disabled?: boolean
+  readonly style?: Reactive<StyleInput>
+}
+
+/** A compact connected single-select (iOS-style segmented control). Flex-only → web + native. */
+export const SegmentedControl: Component<SegmentedControlProps> = (props) => {
+  const theme = useTheme()
+  const { value, segments, onValueChange, disabled, style, ...rest } = props
+  const selected = toAccessor(value, segments[0]?.value ?? '')
+  return createElement(
+    View,
+    {
+      ...toHostProps({ ...rest, style }),
+      role: rest.role ?? 'radiogroup',
+      style: mergeStyle(
+        () => ({
+          display: 'flex',
+          flexDirection: 'row',
+          borderWidth: 1,
+          borderColor: theme().color.border,
+          borderRadius: radiusScale.md,
+          overflow: 'hidden',
+        }),
+        style,
+      ),
+    },
+    ...segments.map((seg) => {
+      const active = (): boolean => selected() === seg.value
+      return createElement(
+        Pressable,
+        {
+          role: 'radio',
+          state: () => ({ selected: active(), disabled }),
+          ...(disabled ? {} : { onPress: () => onValueChange?.(seg.value) }),
+          style: () => ({
+            paddingTop: space.xs,
+            paddingBottom: space.xs,
+            paddingLeft: space.md,
+            paddingRight: space.md,
+            backgroundColor: active() ? theme().color.primary : 'transparent',
+          }),
+        },
+        typeof seg.label === 'string'
+          ? createElement(
+              Text,
+              {
+                style: () => ({
+                  color: active() ? theme().color.onTone : theme().color.text,
+                  ...(active() ? { fontWeight: fontWeight.semibold } : {}),
+                }),
+              },
+              seg.label,
+            )
+          : seg.label,
+      )
+    }),
+  )
+}

@@ -56,8 +56,13 @@ export {
   type RadioOption,
   SafeAreaView,
   type SafeAreaViewProps,
+  type Segment,
+  SegmentedControl,
+  type SegmentedControlProps,
   Skeleton,
   type SkeletonProps,
+  Stepper,
+  type StepperProps,
   Switch,
   type SwitchProps,
   type TabItem,
@@ -96,6 +101,8 @@ export {
   type FocusScopeProps,
   Modal,
   type ModalProps,
+  Toast,
+  type ToastProps,
 } from './overlay'
 export {
   Button,
