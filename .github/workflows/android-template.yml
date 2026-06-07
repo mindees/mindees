@@ -87,7 +87,11 @@ jobs:
           npm run build
           BUNDLE="$RUNNER_TEMP/myapp/mindees-example-app/src/main/assets/mindees-app.bundle.js"
           test -s "$BUNDLE"
-          grep -q "MindeesAppBundle" "$BUNDLE"
+          SIZE=$(wc -c < "$BUNDLE")
+          echo "app-js bundle: $SIZE bytes"
+          # main.tsx is side-effect-only (no exports), so the IIFE emits no global name; instead
+          # assert @mindees/* were INLINED (~112KB) and not left as external imports (~10KB).
+          test "$SIZE" -gt 50000
 
       - name: Select JDK 17
         run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
