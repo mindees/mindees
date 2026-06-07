@@ -3,7 +3,7 @@
 import { createElement, signal } from '@mindees/core'
 import { createDomBackend, render } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
-import { Modal } from './overlay'
+import { Modal, Toast } from './overlay'
 
 const doc = () => document as never
 
@@ -101,5 +101,38 @@ describe('FocusScope autofocus', () => {
     expect(active.getAttribute('role')).toBe('dialog')
     expect(active.getAttribute('aria-label')).toBe('S')
     container.remove()
+  })
+})
+
+describe('Toast', () => {
+  it('renders the message when visible and nothing when hidden', () => {
+    const visible = signal(false)
+    const container = document.createElement('div')
+    render(Toast({ visible, message: 'Saved' }), createDomBackend(doc()), container as never)
+    expect(document.querySelector('[role="status"]')).toBeNull()
+    visible.set(true)
+    const status = document.querySelector('[role="status"]')
+    expect(status?.textContent).toContain('Saved')
+    visible.set(false)
+    expect(document.querySelector('[role="status"]')).toBeNull() // unmounted on hide
+  })
+
+  it('auto-dismisses after the duration', () => {
+    vi.useFakeTimers()
+    try {
+      const visible = signal(true)
+      const onDismiss = vi.fn()
+      const container = document.createElement('div')
+      render(
+        Toast({ visible, message: 'Bye', duration: 3000, onDismiss }),
+        createDomBackend(doc()),
+        container as never,
+      )
+      expect(onDismiss).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(3000)
+      expect(onDismiss).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

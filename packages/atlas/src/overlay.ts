@@ -15,10 +15,17 @@
  * @module
  */
 
-import { type Component, createElement, type MindeesNode, onCleanup, portal } from '@mindees/core'
+import {
+  type Component,
+  createElement,
+  effect,
+  type MindeesNode,
+  onCleanup,
+  portal,
+} from '@mindees/core'
 import type { A11yProps, Role } from './a11y'
 import type { Reactive } from './host'
-import { Pressable, View } from './primitives'
+import { Pressable, Text, View } from './primitives'
 import { flattenStyle, type StyleInput } from './style'
 
 function toAccessor<T>(value: Reactive<T>, fallback: T): () => T {
@@ -157,6 +164,82 @@ export const Modal: Component<ModalProps> = (props) => {
       },
       scrim,
       dialog,
+    )
+    return portal(container, props.mount !== undefined ? { mount: props.mount } : undefined)
+  }
+}
+
+/** Props for {@link Toast}. */
+export interface ToastProps {
+  /** Whether the toast is shown (static or reactive). */
+  readonly visible: Reactive<boolean>
+  /** Convenience message (string or node); or pass `children`. */
+  readonly message?: MindeesNode
+  readonly children?: MindeesNode
+  /** Auto-dismiss after this many ms (calls `onDismiss`). `0`/omitted → stays until hidden. */
+  readonly duration?: number
+  readonly onDismiss?: () => void
+  /** Anchor edge (default `bottom`). */
+  readonly position?: 'top' | 'bottom'
+  /** a11y role (default `status`; use `alert` for errors). */
+  readonly role?: Role
+  /** Explicit overlay host target (else the backend's overlay layer). */
+  readonly mount?: unknown
+}
+
+/**
+ * A portal-backed transient notification (Snackbar). Controlled by `visible`; optionally auto-dismisses
+ * after `duration` ms. Anchored bottom (or top) via the overlay layer — RN ships none built-in.
+ */
+export const Toast: Component<ToastProps> = (props) => {
+  const isVisible = toAccessor(props.visible, false)
+
+  // Auto-dismiss: (re)arm a timer whenever the toast is shown; clear it on hide/unmount/re-run.
+  effect(() => {
+    if (!isVisible()) return
+    const ms = props.duration
+    if (ms && ms > 0 && typeof setTimeout === 'function' && props.onDismiss) {
+      const id = setTimeout(() => props.onDismiss?.(), ms)
+      onCleanup(() => clearTimeout(id))
+    }
+  })
+
+  return () => {
+    if (!isVisible()) return null
+    const atTop = props.position === 'top'
+    const bubble = createElement(
+      View,
+      {
+        role: props.role ?? 'status',
+        style: () => ({
+          backgroundColor: '#1f2430',
+          borderRadius: 12,
+          paddingTop: 12,
+          paddingBottom: 12,
+          paddingLeft: 16,
+          paddingRight: 16,
+          maxWidth: 480,
+        }),
+      },
+      typeof props.message === 'string'
+        ? createElement(Text, { style: () => ({ color: '#ffffff' }) }, props.message)
+        : (props.children ?? props.message),
+    )
+    const container = createElement(
+      View,
+      {
+        style: () => ({
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          [atTop ? 'top' : 'bottom']: 0,
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'center',
+          padding: 16,
+        }),
+      },
+      bubble,
     )
     return portal(container, props.mount !== undefined ? { mount: props.mount } : undefined)
   }

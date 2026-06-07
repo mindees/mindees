@@ -101,6 +101,8 @@ export {
   type FocusScopeProps,
   Modal,
   type ModalProps,
+  Toast,
+  type ToastProps,
 } from './overlay'
 export {
   Button,
