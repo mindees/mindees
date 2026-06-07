@@ -1,5 +1,21 @@
 # @mindees/atlas
 
+## 0.13.0
+
+### Minor Changes
+
+- 79c3f7e: Add **`usePersistentSignal`** — a reactive signal that restores from + auto-saves to a key/value store
+  (web `localStorage` by default; inject any `SignalStorage` for native), so persisting theme/prefs/UI
+  state is one call. Corrupt payloads fall back to the initial value; storage errors are swallowed.
+- 019d31c: Add timer hooks **`useDebounce`** (a debounced view of a reactive source — e.g. search-as-you-type),
+  **`useInterval`** (repeating callback; `null` to pause), and **`useTimeout`** (one-shot; `null` to
+  cancel) — all auto-clear on dispose. More batteries RN/React make you install a library for.
+
+### Patch Changes
+
+- @mindees/core@0.13.0
+- @mindees/router@0.13.0
+
 ## 0.12.0
 
 ### Minor Changes

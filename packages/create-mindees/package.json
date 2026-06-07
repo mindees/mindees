@@ -1,6 +1,6 @@
 {
   "name": "create-mindees",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Create a new MindeesNative app — `npm create mindees@latest`.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
