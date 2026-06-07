@@ -225,4 +225,27 @@ describe('animation hardening (adversarial findings)', () => {
     expect(av()).toBe(100)
     expect(av.velocity()).toBe(0)
   })
+
+  it('a throwing onComplete does not propagate or freeze sibling animations', () => {
+    const m = manualFrameSource()
+    setFrameSource(m.source)
+    const a = animate(0)
+    const b = animate(0)
+    createRoot(() => {
+      timing(a, {
+        to: 10,
+        duration: 100,
+        easing: linear,
+        onComplete: () => {
+          throw new Error('boom')
+        },
+      })
+      timing(b, { to: 100, duration: 1000, easing: linear })
+    })
+    m.tick(0)
+    expect(() => m.tick(100)).not.toThrow() // a completes; its throwing onComplete is isolated
+    m.tick(1000)
+    expect(b()).toBe(100) // the sibling still completed (loop not frozen)
+    setFrameSource(null)
+  })
 })

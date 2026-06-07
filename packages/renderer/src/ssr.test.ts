@@ -95,4 +95,10 @@ describe('hydrate', () => {
     div.dispatchEvent(new Event('click'))
     expect(div.textContent).toBe('4') // interactive after hydration
   })
+
+  it('serializes HTML void elements without a closing tag or children', () => {
+    expect(renderToString(h('image', { src: 'a.png' }))).toBe('<img src="a.png">')
+    expect(renderToString(h('textinput', { id: 'in' }))).toBe('<input id="in">')
+    expect(renderToString(h('image', { src: 'a.png' }))).not.toContain('</img>')
+  })
 })

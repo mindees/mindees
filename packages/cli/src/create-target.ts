@@ -114,6 +114,17 @@ export function resolveCreateTarget(input: string, cwd = '.'): CreateTargetResul
     }
   }
 
+  // A colon is only valid as a drive-letter root (`C:/Users/app`). Any other colon — drive-relative
+  // (`C:foo`), versioned/URL-ish (`app:1.0`), or mid-path (`a/b:c`) — is an illegal Windows path char
+  // that would crash `mkdir` downstream; reject it here so the CLI never throws (its documented contract).
+  const posix = toPosixPath(trimmed)
+  if (posix.includes(':') && !(WINDOWS_DRIVE_ROOT.test(posix) && posix.indexOf(':', 2) === -1)) {
+    return {
+      ok: false,
+      error: `Invalid path "${input}": ':' is only allowed as a drive-letter root (e.g. C:/path).`,
+    }
+  }
+
   const basename = pathBasename(trimmed)
   if (!basename || basename === '.' || basename === '..') {
     return { ok: false, error: `Could not derive a package name from "${input}".` }

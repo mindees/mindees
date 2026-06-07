@@ -6,9 +6,9 @@ describe('generateRouteModule', () => {
     const src = generateRouteModule(['index.tsx', 'about.tsx', 'blog/[slug].tsx'], {
       importBase: './app',
     })
-    expect(src).toContain("import * as _route0 from './app/about'")
-    expect(src).toContain("import * as _route1 from './app/blog/[slug]'")
-    expect(src).toContain("import * as _route2 from './app/index'")
+    expect(src).toContain('import * as _route0 from "./app/about"')
+    expect(src).toContain('import * as _route1 from "./app/blog/[slug]"')
+    expect(src).toContain('import * as _route2 from "./app/index"')
     expect(src).toContain('export const routes = {')
     expect(src).toContain('"about.tsx": _route0,')
     expect(src).toContain('"blog/[slug].tsx": _route1,')
@@ -22,7 +22,7 @@ describe('generateRouteModule', () => {
     expect(src).toContain('export const appRoutes = {')
     expect(src).not.toContain('styles.css')
     expect(src).not.toContain('README.md')
-    expect(src).toContain("'./app/index'") // default importBase
+    expect(src).toContain('"./app/index"') // default importBase
   })
 
   it('emits an empty map for no route files', () => {
@@ -31,7 +31,7 @@ describe('generateRouteModule', () => {
 
   it('normalizes Windows backslash paths in import specifiers and map keys', () => {
     const src = generateRouteModule(['blog\\[slug].tsx'], { importBase: './app' })
-    expect(src).toContain("import * as _route0 from './app/blog/[slug]'") // POSIX specifier
+    expect(src).toContain('import * as _route0 from "./app/blog/[slug]"') // POSIX specifier
     expect(src).toContain('"blog/[slug].tsx": _route0,') // POSIX map key
     expect(src).not.toContain('\\') // no backslashes leak into generated code
   })
@@ -155,5 +155,10 @@ describe('buildRouteManifest', () => {
     const byPath = Object.fromEntries(m.routes.map((r) => [r.routePath, r]))
     expect(byPath['/blog/:slug']?.file).toBe('blog/[slug].tsx') // POSIX import() specifier
     expect(byPath['/settings/profile']?.file).toBe('settings/profile.tsx')
+  })
+
+  it('escapes a special char in a route filename (emits a valid module specifier)', () => {
+    const out = generateRouteModule(["o'brien.tsx"], { importBase: './app' })
+    expect(out).toContain(`from "./app/o'brien"`) // double-quoted, escaped — not a broken string literal
   })
 })

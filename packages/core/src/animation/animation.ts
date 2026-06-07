@@ -134,7 +134,14 @@ function onFrame(now: number): void {
         active.delete(d)
         const st = internals.get(d.av)
         if (st) st.driver = null
-        d.settle(true)
+        // Isolate a throwing onComplete: settle() invokes the user's onComplete, and this runs on the
+        // SHARED frame loop — one bad callback must not propagate out and leave the rAF chain un-rearmed
+        // (which would freeze EVERY animation in the app).
+        try {
+          d.settle(true)
+        } catch {
+          // swallow: a faulty completion callback can't be allowed to kill the loop
+        }
       }
     }
   })
@@ -376,8 +383,14 @@ export function rafFrameSource(): FrameSource {
     const caf = (globalThis as { cancelAnimationFrame?: (id: number) => void }).cancelAnimationFrame
     if (!raf) return () => {} // no rAF (non-browser) → caller already degrades to jump-to-final
     let id = raf(function loop(t: number) {
-      tick(t)
-      id = raf(loop)
+      // Always re-arm the chain, even if `tick` throws — a single bad frame must never permanently
+      // freeze the shared loop. (onFrame already isolates driver ticks + completion callbacks; this is
+      // belt-and-suspenders for any other thrown error.)
+      try {
+        tick(t)
+      } finally {
+        id = raf(loop)
+      }
     })
     return () => caf?.(id)
   }

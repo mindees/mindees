@@ -732,7 +732,11 @@ export interface AccordionProps extends Omit<BaseProps, 'style'> {
 export const Accordion: Component<AccordionProps> = (props) => {
   const theme = useTheme()
   const { sections, multiple, defaultOpen = [], style, ...rest } = props
-  const open = signal<ReadonlySet<string>>(new Set(defaultOpen))
+  // Honor single-open mode from the FIRST frame: in single-open mode keep at most one default-open id
+  // (the toggle handler already enforces it thereafter, but the initial seed bypassed it).
+  const open = signal<ReadonlySet<string>>(
+    new Set(multiple ? defaultOpen : defaultOpen.slice(0, 1)),
+  )
   const isOpen = (id: string): boolean => open().has(id)
   const toggle = (id: string): void => {
     const next = new Set(untrack(open))

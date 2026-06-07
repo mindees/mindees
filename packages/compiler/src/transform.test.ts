@@ -95,4 +95,20 @@ describe('automatic JSX end-to-end (the framework component style compiles + run
     const { code } = compile(src, { flatten: false })
     expect(code.match(/from\s*["']@mindees\/core["']/g)?.length).toBe(1)
   })
+
+  it('never injects a duplicate createElement binding (foreign import or local decl)', () => {
+    const foreign = compile(
+      `import { createElement } from 'preact'
+export const a = <view>x</view>`,
+      { flatten: false },
+    ).code
+    expect((foreign.match(/import \{ createElement \}/g) ?? []).length).toBe(1) // no @mindees/core dupe
+    expect(foreign).not.toContain('@mindees/core')
+    const local = compile(
+      `function createElement() { return null }
+export const a = <view/>`,
+      { flatten: false },
+    ).code
+    expect(local).not.toContain('@mindees/core') // a local decl already binds the name
+  })
 })

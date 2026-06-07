@@ -131,7 +131,9 @@ function nodeToRoutes(node: DirNode): RouteRecord[] {
 
   for (const [dirName, child] of node.dirs) {
     const childRoutes = nodeToRoutes(child)
-    const seg = isGroup(dirName) ? '' : dirName
+    // Convert dynamic/catch-all DIRECTORY names too (`[id]`→`:id`, `[...x]`→`:x*`), not just files —
+    // otherwise a nested dynamic route like `posts/[id]/comments` stays a literal `[id]` and never matches.
+    const seg = isGroup(dirName) ? '' : segmentToPath(dirName)
 
     if (child.layout) {
       // A layout wraps the directory's routes (it renders the outlet via children).
