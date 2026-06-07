@@ -359,5 +359,26 @@ final class UIKitRenderTests: XCTestCase {
         container.layoutIfNeeded()
         XCTAssertEqual(overlay.frame, container.bounds) // pinned to fill the parent
     }
+    func testRoutesRemoteImageSrcToTheLoader() throws {
+        let container = UIView()
+        var requested: String?
+        let loader: ImageLoader = { url, onResult in
+            requested = url
+            onResult(nil) // no data → no decode; we assert the http(s) routing here
+        }
+        let host = MindeesNativeHost(
+            rootId: "host-root", root: container,
+            renderer: UIKitRenderer(imageLoader: loader), onEvent: { _, _ in }
+        )
+        try host.apply(decode("""
+        [
+          {"type":"createNode","id":"img","tag":"image"},
+          {"type":"setProp","id":"img","name":"src","value":"https://example.com/a.png"},
+          {"type":"insertChild","parentId":"host-root","childId":"img","index":0}
+        ]
+        """))
+        XCTAssertEqual(requested, "https://example.com/a.png") // remote src routed to the loader
+        XCTAssertTrue(container.subviews.first is UIImageView)
+    }
 }
 #endif
