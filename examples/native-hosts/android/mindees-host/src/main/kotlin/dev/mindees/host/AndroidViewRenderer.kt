@@ -144,6 +144,16 @@ class AndroidViewRenderer(private val context: Context) : HostRenderer<View> {
             scrollContent[this] = content
             layoutOf(content).horizontal = true // gaps go on the X axis even before any style arrives
         }
+        // 'overlay' → the portal layer (Modal/Toast mount here). A full-screen flex container that
+        // FILLS its parent so it overlaps the app content (the host root is a FrameLayout that
+        // z-stacks; the renderer keeps the overlay painting last, so it sits on top).
+        "overlay" -> FlexboxLayout(context).apply {
+            flexDirection = FlexDirection.COLUMN
+            layoutOf(this).apply {
+                widthSpec = ViewGroup.LayoutParams.MATCH_PARENT
+                heightSpec = ViewGroup.LayoutParams.MATCH_PARENT
+            }
+        }
         // 'view' / unknown → a real flex container (FlexboxLayout): full
         // flexDirection / justifyContent (incl. space-*) / alignItems / flexWrap / alignSelf.
         else -> FlexboxLayout(context).apply {
