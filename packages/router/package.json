@@ -1,6 +1,6 @@
 {
   "name": "@mindees/router",
-  "version": "0.22.3",
+  "version": "0.22.4",
   "description": "Quantum — the typed, signals-native router for MindeesNative: codegen-free typed path params, Standard Schema validated search params, and selector-isolated reactive route state.",
   "keywords": [
     "router",
