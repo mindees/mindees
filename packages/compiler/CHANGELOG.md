@@ -1,5 +1,12 @@
 # @mindees/compiler
 
+## 0.22.1
+
+### Patch Changes
+
+- Updated dependencies [57a45ee]
+  - @mindees/core@0.22.1
+
 ## 0.22.0
 
 ### Patch Changes
