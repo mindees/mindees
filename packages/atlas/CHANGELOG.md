@@ -1,5 +1,18 @@
 # @mindees/atlas
 
+## 0.17.0
+
+### Minor Changes
+
+- fc35a95: Add **`Show`** — the ergonomic conditional control-flow component. Renders `children` when `when`
+  (value or accessor) is truthy, else `fallback`; a function child receives the **narrowed** truthy value.
+  A reactive region that swaps content as the condition flips.
+
+### Patch Changes
+
+- @mindees/core@0.17.0
+- @mindees/router@0.17.0
+
 ## 0.16.0
 
 ### Minor Changes
