@@ -111,4 +111,17 @@ export const a = <view/>`,
     ).code
     expect(local).not.toContain('@mindees/core') // a local decl already binds the name
   })
+
+  it('keeps a leading directive before the injected runtime import', () => {
+    const { code } = compile('"use client"\nexport const a = <view>x</view>', { flatten: false })
+    expect(code.trimStart().startsWith('"use client"')).toBe(true) // directive stays first
+    expect(code).toContain('@mindees/core') // the runtime import was injected (after the directive)
+  })
+
+  it('enforces the element budget even with flatten:false', () => {
+    const src = 'export const v = <view><text>a</text><text>b</text></view>' // 3 elements
+    const r = compileChecked(src, { budget: { maxElements: 2 }, flatten: false })
+    expect(r.diagnostics.some((d) => d.code === 'MDC_BUDGET_ELEMENTS')).toBe(true)
+    expect(r.code).toBe('') // refused to emit (budget enforced regardless of the optimizer)
+  })
 })

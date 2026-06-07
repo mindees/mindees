@@ -248,4 +248,13 @@ describe('animation hardening (adversarial findings)', () => {
     expect(b()).toBe(100) // the sibling still completed (loop not frozen)
     setFrameSource(null)
   })
+
+  it('extends past a zero-width terminal segment via the last real slope', () => {
+    const v = signal(0)
+    const out = interpolate(() => v(), [0, 100, 100], [0, 5, 9], { extrapolate: 'extend' })
+    v.set(300)
+    expect(out()).toBe(15) // slope of segment 0 (0.05) x 300 — not the buggy plateau-start 5
+    const flat = interpolate(() => v(), [0, 0], [3, 7], { extrapolate: 'extend' })
+    expect(flat()).toBe(7) // all-degenerate terminal → the terminal output, not the start
+  })
 })
