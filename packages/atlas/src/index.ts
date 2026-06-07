@@ -83,6 +83,7 @@ export {
   useWindowDimensions,
   type WindowDimensions,
 } from './environment'
+export { ErrorBoundary, type ErrorBoundaryProps } from './error-boundary'
 export { type Field, type FormApi, type UseFormOptions, useForm } from './form'
 export { type AttachableGesture, GestureView, type GestureViewProps } from './gesture'
 export {
