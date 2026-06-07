@@ -1,5 +1,12 @@
 # @mindees/data
 
+## 0.22.5
+
+### Patch Changes
+
+- Updated dependencies [bed575f]
+  - @mindees/core@0.22.5
+
 ## 0.22.4
 
 ### Patch Changes
