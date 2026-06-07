@@ -82,6 +82,7 @@ export {
   streamObject,
 } from './object'
 export { createOnDeviceBackend } from './on-device'
+export { type RetryOptions, withRetry } from './retry'
 export type { StandardSchemaV1 } from './standard-schema'
 export {
   type RunToolsOptions,
