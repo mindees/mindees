@@ -79,9 +79,12 @@ export {
   orValues,
 } from './or-set'
 export {
+  createIndexedDbPersistence,
   createMemoryPersistence,
   createPersistentEngine,
   createWebStoragePersistence,
+  type IndexedDbFactoryLike,
+  type IndexedDbPersistenceOptions,
   loadSnapshot,
   type Persistence,
   type PersistentEngineOptions,
