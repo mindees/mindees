@@ -20,7 +20,9 @@ import {
   ProgressBar,
   RadioGroup,
   SafeAreaView,
+  SegmentedControl,
   Skeleton,
+  Stepper,
   Switch,
   Tabs,
 } from './components'
@@ -307,5 +309,71 @@ describe('Tabs / Accordion', () => {
     const html = renderToString(node)
     expect(html).toContain('Content 2')
     expect(html).not.toContain('Content 1')
+  })
+})
+
+describe('Stepper / SegmentedControl', () => {
+  const collectByRole = (
+    node: unknown,
+    role: string,
+    acc: MindeesElement[] = [],
+  ): MindeesElement[] => {
+    if (isElement(node)) {
+      if ((node.props as Record<string, unknown>).role === role) acc.push(node)
+      for (const c of node.children) collectByRole(c, role, acc)
+    } else if (Array.isArray(node)) {
+      for (const c of node) collectByRole(c, role, acc)
+    }
+    return acc
+  }
+
+  it('Stepper increments/decrements the controlled value and clamps to min/max', () => {
+    const value = signal(2)
+    const node = Stepper({ value, min: 1, max: 3, onValueChange: (v) => value.set(v) })
+    expect(el(node).props.role).toBe('group')
+    const buttons = collectByRole(node, 'button')
+    expect(buttons).toHaveLength(2)
+    ;(buttons[1]?.props.onPress as () => void)() // +
+    expect(value()).toBe(3)
+    ;(buttons[1]?.props.onPress as () => void)() // + at max → clamped (no enabled press)
+    expect(value()).toBe(3)
+    ;(buttons[0]?.props.onPress as () => void)() // −
+    expect(value()).toBe(2)
+  })
+
+  it('SegmentedControl is a radiogroup that selects the pressed segment', () => {
+    const value = signal('a')
+    const node = SegmentedControl({
+      value,
+      segments: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+        { value: 'c', label: 'C' },
+      ],
+      onValueChange: (v) => value.set(v),
+    })
+    expect(el(node).props.role).toBe('radiogroup')
+    const radios = collectByRole(node, 'radio')
+    expect(radios).toHaveLength(3)
+    ;(radios[2]?.props.onPress as () => void)()
+    expect(value()).toBe('c')
+  })
+
+  it('a disabled Stepper / SegmentedControl is inert', () => {
+    expect(
+      collectByRole(Stepper({ value: 1, disabled: true, onValueChange: () => {} }), 'button')[0]
+        ?.props.onPress,
+    ).toBeUndefined()
+    expect(
+      collectByRole(
+        SegmentedControl({
+          value: 'a',
+          disabled: true,
+          segments: [{ value: 'a', label: 'A' }],
+          onValueChange: () => {},
+        }),
+        'radio',
+      )[0]?.props.onPress,
+    ).toBeUndefined()
   })
 })
