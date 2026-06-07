@@ -136,3 +136,97 @@ export async function createPersistentEngine<T>(
   const engine = createSyncEngine<T>(snapshot ? { ...syncOptions, snapshot } : syncOptions)
   return persistEngine(engine, persistence, key)
 }
+
+// --- IndexedDB persistence (durable browser storage; large + async, beyond localStorage's sync ~5MB) ---
+//
+// A minimal structural subset of the DOM IndexedDB types, declared here so @mindees/data stays
+// DOM-lib-free (mirrors WebStorageLike). The real `globalThis.indexedDB` and `fake-indexeddb` are
+// structurally assignable to IndexedDbFactoryLike.
+
+interface IdbRequestLike<T> {
+  result: T
+  error: unknown
+  onsuccess: (() => void) | null
+  onerror: (() => void) | null
+}
+interface IdbOpenRequestLike extends IdbRequestLike<IdbDatabaseLike> {
+  onupgradeneeded: (() => void) | null
+}
+interface IdbObjectStoreLike {
+  get(key: string): IdbRequestLike<unknown>
+  put(value: string, key: string): IdbRequestLike<unknown>
+}
+interface IdbTransactionLike {
+  objectStore(name: string): IdbObjectStoreLike
+}
+interface IdbDatabaseLike {
+  objectStoreNames: { contains(name: string): boolean }
+  createObjectStore(name: string): unknown
+  transaction(storeNames: string, mode: 'readonly' | 'readwrite'): IdbTransactionLike
+}
+/** The minimal IndexedDB factory surface (a structural subset of the DOM `IDBFactory`). */
+export interface IndexedDbFactoryLike {
+  open(name: string, version?: number): IdbOpenRequestLike
+}
+
+/** Options for {@link createIndexedDbPersistence}. */
+export interface IndexedDbPersistenceOptions {
+  /** Database name (default `'mindees'`). */
+  readonly databaseName?: string
+  /** Object-store name (default `'continuum'`). */
+  readonly storeName?: string
+  /** The IndexedDB factory; defaults to `globalThis.indexedDB`. Inject (e.g. `fake-indexeddb`) elsewhere. */
+  readonly factory?: IndexedDbFactoryLike
+}
+
+/**
+ * A durable {@link Persistence} backed by IndexedDB — large, asynchronous browser storage (beyond
+ * `localStorage`'s synchronous ~5MB cap), a better home for a growing Continuum op log/snapshot. The
+ * database + object store open lazily on first use and are reused. Inject `factory` to run outside a
+ * browser (tests, or a custom environment); throws if none is available.
+ */
+export function createIndexedDbPersistence(options: IndexedDbPersistenceOptions = {}): Persistence {
+  const dbName = options.databaseName ?? 'mindees'
+  const storeName = options.storeName ?? 'continuum'
+  const factory = options.factory ?? (globalThis as { indexedDB?: IndexedDbFactoryLike }).indexedDB
+  if (!factory) {
+    throw new Error('createIndexedDbPersistence: IndexedDB is unavailable; pass `factory`.')
+  }
+
+  let dbPromise: Promise<IdbDatabaseLike> | undefined
+  const openDb = (): Promise<IdbDatabaseLike> => {
+    if (!dbPromise) {
+      dbPromise = new Promise<IdbDatabaseLike>((resolve, reject) => {
+        const request = factory.open(dbName, 1)
+        request.onupgradeneeded = () => {
+          const db = request.result
+          if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName)
+        }
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'))
+      })
+    }
+    return dbPromise
+  }
+
+  const run = <T>(
+    mode: 'readonly' | 'readwrite',
+    op: (store: IdbObjectStoreLike) => IdbRequestLike<T>,
+  ): Promise<T> =>
+    openDb().then(
+      (db) =>
+        new Promise<T>((resolve, reject) => {
+          const request = op(db.transaction(storeName, mode).objectStore(storeName))
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'))
+        }),
+    )
+
+  return {
+    load: (key) =>
+      run('readonly', (store) => store.get(key)).then((value) =>
+        value === undefined || value === null ? null : String(value),
+      ),
+    save: (key, value) => run('readwrite', (store) => store.put(value, key)).then(() => undefined),
+  }
+}
