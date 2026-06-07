@@ -193,4 +193,26 @@ describe('perf-lint — For/List row callback-param accessors (003/004)', () => 
     const src = 'function plain(item:()=>any){ for (let i=0;i<3;i++){ use(item()); log(item()) } }'
     expect(codes(src)).not.toContain('MDC_PERF_004')
   })
+
+  describe('MDC_PERF_008 — async effect', () => {
+    it('flags an async arrow passed to effect()', () => {
+      const src =
+        'const c = signal(0); effect(async () => { const v = c(); await fetch(String(v)) })'
+      expect(codes(src)).toContain('MDC_PERF_008')
+    })
+    it('flags an async function expression passed to effect()', () => {
+      const src = 'effect(async function () { await Promise.resolve() })'
+      expect(codes(src)).toContain('MDC_PERF_008')
+    })
+    it('does not flag a normal sync effect', () => {
+      expect(codes('const c = signal(0); effect(() => { void c() })')).not.toContain('MDC_PERF_008')
+    })
+    it('is suppressible via mdc-perf-ignore', () => {
+      const src = [
+        '// mdc-perf-ignore MDC_PERF_008',
+        'effect(async () => { await Promise.resolve() })',
+      ].join('\n')
+      expect(codes(src)).not.toContain('MDC_PERF_008')
+    })
+  })
 })

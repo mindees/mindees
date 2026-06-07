@@ -388,6 +388,23 @@ export function perfLint(
     }
   }
 
+  const ruleAsyncEffect = (node: ts.Node): void => {
+    if (!ts.isCallExpression(node) || calleeName(node) !== 'effect') return
+    const fn = node.arguments[0]
+    if (!fn || (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn))) return
+    const isAsync = fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ?? false
+    if (isAsync) {
+      emit(
+        node,
+        'MDC_PERF_008',
+        'effect() given an async function — dependency tracking stops at the first `await` (signals ' +
+          "written afterward won't re-run the effect), and the returned Promise is ignored, not used as " +
+          'cleanup. Keep the effect sync and launch the async work inside it: ' +
+          'effect(() => { const d = dep(); void run(d) }).',
+      )
+    }
+  }
+
   const ruleConstFunctionStyle = (node: ts.Node): void => {
     if (!ts.isJsxAttribute(node) || !node.initializer) return
     if (!ts.isJsxExpression(node.initializer) || !node.initializer.expression) return
@@ -438,6 +455,7 @@ export function perfLint(
     ruleMapJsxChild(node)
     ruleMissingKey(node)
     ruleHeavyEffect(node)
+    ruleAsyncEffect(node)
     ruleRepeatedReadInLoop(node)
     ruleEffectNoCleanup(node)
     ruleConstFunctionStyle(node)
