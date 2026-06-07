@@ -336,5 +336,28 @@ final class UIKitRenderTests: XCTestCase {
         try host.apply(decode("[{\"type\":\"unregisterEvent\",\"id\":\"a\",\"eventName\":\"input\",\"handlerId\":\"ch1\"}]"))
         XCTAssertEqual(field.allTargets.count, 0) // detached on unregister
     }
+    func testOverlayLayerFillsAndStacksOnTop() throws {
+        let container = UIView()
+        container.frame = CGRect(x: 0, y: 0, width: 320, height: 600)
+        let host = MindeesNativeHost(
+            rootId: "host-root", root: container, renderer: UIKitRenderer(), onEvent: { _, _ in }
+        )
+        try host.apply(decode("""
+        [
+          {"type":"createNode","id":"content","tag":"view"},
+          {"type":"insertChild","parentId":"host-root","childId":"content","index":0},
+          {"type":"createNode","id":"ov","tag":"overlay"},
+          {"type":"createNode","id":"scrim","tag":"view"},
+          {"type":"insertChild","parentId":"ov","childId":"scrim","index":0},
+          {"type":"insertChild","parentId":"host-root","childId":"ov","index":1}
+        ]
+        """))
+        XCTAssertEqual(container.subviews.count, 2)
+        let overlay = try XCTUnwrap(container.subviews.last) // added last → top of the z-order
+        XCTAssertFalse(overlay.translatesAutoresizingMaskIntoConstraints)
+        container.setNeedsLayout()
+        container.layoutIfNeeded()
+        XCTAssertEqual(overlay.frame, container.bounds) // pinned to fill the parent
+    }
 }
 #endif
