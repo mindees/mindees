@@ -74,4 +74,19 @@ describe('android template', () => {
     // the built bundle is never scaffolded — the user generates it via the app-js build
     expect(snap['out/mindees-example-app/src/main/assets/mindees-app.bundle.js']).toBeUndefined()
   })
+
+  it('parameterizes applicationId + rootProject.name per app (install coexistence)', () => {
+    const fs = createMemoryFileSystem()
+    scaffold(fs, { appName: 'my-droid', targetDir: 'out', template: 'android' })
+    const snap = fs.snapshot()
+    const gradle = snap['out/mindees-example-app/build.gradle.kts'] ?? ''
+    expect(gradle).toContain('applicationId = "com.example.mydroid"') // unique install id per app
+    expect(gradle).toContain('namespace = "dev.mindees.example"') // compile package stays
+    expect(snap['out/settings.gradle.kts']).toContain('rootProject.name = "my-droid"')
+    // no unsubstituted placeholders leak through
+    for (const contents of Object.values(snap)) {
+      expect(contents).not.toContain('{{androidAppId}}')
+      expect(contents).not.toContain('{{appName}}')
+    }
+  })
 })
