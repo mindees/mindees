@@ -33,6 +33,7 @@ export const maturity: Maturity = 'experimental'
  */
 export const info: PackageInfo = Object.freeze({ name, version: VERSION, maturity })
 
+export { type CacheOptions, withCache } from './cache'
 export {
   type AbortLike,
   type Ai,
