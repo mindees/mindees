@@ -136,6 +136,7 @@ export {
   View,
   type ViewProps,
 } from './primitives'
+export { Show, type ShowProps } from './show'
 export { flattenStyle, type StyleInput, type StyleObject, type StyleValue } from './style'
 export {
   duration,
