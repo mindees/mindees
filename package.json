@@ -31,7 +31,7 @@
     "build:android-example-js": "pnpm run build && node examples/native-hosts/android/mindees-example-app/app-js/scripts/gen-routes.mjs && tsdown --config examples/native-hosts/android/mindees-example-app/app-js/tsdown.config.ts",
     "verify": "pnpm run lint && pnpm run check:versions && pnpm run check:android-template && pnpm run typecheck && pnpm run build && pnpm run check:exports && pnpm run check:pack && pnpm run smoke:cli && pnpm run test",
     "changeset": "changeset",
-    "version-packages": "changeset version && node scripts/sync-versions.mjs",
+    "version-packages": "changeset version && node scripts/sync-versions.mjs && pnpm --filter @mindees/cli run gen:android-template",
     "check:versions": "node scripts/sync-versions.mjs --check",
     "check:android-template": "pnpm --filter @mindees/cli run check:android-template",
     "check:exports": "node scripts/validate-exports.mjs",
