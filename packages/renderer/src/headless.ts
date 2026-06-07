@@ -83,9 +83,33 @@ function serializeHeadless(node: HeadlessNode, options?: SerializeOptions): stri
       value === true ? ` ${key}=""` : ` ${key}="${escapeAttr(serializeAttrValue(value))}"`,
     )
     .join('')
+  // HTML void elements (e.g. `img`, `input` — what `image`/`textinput` map to) have NO closing tag
+  // and NO children: emitting `<img>...</img>` is malformed and the browser reparents the children as
+  // siblings, diverging from the reconciler's tree. Emit a self-contained start tag only.
+  if (VOID_ELEMENTS.has(tag)) {
+    return `<${tag}${attrs}>`
+  }
   const inner = node.children.map((c) => serializeHeadless(c, options)).join('')
   return `<${tag}${attrs}>${inner}</${tag}>`
 }
+
+/** HTML void elements — serialized with no closing tag and no children (post-`mapTag` names). */
+const VOID_ELEMENTS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+])
 
 /** Options for {@link createHeadlessBackend}. */
 export interface HeadlessBackendOptions {

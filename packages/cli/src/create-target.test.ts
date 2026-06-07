@@ -25,4 +25,11 @@ describe('quoteShellPath', () => {
     expect(quoteShellPath('app$(id)')).toBe("'app$(id)'")
     expect(quoteShellPath("a'b")).toBe("'a'\\''b'") // embedded quote: close, escape, reopen
   })
+
+  it('rejects illegal colon paths but allows a drive-letter path', () => {
+    expect(resolveCreateTarget('C:foo', 'D:/work').ok).toBe(false) // drive-relative
+    expect(resolveCreateTarget('app:1.0', 'D:/work').ok).toBe(false) // versioned name
+    expect(resolveCreateTarget('foo:bar', 'D:/work').ok).toBe(false) // mid-string colon
+    expect(resolveCreateTarget('C:/Users/app').ok).toBe(true) // a real drive path still works
+  })
 })

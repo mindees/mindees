@@ -91,4 +91,15 @@ describe('createFileRouter', () => {
     router.navigate('/posts/42')
     expect(router.params().id).toBe('42')
   })
+
+  it('maps a dynamic/catch-all DIRECTORY name (not just files), so nested dynamic routes match', () => {
+    const routes = routesFromModules({
+      'posts/[id]/index.tsx': mod('postIndex'),
+      'posts/[id]/comments.tsx': mod('comments'),
+    })
+    const posts = find(routes, 'posts')
+    expect(find(posts?.children ?? [], ':id')).toBeTruthy() // [id] DIR → :id (was literal '[id]')
+    const catchall = routesFromModules({ 'files/[...path]/index.tsx': mod('files') })
+    expect(find(catchall, ':path*')).toBeTruthy() // [...path] DIR → catch-all
+  })
 })

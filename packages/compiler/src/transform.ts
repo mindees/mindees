@@ -42,17 +42,25 @@ const RUNTIME_NAMES = ['createElement', 'Fragment'] as const
  */
 function createRuntimeImportTransformer(tsmod: typeof ts): ts.TransformerFactory<ts.SourceFile> {
   return (context) => (sourceFile) => {
+    // Every name already bound at the top level — from ANY import (named/aliased/default/namespace,
+    // any module) OR a local var/function/class. We must never inject a runtime import for a name that
+    // already has a binding: a duplicate top-level binding is a hard SyntaxError that fails module load.
     const imported = new Set<string>()
     for (const stmt of sourceFile.statements) {
-      if (
-        tsmod.isImportDeclaration(stmt) &&
-        tsmod.isStringLiteral(stmt.moduleSpecifier) &&
-        stmt.moduleSpecifier.text === '@mindees/core'
-      ) {
-        const named = stmt.importClause?.namedBindings
-        if (named && tsmod.isNamedImports(named)) {
-          for (const el of named.elements) imported.add((el.propertyName ?? el.name).text)
+      if (tsmod.isImportDeclaration(stmt) && stmt.importClause) {
+        const clause = stmt.importClause
+        if (clause.name) imported.add(clause.name.text) // default import
+        const named = clause.namedBindings
+        if (named) {
+          if (tsmod.isNamespaceImport(named)) imported.add(named.name.text)
+          else for (const el of named.elements) imported.add(el.name.text) // local binding name
         }
+      } else if (tsmod.isVariableStatement(stmt)) {
+        for (const d of stmt.declarationList.declarations) {
+          if (tsmod.isIdentifier(d.name)) imported.add(d.name.text)
+        }
+      } else if (tsmod.isFunctionDeclaration(stmt) || tsmod.isClassDeclaration(stmt)) {
+        if (stmt.name) imported.add(stmt.name.text)
       }
     }
     const referenced = new Set<string>()

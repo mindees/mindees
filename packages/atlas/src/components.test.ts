@@ -376,4 +376,17 @@ describe('Stepper / SegmentedControl', () => {
       )[0]?.props.onPress,
     ).toBeUndefined()
   })
+
+  it('Accordion defaultOpen respects single-open mode (only the first seeds open)', () => {
+    const sections = [
+      { id: 's1', header: 'One', content: createElement(Text, {}, 'Content 1') },
+      { id: 's2', header: 'Two', content: createElement(Text, {}, 'Content 2') },
+    ]
+    const single = renderToString(Accordion({ sections, defaultOpen: ['s1', 's2'] }))
+    expect(single).toContain('Content 1')
+    expect(single).not.toContain('Content 2') // single-open: only the first default seeds open
+    const multi = renderToString(Accordion({ sections, defaultOpen: ['s1', 's2'], multiple: true }))
+    expect(multi).toContain('Content 1')
+    expect(multi).toContain('Content 2')
+  })
 })

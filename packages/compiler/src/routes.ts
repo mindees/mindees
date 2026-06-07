@@ -202,7 +202,10 @@ export function generateRouteModule(
     .filter((f) => ROUTE_FILE.test(f))
     .sort()
   const imports = routeFiles.map(
-    (file, i) => `import * as _route${i} from '${importBase}/${stripExt(file)}'`,
+    // JSON.stringify the specifier (escaped, double-quoted) — a filename with a quote/special char
+    // would otherwise terminate the string literal and emit a non-parsing module (the map key below
+    // is already escaped this way).
+    (file, i) => `import * as _route${i} from ${JSON.stringify(`${importBase}/${stripExt(file)}`)}`,
   )
   const entries = routeFiles.map((file, i) => `  ${JSON.stringify(file)}: _route${i},`)
   const header =
