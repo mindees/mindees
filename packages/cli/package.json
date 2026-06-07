@@ -28,7 +28,9 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "gen:android-template": "node scripts/gen-android-template.mjs",
+    "check:android-template": "node scripts/gen-android-template.mjs && git diff --exit-code src/android-template.generated.ts"
   },
   "dependencies": {
     "@mindees/core": "workspace:*",

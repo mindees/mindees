@@ -8,7 +8,11 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/assets/mindees-app.bundle.js"]
+    "includes": [
+      "**",
+      "!**/assets/mindees-app.bundle.js",
+      "!packages/cli/src/android-template.generated.ts"
+    ]
   },
   "formatter": {
     "enabled": true,

@@ -1,0 +1,62 @@
+# MindeesNative — Android app (experimental)
+
+A standalone native **Android** app built with MindeesNative. The UI is authored in
+TypeScript/TSX (Atlas components + the Quantum file-based router) and runs on a real
+Android view tree through an **embedded QuickJS** runtime. The native host
+(`mindees-host/`) is **vendored as Kotlin source** — no Maven dependency on
+MindeesNative is required.
+
+> **Experimental.** This scaffold is verified end-to-end in CI (the app-js bundle
+> builds from npm and `gradle assembleDebug` produces an APK containing it), but the
+> native mobile product is pre-1.0. Expect rough edges.
+
+## Prerequisites
+
+- **JDK 17**
+- **Gradle 9.4.1+** (AGP 9.2 requires it) — used once to bootstrap the wrapper
+- **Android SDK** with `platforms;android-36`
+- **Node 20+** (for the app-js bundle)
+
+## Build (two phases, in order)
+
+The native app loads `mindees-example-app/src/main/assets/mindees-app.bundle.js`,
+which is **generated** from the TSX app — it is git-ignored and absent until you build
+it. Build the JS bundle **first**, then the APK:
+
+```sh
+# 1. Build the JS app bundle (installs @mindees/* from npm, runs route codegen + tsdown)
+cd mindees-example-app/app-js
+npm install
+npm run build            # → ../src/main/assets/mindees-app.bundle.js
+
+# 2. Build the Android APK
+cd ../..
+gradle wrapper --gradle-version 9.4.1   # one-time: the wrapper jar isn't vendored
+./gradlew :mindees-example-app:assembleDebug
+# → mindees-example-app/build/outputs/apk/debug/*.apk
+```
+
+Install the APK on a device/emulator with `./gradlew :mindees-example-app:installDebug`.
+
+## Project layout
+
+```
+mindees-host/            # the native renderer + JS↔native bridge — VENDORED Kotlin source
+mindees-example-app/
+  app-js/                # your TypeScript/TSX app (Atlas + router); builds the JS bundle
+    src/app/             # file-based routes — drop a .tsx file to add a screen
+    src/main.tsx         # entry: createNativeApp(...)
+  src/main/kotlin/       # the Android host shell (MainActivity, QuickJS bridge)
+```
+
+Edit your UI under `mindees-example-app/app-js/src/`, re-run the app-js build, then
+re-run `assembleDebug`.
+
+## Notes & limitations (experimental)
+
+- The Android package id is `dev.mindees.example` and `rootProject.name` is fixed, so
+  two scaffolds can't be installed side-by-side yet (namespace parameterization is a
+  planned enhancement).
+- App-level Android dependencies (QuickJS, AndroidX, FlexboxLayout) still come from
+  Maven Central / Google — "no Maven" applies to the **MindeesNative host**, which is
+  vendored as source.

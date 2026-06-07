@@ -1,0 +1,35 @@
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { defineConfig } from 'tsdown'
+
+const here = dirname(fileURLToPath(import.meta.url))
+
+/**
+ * Bundles the TSX-authored Atlas + Helix + Quantum app (src/main.tsx) into a single
+ * QuickJS-safe IIFE the Android host loads from assets. `@mindees/*` resolve from
+ * node_modules via their package `exports` (incl. the automatic JSX runtime subpath
+ * `@mindees/core/jsx-runtime`, see tsconfig.json) and are inlined into the IIFE — the
+ * framework has no node-builtin runtime deps. A banner polyfills `queueMicrotask`
+ * (some embedded engines lack it) before any module initializes.
+ */
+export default defineConfig({
+  entry: [resolve(here, 'src/main.tsx')],
+  outDir: resolve(here, '..', 'src', 'main', 'assets'),
+  format: ['iife'],
+  globalName: 'MindeesAppBundle',
+  platform: 'node',
+  target: 'es2020',
+  // Inline the framework packages into the IIFE (they are package.json `dependencies`,
+  // which tsdown would otherwise treat as external bare imports — the embedded QuickJS
+  // engine has no module loader, so everything must be bundled).
+  noExternal: [/^@mindees\//],
+  dts: false,
+  clean: false,
+  minify: false,
+  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+  outputOptions: {
+    entryFileNames: 'mindees-app.bundle.js',
+    banner:
+      "if (typeof globalThis !== 'undefined' && typeof globalThis.queueMicrotask !== 'function') { globalThis.queueMicrotask = function (cb) { Promise.resolve().then(cb); }; }",
+  },
+})

@@ -8,6 +8,7 @@
  * @module
  */
 
+import { ANDROID_TEMPLATE_FILES } from './android-template.generated'
 import { VERSION } from './version'
 
 /** A template: a name, a description, and its files (relative path → contents). */
@@ -170,10 +171,27 @@ if (root) render(App, {}, createDomBackend(), root)
 }
 
 /** All built-in templates, keyed by name. */
+/**
+ * The `android` template (EXPERIMENTAL): a standalone native Android app you build with
+ * `gradle assembleDebug`. The UI is TSX (Atlas + the Quantum router) running on a real
+ * Android view tree via an embedded QuickJS runtime; the native host is vendored as
+ * Kotlin source (no Maven dependency on MindeesNative). Files are codegen'd from the
+ * CI-verified reference host (see scripts/gen-android-template.mjs), so they can't drift.
+ * Unlike the web templates this carries no root package.json/tsconfig — the app-js build
+ * lives under `mindees-example-app/app-js/`. See the scaffolded README for the build flow.
+ */
+const android: Template = {
+  name: 'android',
+  description:
+    'EXPERIMENTAL — a standalone native Android app (gradle assembleDebug; QuickJS-hosted, host vendored as source).',
+  files: ANDROID_TEMPLATE_FILES,
+}
+
 export const TEMPLATES: Record<string, Template> = {
   blank,
   counter,
   app,
+  android,
 }
 
 /** The default template name used when none is specified. */
