@@ -1,12 +1,15 @@
 import { createRoot, signal } from '@mindees/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   type AsyncState,
   useAsync,
   useCounter,
+  useDebounce,
+  useInterval,
   usePersistentSignal,
   usePrevious,
   useReducer,
+  useTimeout,
   useToggle,
 } from './hooks'
 
@@ -170,5 +173,86 @@ describe('usePersistentSignal', () => {
       s.set({ a: 2, b: ['x', 'y'] })
       expect(JSON.parse(storage.getItem('prefs') ?? 'null')).toEqual({ a: 2, b: ['x', 'y'] })
     })
+  })
+})
+
+describe('timer hooks', () => {
+  it('useDebounce updates only after the source settles', () => {
+    vi.useFakeTimers()
+    try {
+      createRoot(() => {
+        const src = signal('a')
+        const d = useDebounce(() => src(), 200)
+        expect(d()).toBe('a')
+        src.set('ab')
+        src.set('abc') // rapid changes coalesce
+        vi.advanceTimersByTime(199)
+        expect(d()).toBe('a') // not settled yet
+        vi.advanceTimersByTime(1)
+        expect(d()).toBe('abc') // settled → last value
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('useInterval runs on a cadence and clears on dispose', () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      let dispose = () => {}
+      createRoot((d) => {
+        dispose = d
+        useInterval(() => {
+          calls += 1
+        }, 100)
+      })
+      vi.advanceTimersByTime(350)
+      expect(calls).toBe(3)
+      dispose()
+      vi.advanceTimersByTime(300)
+      expect(calls).toBe(3) // cleared on dispose
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('useTimeout fires once after the delay', () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      createRoot(() => {
+        useTimeout(() => {
+          calls += 1
+        }, 100)
+      })
+      vi.advanceTimersByTime(99)
+      expect(calls).toBe(0)
+      vi.advanceTimersByTime(1)
+      expect(calls).toBe(1)
+      vi.advanceTimersByTime(500)
+      expect(calls).toBe(1) // once only
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('useInterval / useTimeout no-op when ms is null', () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      createRoot(() => {
+        useInterval(() => {
+          calls += 1
+        }, null)
+        useTimeout(() => {
+          calls += 1
+        }, null)
+      })
+      vi.advanceTimersByTime(1000)
+      expect(calls).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

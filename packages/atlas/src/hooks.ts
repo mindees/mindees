@@ -221,3 +221,39 @@ export function usePersistentSignal<T>(
   })
   return s
 }
+
+/**
+ * A debounced view of `source`: it follows `source` but only after the source has stopped changing
+ * for `ms` (e.g. a search box that queries after typing settles). Rapid changes coalesce to the last.
+ */
+export function useDebounce<T>(source: Accessor<T>, ms: number): Accessor<T> {
+  const out = signal(untrack(source))
+  effect(() => {
+    const value = source() // track
+    if (typeof setTimeout !== 'function') {
+      untrack(() => out.set(value)) // SSR/no-timer: pass through synchronously
+      return
+    }
+    const id = setTimeout(() => out.set(value), ms)
+    onCleanup(() => clearTimeout(id))
+  })
+  return () => out()
+}
+
+/** Run `callback` every `ms` while the owner is alive; pass `null` to pause. Cleared on dispose. */
+export function useInterval(callback: () => void, ms: number | null): void {
+  effect(() => {
+    if (ms === null || typeof setInterval !== 'function') return
+    const id = setInterval(() => callback(), ms)
+    onCleanup(() => clearInterval(id))
+  })
+}
+
+/** Run `callback` once after `ms`; pass `null` to cancel. Cleared on dispose before it fires. */
+export function useTimeout(callback: () => void, ms: number | null): void {
+  effect(() => {
+    if (ms === null || typeof setTimeout !== 'function') return
+    const id = setTimeout(() => callback(), ms)
+    onCleanup(() => clearTimeout(id))
+  })
+}
