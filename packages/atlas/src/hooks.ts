@@ -8,7 +8,15 @@
  * @module
  */
 
-import { type Accessor, batch, effect, onCleanup, signal, untrack } from '@mindees/core'
+import {
+  type Accessor,
+  batch,
+  effect,
+  onCleanup,
+  type Signal,
+  signal,
+  untrack,
+} from '@mindees/core'
 
 /** A boolean toggle (RN/React: bring-your-own). */
 export interface Toggle {
@@ -147,4 +155,69 @@ export function useAsync<T>(
   })
   if (options.immediate !== false) run()
   return { data: () => data(), error: () => error(), loading: () => loading(), run }
+}
+
+/** The minimal key/value store {@link usePersistentSignal} reads/writes (a Web Storage subset). */
+export interface SignalStorage {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+}
+
+/** Options for {@link usePersistentSignal}. */
+export interface PersistentSignalOptions<T> {
+  /** Where to persist. Defaults to `localStorage` on web; degrades to in-memory elsewhere (no-op). */
+  readonly storage?: SignalStorage
+  /** Serialize before saving (default `JSON.stringify`). */
+  readonly serialize?: (value: T) => string
+  /** Parse on restore (default `JSON.parse`). */
+  readonly deserialize?: (raw: string) => T
+}
+
+/** Web `localStorage` if available, else a no-op store (SSR/native without an injected storage). */
+function defaultStorage(): SignalStorage {
+  const ls = (globalThis as { localStorage?: SignalStorage }).localStorage
+  if (ls && typeof ls.getItem === 'function' && typeof ls.setItem === 'function') return ls
+  return { getItem: () => null, setItem: () => {} }
+}
+
+/**
+ * A signal that restores its initial value from a key/value store and auto-saves on every change —
+ * persist theme/prefs/UI state with one call. On web it uses `localStorage` by default; inject a
+ * `storage` (e.g. a Continuum-backed one) for native. A corrupt/unparseable stored value falls back
+ * to `initial`; storage errors (quota/SSR) are swallowed so the signal always works.
+ */
+export function usePersistentSignal<T>(
+  key: string,
+  initial: T,
+  options: PersistentSignalOptions<T> = {},
+): Signal<T> {
+  const storage = options.storage ?? defaultStorage()
+  const serialize = options.serialize ?? JSON.stringify
+  const deserialize = options.deserialize ?? (JSON.parse as (raw: string) => T)
+
+  let start = initial
+  let raw: string | null = null
+  try {
+    raw = storage.getItem(key)
+  } catch {
+    raw = null
+  }
+  if (raw !== null) {
+    try {
+      start = deserialize(raw)
+    } catch {
+      start = initial // corrupt payload → fall back
+    }
+  }
+
+  const s = signal(start)
+  effect(() => {
+    const value = s()
+    try {
+      storage.setItem(key, serialize(value))
+    } catch {
+      // quota exceeded / no storage → ignore; the in-memory signal still works
+    }
+  })
+  return s
 }

@@ -1,6 +1,14 @@
 import { createRoot, signal } from '@mindees/core'
 import { describe, expect, it } from 'vitest'
-import { type AsyncState, useAsync, useCounter, usePrevious, useReducer, useToggle } from './hooks'
+import {
+  type AsyncState,
+  useAsync,
+  useCounter,
+  usePersistentSignal,
+  usePrevious,
+  useReducer,
+  useToggle,
+} from './hooks'
 
 describe('useToggle', () => {
   it('toggles, sets, and reads reactively', () => {
@@ -112,5 +120,55 @@ describe('useAsync', () => {
     resolveStale(1) // #0 resolves late — must be ignored
     for (let k = 0; k < 4; k++) await Promise.resolve()
     expect(st.data()).toBe(2)
+  })
+})
+
+describe('usePersistentSignal', () => {
+  const mockStorage = (init: Record<string, string> = {}) => {
+    const m = new Map<string, string>(Object.entries(init))
+    return {
+      getItem: (k: string): string | null => m.get(k) ?? null,
+      setItem: (k: string, v: string): void => {
+        m.set(k, v)
+      },
+    }
+  }
+
+  it('restores from storage on init, then auto-saves on change', () => {
+    createRoot(() => {
+      const storage = mockStorage({ theme: '"dark"' })
+      const s = usePersistentSignal('theme', 'light', { storage })
+      expect(s()).toBe('dark')
+      s.set('solarized')
+      expect(storage.getItem('theme')).toBe('"solarized"')
+    })
+  })
+
+  it('uses the initial value when nothing is stored, and persists it', () => {
+    createRoot(() => {
+      const storage = mockStorage()
+      const s = usePersistentSignal('count', 7, { storage })
+      expect(s()).toBe(7)
+      expect(storage.getItem('count')).toBe('7')
+      s.set(8)
+      expect(storage.getItem('count')).toBe('8')
+    })
+  })
+
+  it('falls back to the initial value on a corrupt stored payload', () => {
+    createRoot(() => {
+      const storage = mockStorage({ n: 'not-json{' })
+      const s = usePersistentSignal('n', 42, { storage })
+      expect(s()).toBe(42)
+    })
+  })
+
+  it('round-trips complex JSON values', () => {
+    createRoot(() => {
+      const storage = mockStorage()
+      const s = usePersistentSignal('prefs', { a: 1, b: ['x'] }, { storage })
+      s.set({ a: 2, b: ['x', 'y'] })
+      expect(JSON.parse(storage.getItem('prefs') ?? 'null')).toEqual({ a: 2, b: ['x', 'y'] })
+    })
   })
 })

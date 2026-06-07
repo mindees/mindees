@@ -87,9 +87,12 @@ export { type AttachableGesture, GestureView, type GestureViewProps } from './ge
 export {
   type AsyncState,
   type Counter,
+  type PersistentSignalOptions,
+  type SignalStorage,
   type Toggle,
   useAsync,
   useCounter,
+  usePersistentSignal,
   usePrevious,
   useReducer,
   useToggle,
