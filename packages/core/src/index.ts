@@ -101,6 +101,7 @@ export {
   type Memo,
   memo,
   type Owner,
+  on,
   onCleanup,
   runWithOwner,
   type Signal,

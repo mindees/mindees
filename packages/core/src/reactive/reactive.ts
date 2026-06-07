@@ -688,6 +688,36 @@ export function untrack<T>(fn: () => T): T {
 }
 
 /**
+ * Make a computation react to an EXPLICIT dependency only — the body runs untracked, so signals it
+ * reads don't subscribe; only `deps` does. Wrap it in `effect`/`memo`: `effect(on(() => a(), (av) => …))`
+ * re-runs when `a` changes but not when other signals the body reads change. The callback receives the
+ * current dep value, the previous dep value, and its own previous return. With `{ defer: true }` the
+ * first run is skipped (deps are still tracked) — react only to *changes*, not the initial value.
+ *
+ * @example effect(on(() => userId(), (id) => { void load(id) }, { defer: true }))
+ */
+export function on<S, U>(
+  deps: Accessor<S>,
+  fn: (input: S, prevInput: S | undefined, prev: U | undefined) => U,
+  options?: { defer?: boolean },
+): () => U | undefined {
+  let defer = options?.defer ?? false
+  let prevInput: S | undefined
+  let prevResult: U | undefined
+  return () => {
+    const input = deps() // the ONLY tracked read
+    if (defer) {
+      defer = false
+      prevInput = input
+      return undefined
+    }
+    prevResult = untrack(() => fn(input, prevInput, prevResult))
+    prevInput = input
+    return prevResult
+  }
+}
+
+/**
  * Register a cleanup to run before the owning computation re-runs and when it
  * is disposed. No-op outside a reactive scope.
  */

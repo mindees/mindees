@@ -16,6 +16,7 @@ export {
   effect,
   getOwner,
   memo,
+  on,
   onCleanup,
   runWithOwner,
   setReactiveScheduler,
