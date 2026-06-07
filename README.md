@@ -15,7 +15,7 @@ OTA updates. Built in the open.
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
-[![Status: v0.8.0 experimental](https://img.shields.io/badge/status-v0.8.0%20experimental-orange.svg)](./STATUS.md)
+[![Status: v0.13.0 experimental](https://img.shields.io/badge/status-v0.13.0%20experimental-orange.svg)](./STATUS.md)
 [![npm](https://img.shields.io/badge/npm-%40mindees%2F*-cb3837.svg)](https://www.npmjs.com/org/mindees)
 
 [Status](./STATUS.md) · [Roadmap](./ROADMAP.md) · [Contributing](./CONTRIBUTING.md) · [RFCs](./rfcs/README.md) · [Discussions](https://github.com/mindees/mindees/discussions)
@@ -24,26 +24,33 @@ OTA updates. Built in the open.
 
 ---
 
-> ### ⚠️ v0.8.0 — experimental, building in the open (all 10 packages on npm)
+> ### ⚠️ v0.13.0 — experimental, building in the open (all 10 packages on npm)
 >
 > MindeesNative is **not production-ready yet** — we are building it in public and
 > follow one rule above all: **everything we ship actually works.**
 > [`STATUS.md`](./STATUS.md) is the honest, per-package source of truth.
 >
-> **Real and tested today:** fine-grained + **concurrent** reactivity (signals,
-> scheduler, `startTransition`/`deferred`), the Helix renderer with **real SSR**, the
-> compiler (now with an opt-in **perf-lint**), the CLI, the typed **router with an
-> animated stack navigator**, an **animation engine** (timing/spring/interpolate), a
-> **gesture system** (tap/long-press/pan/pinch/swipe), and a batteries-included
-> **Atlas** UI kit (20+ components, standard hooks, a `useForm` with Standard-Schema
-> validation). Animations/gestures/transitions run **smooth on a real Android device
-> via vsync**, verified in CI on an emulator through an embedded-QuickJS JS↔native
-> bridge; iOS has a JavaScriptCore bridge verified on the Simulator. Pulse OTA,
-> Continuum local-first data, and Synapse AI ship in their documented experimental
-> scope. **Still missing:** physical-device proof, a published native host library,
-> app-store packaging, and production hardening — so end-to-end production native
-> mobile apps are not ready yet. We benchmark against the **latest stable React
-> Native (0.85) and Flutter (3.44)**.
+> **The headline, real and CI-verified today: the *same* TypeScript app renders and is
+> interactive on web, Android, and iOS.** The Helix renderer drives a web/DOM target
+> (with real SSR), a real **Android** view tree (flex via FlexboxLayout, scrolling,
+> text, images, text inputs, elevation), and a real **iOS** UIKit tree
+> (UIStackView/Auto-Layout, scrolling, text, images, inputs) — and native **events
+> carry values**, so `onChangeText` delivers the typed text. Each is proven every PR on
+> a real **Android emulator** (Robolectric + QuickJS bridge) and a real **iOS Simulator**
+> (XCTest + JavaScriptCore bridge), no local Mac required.
+>
+> **The rest, real and tested:** fine-grained + **concurrent** reactivity, an
+> **animation engine** + **gesture system**, the typed **router** with an animated stack
+> navigator, the compiler with an opt-in **perf-lint** and **enforced perf budgets**, the
+> Helix **Canvas strand** (2D scene graph, WebGPU-ready), and a batteries-included
+> **Atlas** kit — **27+ components** (incl. Tabs, Accordion, Stepper, SegmentedControl,
+> Toast, Modal), **12+ hooks** (incl. `useForm`, `usePersistentSignal`, debounce/interval),
+> and theming. **Pulse** ships signed OTA + WASM modules + server-driven UI; **Continuum**
+> ships local-first CRDTs (LWW, OR-set, PN-counter, version vectors) + sync; **Synapse** is
+> the AI layer. **Still missing:** physical-device proof, a *published* native host library
+> (Maven/SPM), app-store packaging, and production hardening — so end-to-end production
+> native apps are not ready yet. We benchmark against the **latest stable React Native
+> (0.85) and Flutter (3.44)**.
 >
 > ⭐ **Star the repo** to follow along, and check the
 > [`good first issue`](https://github.com/mindees/mindees/labels/good%20first%20issue)
@@ -366,8 +373,9 @@ you're into language runtimes, compilers, reactivity, mobile, or docs.
 **Is MindeesNative a React Native alternative?**
 That's the goal — a TypeScript cross-platform framework that keeps React
 Native's strengths (familiar language, native UI, OTA updates) while removing
-its pain points (dependency hell, single-thread limits, debugging). It's at an
-early, experimental `v0.1.0` today.
+its pain points (dependency hell, single-thread limits, debugging). It's
+experimental (`v0.13.0`) but already renders the same app interactively on web,
+Android, and iOS in CI.
 
 **Is it a Flutter alternative?**
 Yes — without requiring a new language (Dart). You write TypeScript, target iOS,
@@ -377,14 +385,14 @@ Android and web, and get fine-grained reactivity and native UI.
 100% TypeScript. No new language to learn.
 
 **Can I build mobile apps with it today?**
-Not for production yet — it's an early, experimental `v0.1.0`. The reactive core, **web** renderer (with
-SSR), compiler, CLI, typed router, Pulse OTA, Continuum data, Synapse AI, Atlas UI,
-and the native rendering foundation all work in their documented experimental scope.
-The repo also has CI-verified iOS/Android host projects, an Android example app
-that runs on an emulator through an embedded QuickJS JS<->native bridge, and an
-iOS JavaScriptCore bridge exercised on an iOS Simulator. Still missing:
-physical-device proof, app-store packaging, and the production hardening expected
-before real mobile apps.
+Not for production yet — it's experimental (`v0.13.0`). But the *same* TypeScript app
+already renders **styled, laid-out, interactive UI on web, a real Android emulator,
+and a real iOS Simulator** in CI — flex, scrolling, text, images, text inputs, and
+events that carry values (native `onChangeText` works) — through embedded QuickJS
+(Android) and JavaScriptCore (iOS) JS↔native bridges. The reactive core, compiler,
+CLI, typed router, Pulse OTA, Continuum data, Synapse AI, and the Atlas UI kit all
+work in their documented experimental scope. Still missing: physical-device proof, a
+*published* native host library, app-store packaging, and production hardening.
 
 **Is it open source?**
 Yes — dual-licensed **MIT OR Apache-2.0**, built fully in the open.
