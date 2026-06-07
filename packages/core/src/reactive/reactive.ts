@@ -116,6 +116,19 @@ let effectKeySeq = 0
 let transitionDepth = 0
 /** Sync effects staled inside the current transition — treated as deferred for THIS drain only. */
 const transitionTagged = new Set<AnyComputation>()
+/**
+ * Effects currently holding a live deferred {@link ScheduledTask}. Urgent preemption (an urgent write
+ * interrupting a transition-deferred effect) is armed only when this is non-empty — so the entire
+ * preemption path is inert on every default/SSR run (no scheduler, or nothing deferred). A Set (not a
+ * counter) so membership is idempotent, never goes negative, and can be reconciled when the scheduler is
+ * detached/replaced.
+ */
+const deferredEffects = new Set<AnyComputation>()
+/**
+ * Bumped once per urgent write that can preempt, so a single {@link Computation.markStale} walk dedups
+ * its traversal (a diamond isn't re-walked per branch, an effect isn't preempted twice).
+ */
+let urgentEpoch = 0
 
 /**
  * Inject (or clear) the {@link Scheduler} that `effect(fn, { priority: 'normal' })` defers through.
@@ -123,7 +136,30 @@ const transitionTagged = new Set<AnyComputation>()
  * identical to today until a host wires one in. Pass `null` to detach.
  */
 export function setReactiveScheduler(scheduler: Scheduler | null): void {
+  if (scheduler !== reactiveScheduler && deferredEffects.size > 0) {
+    // Detaching/replacing while effects are deferred: their tasks belong to the OLD scheduler and would
+    // never run. Cancel them and re-queue the still-stale ones for a catch-up flush (the "no scheduler →
+    // synchronous" contract) so none is stranded DIRTY-but-unrunnable. Set the new scheduler FIRST so the
+    // flush uses its lane rules (→ null runs them all sync; → a new scheduler re-defers normal-lane ones).
+    const orphaned = [...deferredEffects]
+    deferredEffects.clear()
+    for (const e of orphaned) {
+      e.pendingTask?.cancel()
+      e.pendingTask = null
+      if (e.state !== CLEAN && e.state !== DISPOSED) effectQueue.push(e)
+    }
+    reactiveScheduler = scheduler
+    // Honor an open batch/transition: inside one, the batch-end flush drains effectQueue under the new
+    // scheduler — force-flushing here would expose a torn intermediate (the very thing batching hides).
+    if (batchDepth === 0) flushEffects()
+    return
+  }
   reactiveScheduler = scheduler
+}
+
+/** @internal Test-only: # of effects holding a live deferred task. Must return to 0 when idle. */
+export function _deferredEffectCount(): number {
+  return deferredEffects.size
 }
 
 /** @internal Test-only handle to a node behind an accessor. Not public API. */
@@ -156,6 +192,8 @@ class Computation<T> implements OwnerNode {
   lane: Priority = 'sync'
   /** A pending scheduled flush for a `'normal'`-lane effect (cancelled on disposal). */
   pendingTask: ScheduledTask | null = null
+  /** Last {@link urgentEpoch} a preemption walk visited this node (dedups diamond re-traversal). */
+  urgentSeen = 0
   /** Scheduler dedup key for a `'normal'`-lane effect (so rapid re-stales coalesce). */
   schedKey: string | undefined
   /**
@@ -202,6 +240,11 @@ class Computation<T> implements OwnerNode {
   write(value: T): T {
     if (this.equals !== false && this.equals(this.value, value)) return this.value
     this.value = value
+    // One fresh epoch per urgent write that can preempt, BEFORE propagation, so the whole markStale
+    // walk shares one stamp (the per-node epoch guard then dedups it). Inert on every default path.
+    if (reactiveScheduler !== null && transitionDepth === 0 && deferredEffects.size > 0) {
+      urgentEpoch++
+    }
     if (this.observers) {
       for (const o of this.observers) o.markStale(DIRTY)
     }
@@ -220,6 +263,10 @@ class Computation<T> implements OwnerNode {
       this.restaleRequested = true
       return
     }
+    // Urgent preemption is armed ONLY when a scheduler is live, we're OUTSIDE any transition, and at
+    // least one effect is currently deferred. On every default/SSR path this is `false`, so the tail
+    // below is inert (provably zero behavior change where nothing is deferred).
+    const preempt = reactiveScheduler !== null && transitionDepth === 0 && deferredEffects.size > 0
     if (this.state < state) {
       const wasClean = this.state === CLEAN
       this.state = state
@@ -232,6 +279,23 @@ class Computation<T> implements OwnerNode {
         }
       }
       if (this.observers) {
+        for (const o of this.observers) o.markStale(CHECK)
+      }
+    }
+    // URGENT PREEMPTION: an urgent write must reach a transition-deferred effect even when the gate
+    // above no-ops (this node is already at/above `state`) — exactly where the mark used to die at an
+    // already-colored computed. Decided PER NODE, not from `state`. The epoch guard makes each node act
+    // at most once per urgent write (diamond-safe). preemptEffect re-queues the effect synchronously, so
+    // the write()'s own flushEffects() then runs it with the urgent value.
+    if (preempt && this.urgentSeen !== urgentEpoch) {
+      this.urgentSeen = urgentEpoch
+      if (this.isEffect) {
+        // Preempt ONLY a transition-deferred SYNC effect (a normally-urgent effect a startTransition
+        // temporarily parked). A `priority:'normal'` effect is permanently deferred by the dev's explicit
+        // choice — an urgent write must NOT force it synchronous; it stays deferred and runs the latest
+        // value on the next drain (markStale already kept it deferred).
+        if (this.pendingTask && this.lane === 'sync') preemptEffect(this)
+      } else if (this.observers && this.state >= CHECK) {
         for (const o of this.observers) o.markStale(CHECK)
       }
     }
@@ -421,6 +485,7 @@ function disposeComputation(node: AnyComputation): void {
       node.pendingTask.cancel()
       node.pendingTask = null
     }
+    deferredEffects.delete(node) // idempotent; no-op unless this effect was deferred
   }
 }
 
@@ -433,6 +498,26 @@ function adopt(node: AnyComputation): void {
 // ---------------------------------------------------------------------------
 // Effect scheduling
 // ---------------------------------------------------------------------------
+
+/**
+ * Preempt a transition-deferred effect: cancel its scheduled task and re-queue it for SYNCHRONOUS
+ * flush, so an urgent write that reached it runs it now (with the urgent value) rather than later. Its
+ * source chain is already (re)colored by the urgent mark, so {@link Computation.updateIfNecessary}
+ * recomputes its computeds in order first — glitch-free. Does NOT force the color: a deferred effect is
+ * already CHECK or DIRTY, and leaving CHECK as CHECK lets updateIfNecessary VALIDATE its sources and
+ * SUPPRESS the run when the observed value is unchanged (no redundant recompute). Always re-queues (no
+ * `includes` guard): a deferred effect with a pendingTask always sits at an ALREADY-DRAINED index, so
+ * the live drain's cursor is past it — the appended copy is the one that runs, exactly once.
+ */
+function preemptEffect(e: AnyComputation): void {
+  if (e.state === DISPOSED) return
+  if (e.pendingTask) {
+    e.pendingTask.cancel()
+    e.pendingTask = null
+  }
+  deferredEffects.delete(e)
+  effectQueue.push(e)
+}
 
 function flushEffects(): void {
   if (flushing) return
@@ -467,10 +552,12 @@ function flushEffects(): void {
           node.pendingTask = sched.schedule(
             () => {
               node.pendingTask = null
+              deferredEffects.delete(node)
               if (node.state !== CLEAN && node.state !== DISPOSED) node.updateIfNecessary()
             },
             { priority: 'normal', key: node.schedKey },
           )
+          deferredEffects.add(node) // idempotent; arms urgent preemption while this effect is deferred
         } else {
           // Synchronous lane — byte-identical to the pre-scheduler behavior (and the path every
           // existing test + SSR takes, since `lane` is 'sync' and/or no scheduler is injected).
