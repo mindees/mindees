@@ -5,9 +5,10 @@ installed apps without an app-store release, safely.
 
 > Status: 🧪 **Experimental** — Phase 9 (Pulse) is complete in its current scope.
 > Implemented and tested: signed OTA core, differential bundle diffing, the reference
-> update server, and server-driven UI (SDUI). The WASM module runtime is a 🔬 research
-> track (`createWasmModuleRuntime()` throws `NotImplementedError`). See the repository
-> [STATUS.md](../../STATUS.md).
+> update server, server-driven UI (SDUI), and a real **sandboxed WASM module runtime**
+> (`createWasmModuleRuntime()` — capability-secure, core WebAssembly; the full WASM
+> Component Model / WASI 0.2/0.3 is a labeled follow-up behind the same seam). See the
+> repository [STATUS.md](../../STATUS.md).
 
 ## What works today
 
@@ -69,6 +70,29 @@ registry and compiles it to a `@mindees/core` `MindeesNode`:
 Incremental updates use a pure-TS RFC 7396 merge-patch (`applyMergePatch`) and a safe
 RFC 6902 subset (`applyJsonPatch` — `add`/`remove`/`replace`); a patched tree must be
 re-run through `compileSdui` before render. Design: [ADR-0011](../../docs/adr/0011-pulse-sdui.md).
+
+## Sandboxed WASM modules
+
+`@mindees/updates` ships a real, **capability-secure** WebAssembly runtime so an OTA
+update can carry signed feature modules that run at runtime, isolated in their own linear
+memory. `createWasmModuleRuntime()` returns a runtime whose `instantiate`:
+
+- **is the sandbox** — a module sees ONLY the `capabilities` you pass as its import object;
+  it has no ambient access to the JS realm, the network, or the DOM,
+- **fails closed** — a module that asks for a capability it wasn't granted (`LinkError`),
+  malformed bytecode, or an over-budget module (default 16 MiB cap) is rejected
+  deterministically with `UpdateError('MODULE_INVALID')`,
+- **runs everywhere** — core WebAssembly, so it works on Hermes/React Native, Node, and the
+  web today without a native module; the full WASM **Component Model** (WASI 0.2/0.3 typed
+  interfaces) is a labeled follow-up that slots in behind the same `instantiate` seam.
+
+```ts
+import { createWasmModuleRuntime } from '@mindees/updates'
+
+const runtime = createWasmModuleRuntime()
+const mod = await runtime.instantiate(wasmBytes, { host: { inc: (n: number) => n + 1 } })
+mod.call<number>('run', 41) // → 42, using only the granted host.inc capability
+```
 
 ## Quick start
 

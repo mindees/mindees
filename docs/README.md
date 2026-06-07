@@ -12,6 +12,6 @@ This directory holds project documentation that lives in the repository.
   implemented hot paths.
 
 The full documentation site (getting started, guides, API reference, the
-honest maturity matrix) is built in a later phase under `mindees/docs`. Until
+honest maturity matrix) is still a later phase and has not been built yet. Until
 then, the source of truth for "what works today" is the root
-[`STATUS.md`](../STATUS.md).
+[`STATUS.md`](../STATUS.md), which tracks the current **0.13.0** release line.

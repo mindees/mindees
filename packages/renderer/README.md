@@ -6,12 +6,16 @@ reactive bindings**: a changing signal patches exactly the affected
 attribute/text/region — no virtual-DOM diffing.
 
 > **Status: 🧪 Experimental.** Implemented and tested: the reconciler, the
-> **web/DOM backend**, **SSR + hydration**, a **headless** test backend, a
-> **native command backend** (`createNativeCommandBackend()`), a strict reference
-> host (`createReferenceHost()`), and iOS/Android host projects that compile and
-> render the command stream into native view trees in CI. A full end-to-end native
-> app bridge/embedded JS engine and GPU canvas remain **research tracks**; the
-> direct `createNativeBackend()` and `createCanvasBackend()` seams throw
+> **web/DOM backend**, **SSR + hydration**, a **headless** test backend, the
+> **Helix Canvas strand** (`createCanvas2DBackend()` — a reconciler-driven 2D
+> scene graph), a **native command backend** (`createNativeCommandBackend()`), a
+> one-call native entry (`createNativeApp()`), and a strict reference host
+> (`createReferenceHost()`). The same TypeScript app now runs **end to end on a
+> real Android emulator (embedded QuickJS bridge) and a real iOS simulator
+> (JavaScriptCore)** — both CI-verified — with native events that carry values
+> (e.g. `onChangeText` delivers the typed text). The **GPU** canvas
+> (wgpu/WebGPU) and a direct in-process runtime native backend remain **research
+> tracks**; the `createNativeBackend()` and `createCanvasBackend()` seams throw
 > `NotImplementedError`. APIs may change before `1.0`.
 
 ## Install
@@ -29,8 +33,9 @@ pnpm add @mindees/renderer
   `text`→`span`, …), unlike canvas-based web renderers. `hydrate` attaches
   reactivity on the client.
 - **Backend-agnostic** — the reconciler speaks only the `HostBackend` contract,
-  so a new platform is "implement `HostBackend<N>`." DOM, headless, native command
-  stream, and reference-host validation ship today.
+  so a new platform is "implement `HostBackend<N>`." DOM, headless, the 2D Canvas
+  strand, the native command stream (running on a real Android emulator + iOS
+  simulator via embedded JS), and reference-host validation all ship today.
 
 ## Quick start
 
@@ -77,12 +82,15 @@ const commands = backend.flushCommands() // ship this batch to a native host
 // backend.dispatchEvent(handlerId, event)
 ```
 
-> This is the **foundation** for native rendering — it produces the command
-> stream, and the host projects in
+> This is the engine behind native rendering — it produces the command stream,
+> and the host projects in
 > [`examples/native-hosts/`](https://github.com/mindees/mindees/tree/main/examples/native-hosts)
-> replay/render that stream in CI. You cannot build a native mobile app
-> end-to-end yet because Phase 8F still needs an embedded JS engine plus a
-> JS↔native bridge running the reactive app on-device.
+> replay/render that stream. Phase 8F is **done**: those hosts now embed a JS
+> engine (QuickJS on Android, JavaScriptCore on iOS) plus a JS↔native bridge that
+> runs the reactive app **on-device**, so the same app renders + is interactive on
+> a real Android emulator and iOS simulator in CI. For an app you'd use the
+> higher-level [`createNativeApp()`](#one-call-native-entry-createnativeapp) below
+> rather than wiring the command backend by hand.
 
 ### Reference host + conformance contract (Phase 8B)
 
@@ -103,6 +111,46 @@ host.serialize()      // the reconstructed tree, e.g. '<button>count: 0</button>
 host.liveNodeCount()  // 0 after app.dispose() — no orphaned/leaked nodes
 ```
 
+### One-call native entry (`createNativeApp`)
+
+`createNativeApp(<App />)` is the whole entry file for a MindeesNative app on an
+embedded native host. It wires the command backend, renders the root, flushes the
+initial batch, and exposes the `start()` / `dispatchEvent()` / `frameTick()`
+contract the host calls — so on-device it also makes **animations + concurrency
+work by default** (it installs the reactive scheduler and a vsync-driven frame
+source that runs **only while something is animating**, battery-friendly). Native
+events can **carry values**: `dispatchEvent(handlerId, text)` wraps `text` as
+`{ target: { value } }` so handlers read it via the standard event shape.
+
+```tsx
+import { createNativeApp } from '@mindees/renderer'
+import { App } from './App'
+
+createNativeApp(<App />) // host injects MindeesHost.emit + calls MindeesApp.start()
+```
+
+The Android (QuickJS) and iOS (JavaScriptCore) hosts in `examples/native-hosts/`
+run exactly this on a real emulator/simulator in CI.
+
+### Canvas strand (`createCanvas2DBackend`)
+
+The **same reconciler** can drive a retained-mode 2D scene graph — Flutter-grade
+pixel control exactly where you want it. A `canvas-rect` / `canvas-circle` /
+`canvas-line` / `canvas-text` subtree is built + fine-grain-diffed by Helix, and
+`paint(ctx, w, h)` rasterizes it. The 2D context is an interface, so a real
+`CanvasRenderingContext2D` satisfies it on web today and a WebGPU rasterizer can
+drive the same scene later without touching app code (the **GPU** backend itself
+is still a research track — see `createCanvasBackend` below).
+
+```ts
+import { createElement as h } from '@mindees/core'
+import { createCanvas2DBackend, render } from '@mindees/renderer'
+
+const backend = createCanvas2DBackend({ onDirty: () => requestRepaint() })
+render(() => h('canvas-rect', { x: 8, y: 8, width: 64, height: 64, fill: '#09f' }), backend, backend.root)
+backend.paint(ctx, 320, 240) // once for static art, or on a frame loop for animation
+```
+
 ## API
 
 | Export | Kind | Description |
@@ -112,12 +160,14 @@ host.liveNodeCount()  // 0 after app.dispose() — no orphaned/leaked nodes
 | `hydrate(container, node\|component, [props,] opts?)` | fn | Attach reactivity to server HTML (developer preview). |
 | `createDomBackend(doc?)` | fn | Web/DOM `HostBackend`. |
 | `createHeadlessBackend()` / `createHeadlessRoot()` | fn | In-memory backend (tests, snapshots, SSR). |
+| `createCanvas2DBackend(opts?)` | fn | Helix Canvas strand: reconciler-driven 2D scene graph; `paint(ctx, w, h)` rasterizes. |
 | `domTagFor(tag)` | fn | Map a semantic tag to its HTML tag. |
 | `HostBackend` / `SerializableBackend` | type | The platform seam. |
 | `createNativeCommandBackend(opts?)` | fn | Native `HostBackend` that emits a serializable `NativeCommand` stream (Phase 8A). |
+| `createNativeApp(node, opts?)` | fn | One-call native entry: wires the command backend + reactive engines + host contract (`start`/`dispatchEvent`/`frameTick`). |
 | `createReferenceHost(rootId?)` | fn | Strict reference host: replays + validates a `NativeCommand` stream (Phase 8B). |
 | `NativeCommand` + `isNativeCommand` / `isNativePropValue` / `normalizeNativeProp` / `createNativeNodeIdFactory` | type/fn | The native command protocol + helpers. |
-| `createNativeBackend` / `createCanvasBackend` | fn | 🔬 research tracks (direct runtime native backend + GPU canvas) — throw `NotImplementedError`. |
+| `createNativeBackend` / `createCanvasBackend` | fn | 🔬 research tracks (direct in-process runtime native backend + GPU/WebGPU canvas) — throw `NotImplementedError`. |
 
 ### Reactive bindings
 

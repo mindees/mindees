@@ -22,7 +22,12 @@ Sources/MindeesNativeHost/
   MindeesNativeHost.swift    # generic host: applies + strictly validates the stream
   MindeesRuntimeBridge.swift # JavaScriptCore runtime bridge + generic bridge contract
   ModelRenderer.swift        # in-memory renderer (no UIKit) - used by swift test
-  UIKitRenderer.swift        # UIView renderer (the device-facing layer; #if canImport(UIKit))
+  UIKitRenderer.swift        # UIView renderer (the device-facing layer; #if canImport(UIKit)):
+                             #   flex (UIStackView + Auto Layout), scroll + horizontal scroll,
+                             #   text composition + styling, images (data-URI/base64 + bundled
+                             #   asset), TextInput (keyboard/secure/editable), ActivityIndicator,
+                             #   the box model, elevation/shadow, border radius, value-carrying
+                             #   input/change events
 Tests/MindeesNativeHostTests/
   MindeesNativeHostTests.swift        # mirrors the TS conformance suite
   MindeesRuntimeBridgeTests.swift     # JSCore bridge lifecycle + counter app tests
@@ -88,7 +93,15 @@ non-nil value as `{ target: { value } }`.
 - **Phase 8F-C** - `MindeesRuntimeBridge` + `JavaScriptCoreMindeesRuntime` embed a JS
   counter app, apply emitted command batches, and route a `UIButton` `.touchUpInside`
   target/action callback back into `MindeesApp.dispatchEvent(handlerId)` in the iOS
-  Simulator test.
-- Physical-device smoke execution is still pending. The tag-to-view mapping and prop
-  application are an intentional MVP - extend `UIKitRenderer.makeElement` / `setProp`
-  for a real design system.
+  Simulator test. Input/change events carry the field's current text back to JS.
+- **UIKit parity** (broadly tracks the Android `AndroidViewRenderer`): flex
+  (UIStackView + Auto Layout: direction, `space-between`, align, gap, padding), explicit
+  numeric box model, scroll + horizontal scroll, text composition + styling
+  (color/size/weight/align/numberOfLines), data-URI/base64 + bundled-asset images,
+  `TextInput` (placeholder/value/keyboard/secure/editable), `ActivityIndicator`,
+  background/border/radius/opacity, and elevation→shadow. Honest deferred gaps:
+  flex-wrap, `space-around`/`evenly` + per-child `alignSelf`/`flexGrow`, `'100%'`/`'auto'`
+  sizing, remote (http) image loading, and multiline `UITextView` — see the
+  `UIKitRenderer.swift` header.
+- Physical-device smoke execution is still pending. Extend `UIKitRenderer.makeElement`
+  / `setProp` to map further tags/props onto a fuller design system.

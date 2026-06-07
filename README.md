@@ -142,12 +142,15 @@ hydrate(document.getElementById('app'), Counter, {})
 ```
 
 One renderer, swappable **host backends**: a web/DOM backend, a headless backend,
-and a **native command backend** (compiles the tree + reactive updates into a
-serializable native command stream — Phase 8A) ship today. The iOS/Android host
-projects and platform-runtime render verification are in
-[`examples/native-hosts/`](./examples/native-hosts/) and CI; the remaining native
-gap is the end-to-end app bridge/embedded JS engine (Phase 8F). GPU canvas remains
-a research track.
+a **native command backend** (compiles the tree + reactive updates into a
+serializable native command stream — Phase 8A), and the Helix **Canvas strand**
+(`createCanvas2DBackend`, a WebGPU-ready 2D scene graph) all ship today. The
+iOS/Android host projects in [`examples/native-hosts/`](./examples/native-hosts/)
+now run the *same* app end-to-end through embedded JS engines — **QuickJS** on a
+real Android emulator and **JavaScriptCore** on a real iOS Simulator (Phase 8F),
+each render-verified every PR in CI. The remaining native gap is physical-device
+proof + a published host library, and the GPU-accelerated WebGPU canvas backend
+(`createCanvasBackend`) remains a research track.
 
 ### ⚙️ A compiler that won't let type errors ship (Phase 4)
 
@@ -258,10 +261,13 @@ form.field('email').error()   // reactive, per-field — re-renders only this fi
 ```
 
 `useForm` (Standard-Schema validation), `useToggle`/`useCounter`/`usePrevious`/
-`useReducer`/`useAsync`, plus **20+ accessible components** (`Checkbox`, `RadioGroup`,
-`Switch`, `Skeleton`, `Modal`, virtualized `List`, …) and **design-token theming**
-with automatic dark mode. And an opt-in **compiler perf-lint** warns you at build
-time when code will jank — something neither React Native nor Flutter ships.
+`useReducer`/`useAsync`/`usePersistentSignal`/`useDebounce`/`useInterval`/`useTimeout`,
+plus **27+ accessible components** (`Checkbox`, `RadioGroup`, `Switch`, `Skeleton`,
+`Tabs`, `Accordion`, `Stepper`, `SegmentedControl`, `Toast`, `Modal`, virtualized
+`List`, …) and **design-token theming** with automatic dark mode. And an opt-in
+**compiler perf-lint** — plus **enforced perf budgets** that fail the build when a
+hot path blows its budget — warns you when code will jank, something neither React
+Native nor Flutter ships.
 
 ## 📦 Packages
 
@@ -272,14 +278,14 @@ upgrades).
 | Package | Codename | Purpose | Status |
 | --- | --- | --- | --- |
 | [`@mindees/core`](./packages/core) | — | Reactivity (signals) + component model + scheduler + threading | 🧪 Experimental |
-| [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest | 🧪 Experimental |
+| [`@mindees/compiler`](./packages/compiler) | MDC | Build-time optimizer: type-check gate + TSX transform + tree-flatten + route manifest + perf-lint + enforced perf budgets (TS→native AOT 🔬) | 🧪 Experimental |
 | [`@mindees/cli`](./packages/cli) | Forge | `mindees` CLI: create / build / doctor / info / dev | 🧪 Experimental |
 | [`@mindees/router`](./packages/router) | Quantum | Typed router: codegen-free typed params + Standard-Schema search + signals-native state + nested rendering | 🧪 Experimental |
-| [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend + CI-verified iOS/Android host projects; full app bridge + GPU canvas 🔬 | 🧪 Experimental |
-| [`@mindees/atlas`](./packages/atlas) | Atlas | Accessible, signals-native UI primitives (View/Text/Image/TextInput/Pressable/Button/Stack/Row/Column/Spacer/ScrollView) + cross-platform `StyleObject`, `role`/`aria-*` a11y, real-DOM-event interaction, a structural theme, and a virtualized recycling `List`; native 🔬 | 🧪 Experimental |
+| [`@mindees/renderer`](./packages/renderer) | Helix | Reactive renderer: web/DOM + SSR/hydration + native command backend + Canvas strand (2D scene graph) + the *same* app render-verified on a real Android emulator (QuickJS) & iOS Simulator (JavaScriptCore) in CI; GPU/WebGPU canvas 🔬 | 🧪 Experimental |
+| [`@mindees/atlas`](./packages/atlas) | Atlas | 27+ accessible, signals-native components (View/Text/Image/TextInput/Pressable/Button + Card/Switch/Badge/Avatar/Chip/Tabs/Accordion/Stepper/SegmentedControl/Toast/Modal/…) + 12+ hooks, layout, cross-platform `StyleObject`, `role`/`aria-*` a11y, design-token theming + dark mode, and a virtualized recycling `List`; web real, native render-verified in CI | 🧪 Experimental |
 | [`@mindees/ai`](./packages/ai) | Synapse | Provider-agnostic AI: pure-TS contract + mock & inject-`fetch` server backends, `AsyncIterable` streaming, Standard-Schema structured output (`generateObject`/`streamObject`), bounded tool calling (`runTools`), and a dev-time error explainer; on-device runtime 🔬 | 🧪 Experimental |
-| [`@mindees/data`](./packages/data) | Continuum | Local-first: signals-native `createCollection` + HLC causality + CRDT merge (LWW + OR-Set) + delta sync + reference sync server + persistence export/restore | 🧪 Experimental |
-| [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** + **server-driven UI (SDUI)** | 🧪 Experimental |
+| [`@mindees/data`](./packages/data) | Continuum | Local-first: signals-native `createCollection` + HLC causality + CRDT merge (LWW + OR-Set + PN-Counter + MV-register) + version vectors + delta-sync engine + reference sync server + memory/web-storage persistence export/restore | 🧪 Experimental |
+| [`@mindees/updates`](./packages/updates) | Pulse | Signed OTA: hash-addressed manifest + Ed25519 signing (threshold/rotation) + content-addressed store + atomic rollback + **differential (delta) downloads** + **reference update server** + **server-driven UI (SDUI)** + a **sandboxed WASM module runtime** | 🧪 Experimental |
 | [`create-mindees`](./packages/create-mindees) | — | Project scaffolder (`npm create mindees`) | 🧪 Experimental |
 
 > 🧪 **Experimental** = implemented & tested, API may still change before `1.0`.
@@ -302,8 +308,8 @@ upgrades).
 - ✅ **Phase 8B** — native **host conformance contract**: a strict reference host (`createReferenceHost`) that replays + validates the command stream — the executable spec a real native host implements
 - ✅ **Phase 8C / 8D** — **iOS & Android host projects** ([examples/native-hosts/](./examples/native-hosts/)) compile + pass their conformance cores in CI (macOS runner for iOS; Linux + Android SDK for Android)
 - ✅ **Phase 8E** — both hosts **render** the command stream into correct native view trees, verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch)
-- 🧪 **Phase 8F-A/B** — Android embedded-runtime example app: QuickJS + JS↔native command bridge, APK assembly, and emulator-connected smoke test in CI
-- 🧪 **Phase 8F-C** - iOS embedded-runtime bridge: JavaScriptCore + JS<->native command bridge, model bridge tests, and iOS Simulator `UIButton` target/action smoke test in CI
+- ✅ **Phase 8F-A/B** — Android embedded-runtime example app: QuickJS + JS↔native command bridge, APK assembly, and an emulator-connected render/interaction test in CI (`native-android.yml`)
+- ✅ **Phase 8F-C** — iOS embedded-runtime bridge: JavaScriptCore + JS↔native command bridge, model bridge tests, and an iOS Simulator XCTest with value-carrying events in CI (`native-ios.yml`)
 - ✅ **Phase 9A** — Pulse **signed OTA core**: hash-addressed manifest + Ed25519 signing/verify (threshold + key rotation, pure-JS `@noble`) + content-addressed store + an update client with atomic generations & crash-loop rollback
 - ✅ **Phase 9B** — Pulse **differential downloads**: a zero-dep pure-TS byte-level delta codec (`diff`/`applyDelta`) so a changed asset ships as just its delta against a stored base, verified by the existing SHA-256 gate with a full-fetch fallback
 - ✅ **Phase 9C** — Pulse **reference update server**: a pure, capability-injected `createUpdateServer` (channel selection, staged rollout, anti-downgrade, freeze, rollback directives, content-addressed asset serving; never signs) + a runnable `node:http` adapter example
@@ -311,7 +317,7 @@ upgrades).
 - ✅ **Phase 10 (Continuum)** — **local-first data**: signals-native `createCollection` (10A) + Hybrid Logical Clock causality (10B) + CRDT conflict resolution — per-field LWW + add-wins OR-Set (10C) + a **delta-sync engine where two peers converge offline** (10D) + reference sync server and persistence export/restore (10E/10F)
 - ✅ **Phase 11 (Synapse) — provider-agnostic AI**: a pure-TS `AiBackend` (`createAi`) with a deterministic mock + an inject-`fetch` server backend (openai/anthropic), `AsyncIterable` streaming (11A/11B); Standard-Schema **structured output** (`generateObject`/`streamObject`, no `eval`, sanitize-before-validate) + a bounded **tool-calling loop** (`runTools`) (11C); and a dev-time **error explainer** (`mindees ai explain`) (11D) — on-device LLM inference is a labeled 🔬 research track
 - ✅ **Phase 12 (Atlas) — accessible UI primitives + virtualized list**: signals-native `View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button` + layout (`Stack`/`Row`/`Column`/`Spacer`/`ScrollView`), a curated cross-platform `StyleObject` (numbers → `px` on web), `role`/`aria-*` accessibility, real-DOM-event interaction, a structural theme (12A), and a **virtualized recycling `List`** that renders only the visible window and reuses rows as you scroll (12B) — renderer-agnostic trees, web real, native 🔬
-- ⏭️ **Phases 8F / 13** - physical-device native proof, then examples, benchmarks, docs site & release
+- ⏭️ **Phase 13** — physical-device native proof + a published native host library (Maven/SPM), then app-store packaging, production hardening, benchmarks, docs site & release
 
 Benchmark evidence for implemented hot paths lives in [`docs/benchmarks.md`](./docs/benchmarks.md).
 
@@ -319,7 +325,7 @@ Full plan: [ROADMAP.md](./ROADMAP.md).
 
 ## 🚀 Quickstart
 
-Scaffold a new app (the packages are published on npm at `0.1.0`, 🧪 experimental):
+Scaffold a new app (the packages are published on npm at `0.13.0`, 🧪 experimental):
 
 ```bash
 npm create mindees@latest my-app -- --template counter

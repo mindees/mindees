@@ -4,9 +4,10 @@
 
 > Status: 🧪 **Experimental** — Continuum Phases 10A–10F are implemented and tested:
 > the reactive document store, Hybrid Logical Clock causality, CRDT conflict resolution
-> (per-field LWW + add-wins OR-Set), a local-first delta-sync engine where two peers
-> converge offline, a capability-injected reference sync server, and a persistence
-> contract with export/restore. Native durable adapters, production sync hardening, and
+> (per-field LWW + add-wins OR-Set + PN-Counter), a local-first delta-sync engine where
+> two peers converge offline, a capability-injected reference sync server, and a
+> persistence contract with export/restore (in-memory + web-storage adapters). Native
+> durable adapters, production sync hardening, and
 > CRDT-library/rich-text interop are 🔬 research tracks. See the repository
 > [STATUS.md](../../STATUS.md).
 
@@ -32,15 +33,17 @@ The package also ships the sync and durability pieces that build on the store:
 
 - **Causality primitives** — `createClock`, HLC encode/decode/compare helpers, and
   version vectors for drift-guarded causal ordering.
-- **CRDT conflict helpers** — per-field LWW Register/Map and add-wins OR-Set merge
-  utilities, property-tested for convergence.
+- **CRDT conflict helpers** — per-field LWW Register/Map, add-wins OR-Set, and a
+  PN-Counter (increment/decrement integer counter) merge utilities, property-tested for
+  convergence.
 - **Delta sync** — `createSyncEngine`, `createMutationLog`, `createMemoryHub`, and the
   `SyncTransport` contract for optimistic local writes plus push/pull/merge.
 - **Reference sync server** — `createSyncServer` from `@mindees/data/server` over an
   injected `OpLogStore`, with a runnable `node:http` example in
   [`examples/data-sync-server`](../../examples/data-sync-server).
-- **Persistence contract** — `Persistence`, `createMemoryPersistence`, and engine
-  `export()`/restore so replicas keep stable identity across restarts.
+- **Persistence contract** — `Persistence`, `createMemoryPersistence`,
+  `createWebStoragePersistence`, and engine `export()`/restore so replicas keep stable
+  identity across restarts.
 
 ```ts
 import { createCollection } from '@mindees/data'
