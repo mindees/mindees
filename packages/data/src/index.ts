@@ -40,6 +40,14 @@ export {
   type Id,
   type OptimisticChange,
 } from './collection'
+export {
+  type Counter,
+  counterDec,
+  counterInc,
+  counterValue,
+  emptyCounter,
+  mergeCounter,
+} from './counter'
 export { DataError, type DataErrorCode } from './errors'
 export {
   type Clock,
