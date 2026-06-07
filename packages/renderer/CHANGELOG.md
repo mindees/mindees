@@ -1,5 +1,12 @@
 # @mindees/renderer
 
+## 0.22.4
+
+### Patch Changes
+
+- Updated dependencies [6782bee]
+  - @mindees/core@0.22.4
+
 ## 0.22.3
 
 ### Patch Changes
