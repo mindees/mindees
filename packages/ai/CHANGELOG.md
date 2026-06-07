@@ -1,5 +1,17 @@
 # @mindees/ai
 
+## 0.14.0
+
+### Minor Changes
+
+- c3f95ee: Add **`withRetry`** — wrap any `AiBackend` so one-shot `generate` retries transient failures (network
+  blips, 429s, 5xx) with exponential backoff. Configurable `maxAttempts`/`shouldRetry`/`backoffMs` and an
+  injectable `sleep` (deterministic tests). Streaming passes through unwrapped (mid-stream can't resume).
+
+### Patch Changes
+
+- @mindees/core@0.14.0
+
 ## 0.13.0
 
 ### Patch Changes

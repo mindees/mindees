@@ -1,5 +1,12 @@
 # create-mindees
 
+## 0.14.0
+
+### Patch Changes
+
+- @mindees/cli@0.14.0
+- @mindees/core@0.14.0
+
 ## 0.13.0
 
 ### Patch Changes
