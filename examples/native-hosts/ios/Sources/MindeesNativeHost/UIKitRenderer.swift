@@ -32,6 +32,8 @@ public final class UIKitRenderer: HostRenderer {
     /// hold child views, so its text-NODE children compose into its `.text` instead of nesting labels.
     private var textParts: [ObjectIdentifier: [UIView]] = [:]
     private var textOwner: [ObjectIdentifier: UIView] = [:]
+    /// The portal `overlay` nodes (Modal/Toast layer): pinned to fill their parent so they overlap content.
+    private var overlayViews: Set<ObjectIdentifier> = []
 
     /// The flex container to configure for a node: itself, or a scrollview's inner content stack.
     private func contentFor(_ view: UIView) -> UIView { scrollContent[ObjectIdentifier(view)] ?? view }
@@ -61,6 +63,12 @@ public final class UIKitRenderer: HostRenderer {
             return makeScrollHost(axis: .vertical)
         case "horizontalscrollview":
             return makeScrollHost(axis: .horizontal)
+        case "overlay":
+            // The portal layer (Modal/Toast). Pinned to fill its parent on insert + added last (on top).
+            let stack = UIStackView()
+            stack.axis = .vertical
+            overlayViews.insert(ObjectIdentifier(stack))
+            return stack
         default:
             // view / unknown tags → a flex container (default column, mirroring Android).
             let stack = UIStackView()
@@ -161,6 +169,19 @@ public final class UIKitRenderer: HostRenderer {
     // MARK: - Tree structure
 
     public func insert(parent: UIView, child: UIView, index: Int) {
+        // The portal `overlay` layer overlaps content: add it as a plain (non-arranged) subview pinned
+        // to fill the parent, on top of the z-order — so Modal/Toast cover the screen.
+        if overlayViews.contains(ObjectIdentifier(child)) {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            parent.addSubview(child) // added last → top
+            NSLayoutConstraint.activate([
+                child.topAnchor.constraint(equalTo: parent.topAnchor),
+                child.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
+                child.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
+                child.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
+            ])
+            return
+        }
         let target = contentFor(parent) // route scrollview children into the content stack
         if let stack = target as? UIStackView {
             let clamped = max(0, min(index, stack.arrangedSubviews.count))
@@ -194,6 +215,7 @@ public final class UIKitRenderer: HostRenderer {
         let id = ObjectIdentifier(view)
         scrollContent.removeValue(forKey: id)
         sizeConstraints.removeValue(forKey: id)
+        overlayViews.remove(id)
         // (Edit forwarders are associated objects on the field — auto-released when it deallocates.)
         // Detach from any text composition it participated in (as node or as owner).
         if let owner = textOwner.removeValue(forKey: id) {
