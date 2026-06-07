@@ -122,14 +122,22 @@ export function createServerBackend(options: ServerBackendOptions): AiBackend {
         // Terminal sentinel first: a completed stream must resolve normally even if the
         // signal flips on this exact iteration (no spurious ABORTED on a done stream).
         if (message.data.trim() === '[DONE]') return
-        if (request.signal?.aborted) throw new AiError('ABORTED', 'request aborted')
+        // Skip empty keep-alive/heartbeat events (a gateway/proxy may emit a bare `data:`) — JSON.parse('')
+        // would otherwise throw STREAM_PARSE and abort the whole stream.
+        if (message.data.trim() === '') continue
         let parsed: unknown
         try {
           parsed = JSON.parse(message.data)
         } catch {
           throw new AiError('STREAM_PARSE', `malformed SSE data: ${message.data.slice(0, 80)}`)
         }
-        for (const chunk of parseChunk(parsed)) yield chunk
+        const chunks = [...parseChunk(parsed)]
+        // A terminal (finish) event completes the stream — deliver it even if the signal just flipped
+        // (servers that omit [DONE] end with this event); only a MID-stream event honors a fresh abort.
+        if (!chunks.some((c) => c.type === 'finish') && request.signal?.aborted) {
+          throw new AiError('ABORTED', 'request aborted')
+        }
+        for (const chunk of chunks) yield chunk
       }
     },
   }

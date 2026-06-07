@@ -100,4 +100,16 @@ describe('buildProject', () => {
     expect(result.ok).toBe(true)
     expect(result.compiled).toEqual([])
   })
+
+  it('does not manifest a .jsx route the build never compiles (no dangling chunk)', () => {
+    const fs = createMemoryFileSystem({
+      'src/routes/index.tsx': `import { createElement } from "@mindees/core"
+export default () => <view/>`,
+      'src/routes/about.jsx': 'export default () => null',
+    })
+    const result = buildProject(fs)
+    expect(result.ok).toBe(true)
+    // the .jsx route has no emitted chunk → it must not appear in the manifest
+    expect(result.routes?.routes.some((r) => r.routePath === '/about')).toBe(false)
+  })
 })

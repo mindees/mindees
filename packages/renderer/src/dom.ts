@@ -159,6 +159,14 @@ export function createDomBackend(doc?: DomDocument): HostBackend<DomNode> {
       }
       if (key === 'style') {
         const style = el.style
+        // A STRING style (`style="color:red"`) → set cssText wholesale, symmetric with SSR which emits
+        // the string verbatim (was silently dropped before, breaking styling + hydration parity).
+        if (typeof value === 'string') {
+          style.cssText = value
+          return
+        }
+        // Switching away from a previous string style: clear it wholesale before the object diff.
+        if (typeof prev === 'string') style.cssText = ''
         const next = value && typeof value === 'object' ? (value as Record<string, unknown>) : null
         const prevObj = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : null
         // Clear keys present in the previous style object but absent from the

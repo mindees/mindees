@@ -87,11 +87,26 @@ function parseJsonArgs(value: unknown): unknown {
   }
 }
 
-/** Serialize a tool result to the string the wire APIs expect (never throws, cycle-safe-ish). */
+/** Serialize a tool result to the string the wire APIs expect (never throws; bigint- + cycle-safe). */
 function toWireString(value: unknown): string {
   if (typeof value === 'string') return value
+  if (value === null || typeof value !== 'object') {
+    return typeof value === 'bigint' ? value.toString() : String(value)
+  }
   try {
-    return JSON.stringify(value) ?? String(value)
+    // bigint → decimal string (plain JSON.stringify throws on it); re-seen objects → "[Circular]"
+    // (a true cycle would throw too) — so objects/arrays serialize losslessly instead of "[object Object]".
+    const seen = new WeakSet<object>()
+    return (
+      JSON.stringify(value, (_key, v) => {
+        if (typeof v === 'bigint') return v.toString()
+        if (v !== null && typeof v === 'object') {
+          if (seen.has(v)) return '[Circular]'
+          seen.add(v)
+        }
+        return v
+      }) ?? String(value)
+    )
   } catch {
     return String(value)
   }

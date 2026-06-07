@@ -194,4 +194,13 @@ describe('DOM backend — activityindicator spinner', () => {
     )
     expect(document.querySelectorAll('#mindees-keyframes').length).toBe(1)
   })
+
+  it('applies a string style via cssText (was silently dropped)', () => {
+    const container = document.createElement('div')
+    const backend = createDomBackend(document as never)
+    render(h('view', { style: 'color: red; padding: 8px' }, 'Hi'), backend, container as never)
+    const el = container.firstChild as HTMLElement
+    expect(el.style.cssText).toContain('color: red')
+    expect(el.style.cssText).toContain('padding: 8px')
+  })
 })

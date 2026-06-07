@@ -110,7 +110,9 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
   const routesDir = `${srcDir}/routes`
   if (fs.exists(routesDir)) {
     try {
-      routes = buildRouteManifest(fs.readDir(routesDir))
+      // Only manifest routes the build actually COMPILES (.tsx/.ts) — buildRouteManifest otherwise
+      // accepts .jsx/.js too, which the compile loop skips, leaving a manifest entry with no emitted chunk.
+      routes = buildRouteManifest(fs.readDir(routesDir).filter((f) => COMPILABLE.test(f)))
       fs.writeFile(`${outDir}/routes.manifest.json`, `${JSON.stringify(routes, null, 2)}\n`)
     } catch (e) {
       diagnostics.push({
