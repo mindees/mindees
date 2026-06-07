@@ -16,16 +16,26 @@
 #if canImport(UIKit)
 import UIKit
 
+/// Loads bytes for a remote image `url`, invoking `onResult` with the data (or nil on failure).
+public typealias ImageLoader = (_ url: String, _ onResult: @escaping (Data?) -> Void) -> Void
+
 /// Maps MindeesNative semantic tags to UIKit views and applies the command stream.
 public final class UIKitRenderer: HostRenderer {
     public typealias View = UIView
 
-    public init() {}
+    /// Override how remote (`http(s)`) images are fetched (e.g. to inject a cache or a test stub).
+    private let imageLoader: ImageLoader?
+
+    public init(imageLoader: ImageLoader? = nil) {
+        self.imageLoader = imageLoader
+    }
 
     // Side state — the iOS twins of the Android renderer's per-view HashMaps (the command
     // stream hands us only raw UIViews, so layout intent that can't live on the view lives here).
     /// A scrollview node's inner content UIStackView (children + flex styles route into it).
     private var scrollContent: [ObjectIdentifier: UIStackView] = [:]
+    /// Per-ImageView load generation, so a slow/stale remote fetch never overwrites a newer src/disposed view.
+    private var imageGen: [ObjectIdentifier: Int] = [:]
     /// Explicit size constraints per view+key, so re-applying width/height replaces (never stacks).
     private var sizeConstraints: [ObjectIdentifier: [String: NSLayoutConstraint]] = [:]
     /// Text composition (iOS twin of Android's textParts/textOwner): a `text` ELEMENT (UILabel) can't
@@ -216,6 +226,7 @@ public final class UIKitRenderer: HostRenderer {
         scrollContent.removeValue(forKey: id)
         sizeConstraints.removeValue(forKey: id)
         overlayViews.remove(id)
+        imageGen.removeValue(forKey: id) // invalidate any in-flight remote image fetch for this view
         // (Edit forwarders are associated objects on the field — auto-released when it deallocates.)
         // Detach from any text composition it participated in (as node or as owner).
         if let owner = textOwner.removeValue(forKey: id) {
@@ -458,13 +469,34 @@ public final class UIKitRenderer: HostRenderer {
                 image.image = decoded
             }
         } else if src.hasPrefix("http://") || src.hasPrefix("https://") {
-            // Remote loading is a follow-up (needs an off-main fetch + lifecycle hook) — leave unset.
+            // Remote: fetch via imageLoader (default URLSession), decode, set on main — guarded by a
+            // per-view generation token so a stale/slow fetch can't clobber a newer src/disposed view.
+            let id = ObjectIdentifier(image)
+            let token = (imageGen[id] ?? 0) + 1
+            imageGen[id] = token
+            let load = imageLoader ?? UIKitRenderer.defaultImageLoad
+            load(src) { [weak self, weak image] data in
+                guard let data, let decoded = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    guard let self, let image, self.imageGen[ObjectIdentifier(image)] == token else { return }
+                    image.image = decoded
+                }
+            }
         } else {
             let name = src
                 .replacingOccurrences(of: "asset:///", with: "")
                 .replacingOccurrences(of: "file:///android_asset/", with: "")
             if let bundled = UIImage(named: name) { image.image = bundled }
         }
+    }
+
+    /// Default remote loader: fetch the URL with URLSession (off-main inherently).
+    private static func defaultImageLoad(_ url: String, _ onResult: @escaping (Data?) -> Void) {
+        guard let parsed = URL(string: url) else {
+            onResult(nil)
+            return
+        }
+        URLSession.shared.dataTask(with: parsed) { data, _, _ in onResult(data) }.resume()
     }
 
     private func number(_ value: NativePropValue?) -> Double? {
