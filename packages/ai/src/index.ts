@@ -21,7 +21,7 @@ import { NotImplementedError, notImplemented } from '@mindees/core'
 export const name = '@mindees/ai'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.17.0'
+export const VERSION = '0.18.0'
 
 /** Current maturity of this package. See the repository `STATUS.md`. */
 export const maturity: Maturity = 'experimental'
