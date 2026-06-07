@@ -38,7 +38,7 @@ export type {
 export const name = '@mindees/compiler'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.22.5'
+export const VERSION = '0.22.6'
 
 /**
  * Current maturity. The build-time optimizer — type-check gate, TSX→createElement
