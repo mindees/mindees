@@ -19,6 +19,10 @@ export default defineConfig({
   globalName: 'MindeesAppBundle',
   platform: 'node',
   target: 'es2020',
+  // Inline the framework packages into the IIFE (they are package.json `dependencies`,
+  // which tsdown would otherwise treat as external bare imports — the embedded QuickJS
+  // engine has no module loader, so everything must be bundled).
+  noExternal: [/^@mindees\//],
   dts: false,
   clean: false,
   minify: false,
