@@ -92,9 +92,12 @@ export {
   type Toggle,
   useAsync,
   useCounter,
+  useDebounce,
+  useInterval,
   usePersistentSignal,
   usePrevious,
   useReducer,
+  useTimeout,
   useToggle,
 } from './hooks'
 export { type BaseProps, type Reactive, resolveStyle, toHostProps } from './host'
