@@ -47,7 +47,7 @@ export { naturalLanguageToTemplate } from '@mindees/cli'
 export const name = 'create-mindees'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.22.5'
+export const VERSION = '0.22.6'
 
 /** Current maturity. The scaffolder delegates to `@mindees/cli`'s tested core. */
 export const maturity: Maturity = 'experimental'
