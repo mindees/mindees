@@ -78,6 +78,7 @@ export {
   setEnvironment,
   useColorScheme,
   useKeyboard,
+  useReducedMotion,
   useSafeAreaInsets,
   useWindowDimensions,
   type WindowDimensions,

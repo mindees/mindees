@@ -50,12 +50,15 @@ export interface PlatformEnvironment {
   readonly colorScheme: ColorScheme
   readonly safeAreaInsets: SafeAreaInsets
   readonly keyboard: KeyboardState
+  /** Whether the user prefers reduced motion (OS accessibility setting / `prefers-reduced-motion`). */
+  readonly reducedMotion: boolean
 }
 
 const windowSignal = signal<WindowDimensions>({ width: 0, height: 0, scale: 1, fontScale: 1 })
 const colorSchemeSignal = signal<ColorScheme>('light')
 const safeAreaSignal = signal<SafeAreaInsets>({ top: 0, right: 0, bottom: 0, left: 0 })
 const keyboardSignal = signal<KeyboardState>({ visible: false, height: 0 })
+const reducedMotionSignal = signal<boolean>(false)
 
 /**
  * Update the platform environment. The host/runtime calls this — once on launch and
@@ -67,6 +70,7 @@ export function setEnvironment(env: Partial<PlatformEnvironment>): void {
   if (env.colorScheme) colorSchemeSignal.set(env.colorScheme)
   if (env.safeAreaInsets) safeAreaSignal.set(env.safeAreaInsets)
   if (env.keyboard) keyboardSignal.set(env.keyboard)
+  if (env.reducedMotion !== undefined) reducedMotionSignal.set(env.reducedMotion)
 }
 
 /** A snapshot of the current environment (non-reactive; for one-off reads). */
@@ -76,6 +80,7 @@ export function getEnvironment(): PlatformEnvironment {
     colorScheme: colorSchemeSignal(),
     safeAreaInsets: safeAreaSignal(),
     keyboard: keyboardSignal(),
+    reducedMotion: reducedMotionSignal(),
   }
 }
 
@@ -97,4 +102,12 @@ export function useSafeAreaInsets(): () => SafeAreaInsets {
 /** Reactive accessor for the soft-keyboard state. */
 export function useKeyboard(): () => KeyboardState {
   return keyboardSignal
+}
+
+/**
+ * Reactive accessor for the user's reduced-motion preference (a11y). Honor it by skipping/shortening
+ * animations — e.g. `timing(x, { to, duration: useReducedMotion()() ? 0 : 250 })`.
+ */
+export function useReducedMotion(): () => boolean {
+  return reducedMotionSignal
 }

@@ -5,6 +5,7 @@ import {
   setEnvironment,
   useColorScheme,
   useKeyboard,
+  useReducedMotion,
   useSafeAreaInsets,
   useWindowDimensions,
 } from './environment'
@@ -62,5 +63,18 @@ describe('platform environment + device hooks', () => {
       expect(keyboardRuns).toBe(2)
       dispose()
     })
+  })
+
+  it('useReducedMotion tracks the reduced-motion preference reactively', () => {
+    setEnvironment({ reducedMotion: false })
+    const seen: boolean[] = []
+    createRoot(() => {
+      const reduced = useReducedMotion()
+      effect(() => seen.push(reduced()))
+    })
+    expect(seen.at(-1)).toBe(false)
+    setEnvironment({ reducedMotion: true })
+    expect(seen.at(-1)).toBe(true)
+    expect(getEnvironment().reducedMotion).toBe(true)
   })
 })
