@@ -36,11 +36,13 @@ function escapeText(value: string): string {
 }
 
 /**
- * Render an attribute value: a `style` object becomes a CSS string via the SAME serializer
- * the DOM backend uses (kebab-case names + `px` units), so SSR markup matches the hydrated DOM.
+ * Render an attribute value. ONLY the `style` attribute runs the CSS serializer (kebab-case + `px`),
+ * matching the DOM backend so SSR markup equals the hydrated DOM. Gating on the NAME (not the value
+ * type) is essential: a non-`style` object prop (e.g. `data-config={{…}}`) must serialize the same way
+ * the DOM backend does (`String(value)`), not get CSS-mangled — otherwise SSR/DOM hydration diverges.
  */
-function serializeAttrValue(value: unknown): string {
-  if (value && typeof value === 'object') {
+function serializeAttrValue(key: string, value: unknown): string {
+  if (key === 'style' && value && typeof value === 'object') {
     return serializeStyle(value as Record<string, unknown>)
   }
   return String(value)
@@ -80,7 +82,7 @@ function serializeHeadless(node: HeadlessNode, options?: SerializeOptions): stri
     .map(([key, value]) =>
       // Boolean `true` → a valueless attribute (`disabled=""`), matching the DOM
       // backend (dom.ts) so SSR markup equals hydrated markup.
-      value === true ? ` ${key}=""` : ` ${key}="${escapeAttr(serializeAttrValue(value))}"`,
+      value === true ? ` ${key}=""` : ` ${key}="${escapeAttr(serializeAttrValue(key, value))}"`,
     )
     .join('')
   // HTML void elements (e.g. `img`, `input` — what `image`/`textinput` map to) have NO closing tag

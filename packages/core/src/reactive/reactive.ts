@@ -656,7 +656,10 @@ export function startTransition(fn: () => void): void {
  * synchronously (no lag), so SSR/tests see the live value. Must be created inside an owner.
  */
 export function deferred<T>(source: Accessor<T>): Accessor<T> {
-  const out = signal(source())
+  // Seed UNTRACKED: reading source() here would otherwise subscribe the ENCLOSING computation (the
+  // effect/computed deferred() is created in) to source — defeating the deferral and leaking an effect
+  // per re-run. The internal 'normal'-lane effect below still tracks source (lag-then-converge intact).
+  const out = signal(untrack(() => source()))
   effect(() => out.set(source()), { priority: 'normal' })
   return () => out()
 }

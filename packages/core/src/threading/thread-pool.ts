@@ -128,7 +128,9 @@ export function createWorkerPool(options: WorkerPoolOptions): ThreadPool {
       else job.reject(new Error(data.error ?? 'worker job failed'))
     }
     w.onerror = (event) => {
-      if (disposed) return
+      // Ignore a late/duplicate error from a worker that was already replaced at this index — without
+      // the identity check it would wrongly reject the LIVE replacement's jobs and evict it (same index).
+      if (disposed || workers[index] !== w) return
       // A worker crash loses EVERY job in flight on it (a worker can carry many
       // concurrently). Reject all of them — correlated by worker index, so a
       // healthy worker's jobs are never touched — then replace the dead worker in

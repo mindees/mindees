@@ -520,3 +520,38 @@ describe('server backend — errors', () => {
     )
   })
 })
+describe('server backend — SSE robustness (sweep 3)', () => {
+  it('skips empty keep-alive SSE events without crashing the stream', async () => {
+    const sse =
+      'data: {"choices":[{"delta":{"content":"He"}}]}\n\n' +
+      'event: ping\ndata: \n\n' + // empty keep-alive (JSON.parse('') used to throw STREAM_PARSE)
+      'data: {"choices":[{"delta":{"content":"llo"}}]}\n\n' +
+      'data: [DONE]\n\n'
+    const ai = createServerBackend({
+      fetch: fakeFetch({ body: bodyOf(sse) }),
+      baseUrl: 'x',
+      model: 'm',
+    })
+    const chunks = await collect(ai.stream({ messages: [] }))
+    expect(chunks).toEqual([
+      { type: 'text-delta', delta: 'He' },
+      { type: 'text-delta', delta: 'llo' },
+    ])
+  })
+
+  it('delivers the terminal finish event even if the signal flips and there is no [DONE]', async () => {
+    // A plain AbortLike (the package's signal contract) — AbortController isn't in the package's lib.
+    const signal = { aborted: false }
+    async function* body(): AsyncIterable<Uint8Array> {
+      yield enc.encode('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n')
+      signal.aborted = true // flips between the content event and the terminal finish event
+      yield enc.encode(
+        'data: {"choices":[{"finish_reason":"stop"}],"usage":{"completion_tokens":1}}\n\n',
+      )
+      // NO [DONE]: the finish event is the terminal one
+    }
+    const ai = createServerBackend({ fetch: fakeFetch({ body: body() }), baseUrl: 'x', model: 'm' })
+    const chunks = await collect(ai.stream({ messages: [], signal }))
+    expect(chunks.some((c) => c.type === 'finish')).toBe(true) // terminal event beats the fresh abort
+  })
+})

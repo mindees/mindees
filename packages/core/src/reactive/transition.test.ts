@@ -80,4 +80,18 @@ describe('deferred', () => {
       expect(view()).toBe(5) // synchronous fallback — SSR/test parity
     })
   })
+
+  it('deferred() inside an effect does not subscribe the enclosing effect to source', () => {
+    createRoot(() => {
+      const src = signal(0)
+      let outerRuns = 0
+      effect(() => {
+        outerRuns++
+        deferred(() => src())
+      })
+      expect(outerRuns).toBe(1)
+      src.set(1) // must NOT re-run the outer effect — the deferred seed is read untracked
+      expect(outerRuns).toBe(1)
+    })
+  })
 })

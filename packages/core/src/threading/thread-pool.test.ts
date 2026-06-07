@@ -177,4 +177,29 @@ describe('createNativeThreadPool (research track)', () => {
   it('throws NotImplementedError (honest, not a silent stub)', () => {
     expect(() => createNativeThreadPool()).toThrow(NotImplementedError)
   })
+
+  it('ignores a late onerror from a replaced worker (does not reject the live job)', async () => {
+    const created: WorkerLike[] = []
+    const createWorker = (): WorkerLike => {
+      const w: WorkerLike = {
+        onmessage: null,
+        onerror: null,
+        postMessage(message) {
+          const { id, input } = message as { id: number; input: unknown }
+          if (input === 'boom') queueMicrotask(() => w.onerror?.({ message: 'crashed' }))
+          else queueMicrotask(() => w.onmessage?.({ data: { id, ok: true, result: input } }))
+        },
+        terminate() {},
+      }
+      created.push(w)
+      return w
+    }
+    const pool = createWorkerPool({ size: 1, createWorker })
+    const gen0 = created[0]
+    await expect(pool.run((x: unknown) => x, 'boom')).rejects.toThrow('crashed') // gen0 crashes → replaced
+    const job = pool.run((x: unknown) => x, 'healthy') // dispatched to the replacement (gen1)
+    gen0?.onerror?.({ message: 'late stale crash' }) // OLD worker fires again — must be IGNORED
+    await expect(job).resolves.toBe('healthy') // the live replacement’s job survives
+    pool.dispose()
+  })
 })

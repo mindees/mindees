@@ -48,3 +48,14 @@ describe('headless SSR — style serialization matches the DOM', () => {
     expect(b.serialize(el)).toBe('<view style="width:10px"></view>')
   })
 })
+
+describe('headless backend — attribute serialization parity', () => {
+  it('does not CSS-mangle a non-style object prop (matches the DOM backend String(value))', () => {
+    const backend = createHeadlessBackend()
+    const el = backend.createElement('view')
+    backend.setProp(el, 'data-config', { foo: 'bar', baz: 1 }, undefined)
+    const html = backend.serialize(el)
+    expect(html).toContain('data-config="[object Object]"') // same as the DOM backend's String(value)
+    expect(html).not.toContain('foo:bar') // the CSS serializer must NOT run on a non-style prop
+  })
+})
