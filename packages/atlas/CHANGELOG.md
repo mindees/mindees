@@ -1,5 +1,19 @@
 # @mindees/atlas
 
+## 0.15.0
+
+### Minor Changes
+
+- 41b2999: Add **`useReducedMotion`** + a `reducedMotion` field on the platform environment — a reactive accessor
+  for the user's reduced-motion accessibility preference, so apps/animations can honor it (e.g. shorten or
+  skip transitions). Set via `setEnvironment({ reducedMotion })` from the host (web `prefers-reduced-motion`
+  / native OS setting).
+
+### Patch Changes
+
+- @mindees/core@0.15.0
+- @mindees/router@0.15.0
+
 ## 0.14.0
 
 ### Patch Changes

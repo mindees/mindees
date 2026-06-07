@@ -95,7 +95,7 @@ export type { StandardSchemaV1 } from './standard-schema'
 export const name = '@mindees/router'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.14.0'
+export const VERSION = '0.15.0'
 
 /**
  * Current maturity. Router I (typed params, Standard-Schema search, history, the
