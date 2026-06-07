@@ -1,5 +1,18 @@
 # @mindees/data
 
+## 0.22.0
+
+### Minor Changes
+
+- ac76066: Add **`createIndexedDbPersistence`** — a durable IndexedDB-backed Continuum `Persistence` for the
+  browser (large, async storage beyond `localStorage`'s synchronous ~5MB cap; a better home for a growing
+  op log / snapshot). The database + store open lazily and are reused; inject `factory` to run outside a
+  browser. Stays DOM-lib-free via a minimal `IndexedDbFactoryLike` surface (like `WebStorageLike`).
+
+### Patch Changes
+
+- @mindees/core@0.22.0
+
 ## 0.21.0
 
 ### Patch Changes
