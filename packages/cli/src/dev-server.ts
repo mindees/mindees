@@ -106,20 +106,23 @@ export interface DevServer {
   version(): number
 }
 
-const LIVE_RELOAD = (reloadPath: string, pollMs: number): string =>
-  `<script>(function(){var v=null;setInterval(function(){fetch(${JSON.stringify(reloadPath)}).then(function(r){return r.text()}).then(function(t){if(v===null){v=t}else if(t!==v){location.reload()}}).catch(function(){})},${pollMs})})()</script>`
+const LIVE_RELOAD = (reloadPath: string, pollMs: number, version: number): string =>
+  `<script>(function(){var v=${JSON.stringify(String(version))};setInterval(function(){fetch(${JSON.stringify(reloadPath)}).then(function(r){return r.text()}).then(function(t){if(t!==v){location.reload()}}).catch(function(){})},${pollMs})})()</script>`
 
 /** Create a live-reload {@link DevServer}. The handler serves the app HTML + a version endpoint. */
 export function createDevServer(options: DevServerOptions): DevServer {
   const reloadPath = options.reloadPath ?? '/__mindees/version'
   const pollMs = options.pollMs ?? 1000
-  const client = LIVE_RELOAD(reloadPath, pollMs)
   let version = 0
   let html = options.html
 
-  // Inject the live-reload client just before </body> (or append if there's no body tag).
-  const withClient = (h: string): string =>
-    h.includes('</body>') ? h.replace('</body>', `${client}</body>`) : h + client
+  // Inject the live-reload client just before </body> (or append if there's no body tag). Built
+  // PER-REQUEST with the CURRENT version as the client's baseline — so a rebuild that lands within the
+  // first poll window still differs from the served page and triggers a reload (no missed reloads).
+  const withClient = (h: string): string => {
+    const client = LIVE_RELOAD(reloadPath, pollMs, version)
+    return h.includes('</body>') ? h.replace('</body>', `${client}</body>`) : h + client
+  }
 
   return {
     version: () => version,

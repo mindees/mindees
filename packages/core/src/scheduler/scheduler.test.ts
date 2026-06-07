@@ -198,3 +198,33 @@ describe('flushSync — runaway loop guard', () => {
     expect(sched.size).toBe(0) // both lanes cleared
   })
 })
+
+describe('scheduler — re-key priority', () => {
+  it('re-keying with a changed priority relocates the task to the new lane (runs once)', () => {
+    const { scheduler } = manualScheduler()
+    const order: string[] = []
+    scheduler.schedule(() => order.push('keyed'), { key: 'k', priority: 'normal' })
+    scheduler.schedule(() => order.push('plain-sync'), { priority: 'sync' })
+    scheduler.schedule(() => order.push('keyed'), { key: 'k', priority: 'sync' }) // promote k -> sync
+    scheduler.flushSync()
+    expect(order).toEqual(['plain-sync', 'keyed']) // ran in the sync lane, once (old normal slot tombstoned)
+  })
+})
+
+describe('scheduler — onError during runaway guard', () => {
+  it('runs a recovery task scheduled by onError during the runaway guard', () => {
+    let recovered = false
+    const { scheduler, drainMicrotasks } = manualScheduler(() => {
+      scheduler.schedule(() => {
+        recovered = true
+      })
+    })
+    const loop = (): void => {
+      scheduler.schedule(loop) // re-schedules itself forever
+    }
+    scheduler.schedule(loop)
+    scheduler.flushSync() // hits the cap -> onError -> schedules recovery (outside the flushing window)
+    drainMicrotasks() // the re-armed flush must drain the recovery
+    expect(recovered).toBe(true)
+  })
+})
