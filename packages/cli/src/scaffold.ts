@@ -2,8 +2,14 @@
  * `scaffold` — write a template into a target directory.
  *
  * Pure over an injected {@link FileSystem}, so `create` and `create-mindees`
- * share one tested implementation. Refuses to overwrite a non-empty target
+ * share one tested implementation. Refuses to write into a non-empty target
  * unless `force` is set.
+ *
+ * `force` OVERLAYS the template: each template file is written (overwriting any
+ * same-named file), but pre-existing files the template does NOT include are left
+ * in place — it is a merge, not a clean wipe (the {@link FileSystem} abstraction
+ * has no delete primitive, and recursively removing a user's files would be
+ * unsafe). Scaffold into an empty directory for a pristine result.
  *
  * @module
  */
@@ -19,7 +25,7 @@ export interface ScaffoldOptions {
   targetDir: string
   /** Template name. Defaults to `blank`. */
   template?: string
-  /** Overwrite a non-empty target directory. Default `false`. */
+  /** Overlay the template into a non-empty target (merge; does not delete extra files). Default `false`. */
   force?: boolean
 }
 
@@ -36,7 +42,8 @@ export interface ScaffoldResult {
 
 /**
  * Scaffold a new project. Returns the list of files written, or an error if the
- * template is unknown or the target is non-empty (without `force`).
+ * template is unknown or the target is non-empty (without `force`). With `force`,
+ * the template is overlaid onto the target (see the module note: a merge, not a wipe).
  */
 export function scaffold(fs: FileSystem, options: ScaffoldOptions): ScaffoldResult {
   const { appName, targetDir, template = DEFAULT_TEMPLATE, force = false } = options
@@ -73,7 +80,7 @@ export function scaffold(fs: FileSystem, options: ScaffoldOptions): ScaffoldResu
         ok: false,
         written: [],
         template,
-        error: `Target directory "${targetDir}" is not empty. Use --force to overwrite.`,
+        error: `Target directory "${targetDir}" is not empty. Use --force to overlay the template (merges; keeps existing files).`,
       }
     }
   }

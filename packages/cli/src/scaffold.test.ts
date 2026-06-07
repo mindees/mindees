@@ -90,4 +90,12 @@ describe('scaffold', () => {
     // All scaffolded @mindees/* deps share the one locked version line.
     expect(pkg.devDependencies['@mindees/cli']).toBe(pkg.dependencies['@mindees/core'])
   })
+
+  it('--force overlays the template, preserving pre-existing extra files', () => {
+    const fs = createMemoryFileSystem({ 'app/keepme.txt': 'user data' })
+    const result = scaffold(fs, { appName: 'x', targetDir: 'app', force: true })
+    expect(result.ok).toBe(true)
+    expect(result.written.length).toBeGreaterThan(0) // template files written
+    expect(fs.snapshot()['app/keepme.txt']).toBe('user data') // extra file kept (merge, not wipe)
+  })
 })
