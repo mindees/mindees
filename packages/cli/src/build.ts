@@ -58,6 +58,25 @@ export interface BuildResult {
 const COMPILABLE = /\.(tsx|ts)$/
 const DECLARATION = /\.d\.ts$/
 
+/** The directory portion of a POSIX path (`a/b/c.js` → `a/b`; no slash → `''`). */
+function dirOf(path: string): string {
+  const i = path.lastIndexOf('/')
+  return i < 0 ? '' : path.slice(0, i)
+}
+/** The final segment of a POSIX path (`a/b/c.js` → `c.js`). */
+function baseOf(path: string): string {
+  const i = path.lastIndexOf('/')
+  return i < 0 ? path : path.slice(i + 1)
+}
+/** Relative POSIX path from `fromDir` to `toPath` (e.g. `dist/routes` → `src/routes/x.tsx`). */
+function relativePath(fromDir: string, toPath: string): string {
+  const from = fromDir.split('/').filter(Boolean)
+  const to = toPath.split('/').filter(Boolean)
+  let i = 0
+  while (i < from.length && i < to.length && from[i] === to[i]) i++
+  return [...Array(from.length - i).fill('..'), ...to.slice(i)].join('/') || '.'
+}
+
 /**
  * Build the project at `root`. Compiles every `src/**\/*.{ts,tsx}` (except
  * `.d.ts`) and writes outputs to `outDir`. Stops emitting a module on type
@@ -70,6 +89,7 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
   const diagnostics: Diagnostic[] = []
   const compiled: string[] = []
   const stats = { flattenedNodes: 0, totalElements: 0 }
+  const writtenOutPaths = new Map<string, string>() // outPath → the rel that emitted it (collision guard)
 
   const entries = fs.exists(srcDir) ? fs.readDir(srcDir) : []
   for (const rel of entries) {
@@ -94,8 +114,39 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
       stats.flattenedNodes += emitted.stats.flattenedNodes
       stats.totalElements += emitted.stats.totalElements
       const outPath = `${outDir}/${rel.replace(COMPILABLE, '.js')}`
-      fs.writeFile(outPath, emitted.code)
-      if (emitted.map) fs.writeFile(`${outPath}.map`, emitted.map)
+      // Two sources whose basenames differ only by extension (App.ts + App.tsx) map to one dist/App.js
+      // — fail loudly instead of silently overwriting one with the other.
+      const collidedWith = writtenOutPaths.get(outPath)
+      if (collidedWith !== undefined) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'MDC_OUTPUT_COLLISION',
+          message: `Output collision: "${rel}" and "${collidedWith}" both emit "${outPath}". Rename one.`,
+        })
+        continue
+      }
+      writtenOutPaths.set(outPath, rel)
+      let code = emitted.code
+      if (emitted.map) {
+        // Rewrite the map so `sources` resolves to the real src/ file (TS emits a bare basename that
+        // resolves to a non-existent dist/*.tsx), and point the sourceMappingURL comment at the LITERAL
+        // .map filename (TS percent-encodes special chars like `[ ]`, which won't match the written file).
+        let mapText = emitted.map
+        try {
+          const map = JSON.parse(emitted.map) as { sources?: string[]; sourceRoot?: string }
+          map.sources = [relativePath(dirOf(outPath), `${srcDir}/${rel}`)]
+          map.sourceRoot = ''
+          mapText = JSON.stringify(map)
+        } catch {
+          // leave the map untouched if it isn't parseable (shouldn't happen)
+        }
+        fs.writeFile(`${outPath}.map`, mapText)
+        code = code.replace(
+          /\/\/# sourceMappingURL=.*$/m,
+          `//# sourceMappingURL=${baseOf(outPath)}.map`,
+        )
+      }
+      fs.writeFile(outPath, code)
       compiled.push(rel)
     }
   }

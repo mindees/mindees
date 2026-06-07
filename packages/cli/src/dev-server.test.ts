@@ -119,4 +119,13 @@ describe('createDevServer.setHtml + renderDevPage', () => {
     expect(bad).toContain('1 error')
     expect(bad).toContain('boom &lt;x&gt;') // escaped
   })
+
+  it('embeds the current build version as the live-reload baseline (no missed reload)', () => {
+    const server = createDevServer({ html: '<body></body>' })
+    server.bump() // version 1
+    server.bump() // version 2
+    const body = server.handle('GET', '/').body
+    expect(body).toContain('var v="2"') // baseline = the version the page is served at, not null
+    expect(body).not.toContain('var v=null')
+  })
 })

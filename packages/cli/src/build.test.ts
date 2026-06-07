@@ -112,4 +112,27 @@ export default () => <view/>`,
     // the .jsx route has no emitted chunk → it must not appear in the manifest
     expect(result.routes?.routes.some((r) => r.routePath === '/about')).toBe(false)
   })
+
+  it('rewrites source-map sources to resolve to the real src/ file', () => {
+    const fs = createMemoryFileSystem({
+      'src/App.tsx': `import { createElement } from "@mindees/core"
+export const App = () => <view/>`,
+    })
+    const result = buildProject(fs)
+    expect(result.ok).toBe(true)
+    const map = JSON.parse(fs.snapshot()['dist/App.js.map'] as string)
+    expect(map.sources).toEqual(['../src/App.tsx']) // resolves dist/ -> src/, not a non-existent dist/App.tsx
+    expect(map.sourceRoot).toBe('')
+  })
+
+  it('reports an output collision (App.ts + App.tsx -> one dist/App.js) instead of overwriting', () => {
+    const fs = createMemoryFileSystem({
+      'src/App.ts': 'export const fromTs = 1',
+      'src/App.tsx': `import { createElement } from "@mindees/core"
+export const App = () => <view/>`,
+    })
+    const result = buildProject(fs)
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.some((d) => d.code === 'MDC_OUTPUT_COLLISION')).toBe(true)
+  })
 })

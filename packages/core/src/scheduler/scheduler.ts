@@ -48,6 +48,7 @@ export interface ScheduledTask {
 interface Entry {
   key: string | null
   fn: Task | null // null once cancelled
+  lane: Priority // which lane this entry lives in (so a re-key with a changed priority can relocate it)
 }
 
 /** Options for {@link Scheduler}. */
@@ -95,13 +96,23 @@ export class Scheduler {
     if (key !== null) {
       const existing = this.keyed.get(key)
       if (existing && existing.fn !== null) {
-        // Dedup: replace the callback, keep the existing queue position.
-        existing.fn = task
-        return this.makeHandle(existing)
+        if (existing.lane === priority) {
+          // Same lane → replace the callback, keep the existing queue position (latest callback wins).
+          existing.fn = task
+          return this.makeHandle(existing)
+        }
+        // Changed priority → relocate to the requested lane so the latest PRIORITY wins too: tombstone
+        // the old-lane entry (its slot is skipped via the null fn) and push a fresh one.
+        existing.fn = null
+        const moved: Entry = { key, fn: task, lane: priority }
+        this.keyed.set(key, moved)
+        ;(priority === 'sync' ? this.sync : this.normal).push(moved)
+        this.requestFlush()
+        return this.makeHandle(moved)
       }
     }
 
-    const entry: Entry = { key, fn: task }
+    const entry: Entry = { key, fn: task, lane: priority }
     if (key !== null) this.keyed.set(key, entry)
     ;(priority === 'sync' ? this.sync : this.normal).push(entry)
     this.requestFlush()
@@ -112,6 +123,7 @@ export class Scheduler {
   flushSync(): void {
     if (this.flushing) return
     this.flushing = true
+    let overflowed = false
     try {
       // Drain in priority order. Re-check each loop so tasks scheduled by tasks
       // (e.g. a sync task that queues normal work) are handled in this flush.
@@ -124,12 +136,8 @@ export class Scheduler {
           this.sync.length = 0
           this.normal.length = 0
           this.keyed.clear()
-          this.run(() => {
-            throw new Error(
-              'MindeesNative: potential infinite scheduler loop — a task kept re-scheduling itself.',
-            )
-          })
-          return
+          overflowed = true
+          break
         }
         const entry = this.sync.length > 0 ? this.sync.shift() : this.normal.shift()
         if (!entry) continue
@@ -141,6 +149,15 @@ export class Scheduler {
     } finally {
       this.flushing = false
       this.microtaskQueued = false
+    }
+    if (overflowed) {
+      // Report the overflow OUTSIDE the flushing window: if `onError` schedules a recovery task,
+      // requestFlush() would no-op while `flushing` is true and strand it — now it arms a fresh flush.
+      this.run(() => {
+        throw new Error(
+          'MindeesNative: potential infinite scheduler loop — a task kept re-scheduling itself.',
+        )
+      })
     }
   }
 
