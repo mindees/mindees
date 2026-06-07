@@ -90,7 +90,47 @@ function createRuntimeImportTransformer(tsmod: typeof ts): ts.TransformerFactory
       ),
       tsmod.factory.createStringLiteral('@mindees/core'),
     )
-    return context.factory.updateSourceFile(sourceFile, [importDecl, ...sourceFile.statements])
+    // Insert the import AFTER any leading directive prologue ("use client"/"use server"/"use strict"):
+    // an import before a directive demotes it to a no-op string-expression statement (breaking RSC).
+    const stmts = sourceFile.statements
+    let at = 0
+    while (
+      at < stmts.length &&
+      tsmod.isExpressionStatement(stmts[at] as ts.Statement) &&
+      tsmod.isStringLiteral((stmts[at] as ts.ExpressionStatement).expression)
+    ) {
+      at++
+    }
+    return context.factory.updateSourceFile(sourceFile, [
+      ...stmts.slice(0, at),
+      importDecl,
+      ...stmts.slice(at),
+    ])
+  }
+}
+
+/**
+ * A count-only transformer: tallies post-desugar `createElement(...)` calls into `stats.totalElements`
+ * (matching the flattener's own count) without modifying the tree. Used when `flatten` is off, so the
+ * element budget is enforced regardless of the optimizer.
+ */
+function createElementCounter(
+  tsmod: typeof ts,
+  stats: CompileStats,
+): ts.TransformerFactory<ts.SourceFile> {
+  return () => (sourceFile) => {
+    const visit = (node: ts.Node): void => {
+      if (
+        tsmod.isCallExpression(node) &&
+        tsmod.isIdentifier(node.expression) &&
+        node.expression.text === 'createElement'
+      ) {
+        stats.totalElements++
+      }
+      tsmod.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+    return sourceFile
   }
 }
 
@@ -116,6 +156,10 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
     const flattener = createFlattenTransformer(ts)
     after.push(flattener.factory)
     stats = flattener.stats // live object, updated during emit
+  } else {
+    // No flatten pass → still count elements so the element budget (checkBudget) applies regardless of
+    // `flatten`. Counts the same thing the flattener does: post-desugar `createElement(...)` calls.
+    after.push(createElementCounter(ts, stats))
   }
 
   for (const plugin of plugins) {

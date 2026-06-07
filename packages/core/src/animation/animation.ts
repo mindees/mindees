@@ -366,7 +366,12 @@ export function interpolate(
       return extrapolate === 'extend' ? lerp(0) : (outputRange[0] as number)
     }
     if (x >= (inputRange[n - 1] as number)) {
-      return extrapolate === 'extend' ? lerp(n - 2) : (outputRange[n - 1] as number)
+      if (extrapolate !== 'extend') return outputRange[n - 1] as number
+      // Extend along the slope of the last NON-degenerate segment: a zero-width terminal segment makes
+      // lerp() return its start value (dropping the real terminal output), so skip degenerate segments.
+      let i = n - 2
+      while (i > 0 && inputRange[i] === inputRange[i + 1]) i--
+      return inputRange[i] === inputRange[i + 1] ? (outputRange[n - 1] as number) : lerp(i)
     }
     for (let i = 0; i < n - 1; i++) {
       if (x >= (inputRange[i] as number) && x <= (inputRange[i + 1] as number)) return lerp(i)
