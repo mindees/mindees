@@ -6,11 +6,17 @@
 > (`@mindees/renderer`'s `native-protocol.ts`). In CI they **compile + pass their
 > conformance cores** (macOS for iOS, Linux+SDK for Android - Phase 8C/8D) **and render
 > the command stream into correct native view trees on the platform runtime** (iOS
-> Simulator XCTest; Android Robolectric, incl. click dispatch - Phase 8E). Android has
-> a runnable QuickJS example app with an emulator smoke test; iOS has a JavaScriptCore
-> bridge that renders the same counter shape and handles a `UIButton`
-> `.touchUpInside` target/action callback in the iOS Simulator. Physical-device proof
-> is still pending. Not production hosts.
+> Simulator XCTest; Android Robolectric, incl. click dispatch - Phase 8E). Android runs
+> a **real multi-screen TypeScript app** (signals + Atlas + the Quantum router + the
+> Helix reconciler, in embedded QuickJS) on an **API 35 emulator** in CI - it renders
+> native views, reacts to input, and navigates between routes with state surviving the
+> swap. iOS runs a JavaScriptCore counter app that renders the same shape and routes a
+> `UIButton` `.touchUpInside` target/action callback in the iOS Simulator.
+> **Native events carry values** (`onChangeText` delivers the field text). The renderers
+> now have broad RN-style parity (flex, scroll + horizontal scroll, text composition +
+> styling, images, TextInput, ActivityIndicator, elevation; Android adds per-corner radii
+> and a full-screen portal **overlay** layer where Modal/Toast overlap the app content).
+> Physical-device proof is still pending. Not production hosts.
 
 ## What this is
 
@@ -32,7 +38,10 @@ const app = render(MyComponent, {}, backend, backend.root)
 A native host receives each batch (as JSON over whatever bridge you build) and
 replays it against real platform views. The protocol carries **no functions**:
 event handlers are registered by a stable `handlerId`, and the host calls back
-into the runtime via `dispatchEvent(handlerId, event)` when a native event fires.
+into the runtime via `dispatchEvent(handlerId, value)` when a native event fires.
+Events carry a serializable value: a press is notify-only, while a TextInput
+`input`/`change` delivers the field's current text (the JS layer wraps a non-nil
+value as `{ target: { value } }`), so `onChangeText` receives it.
 
 > **The host semantics are specified executably.** `@mindees/renderer` ships
 > `createReferenceHost()` - a strict reference host (in TypeScript) that applies
@@ -52,7 +61,7 @@ into the runtime via `dispatchEvent(handlerId, event)` when a native event fires
 | `removeChild { parentId, childId }` | Detach `childId` from `parentId` |
 | `updateText { id, text }` | Update a text node's content |
 | `disposeNode { id }` | Free the node (emitted for a removed node and each descendant) |
-| `registerEvent { id, eventName, handlerId }` | Wire a native gesture/event -> `dispatchEvent(handlerId)` |
+| `registerEvent { id, eventName, handlerId }` | Wire a native gesture/event -> `dispatchEvent(handlerId, value)` (press = no value; input/change carry the field text) |
 | `unregisterEvent { id, eventName, handlerId }` | Remove the wiring |
 
 Ordering guarantees from the backend: a node is always `create`d before it is
@@ -75,8 +84,21 @@ renderer, and each is **compiled + its core tested in CI**:
   iOS SDK, and runs the UIKit bridge smoke test on an iOS Simulator.
 - [`android/`](android/README.md) - a **Gradle/Android library** (`dev.mindees.host`).
   Same host + strict validation, `NativeCommandCodec` (org.json), and an
-  `AndroidViewRenderer` (`android.view`). CI (Linux + Android SDK) runs
-  `:mindees-host:test` and `:mindees-host:assembleDebug`.
+  `AndroidViewRenderer` (`android.view`, on Google FlexboxLayout). CI (Linux + Android
+  SDK) runs `:mindees-host:test` and `:mindees-host:assembleDebug`, plus a **real
+  multi-screen example app** (signals + Atlas + the Quantum router + Helix in embedded
+  QuickJS) whose instrumented test boots the Activity on an API 35 **emulator**, taps a
+  native button, and navigates Home <-> About - asserting the native view tree updates
+  and route state survives the swap.
+
+The renderers map Atlas's curated cross-platform `StyleObject` onto native layout +
+visuals with broad RN-style parity: flex (Android FlexboxLayout, iOS UIStackView),
+vertical + horizontal scroll, text composition + styling, images (data-URI/asset),
+TextInput (keyboard/secure/multiline + value-carrying `input`/`change`),
+ActivityIndicator, the box model, background/radius/border, opacity, and elevation.
+Android additionally implements per-corner radii and a full-screen portal **overlay**
+layer (Modal/Toast overlap the app content). iOS has a few honest v1 gaps it documents:
+flex-wrap, `space-around`/`evenly`, per-child `alignSelf`/`flexGrow`.
 
 ## What is implemented vs. future
 
@@ -88,13 +110,17 @@ renderer, and each is **compiled + its core tested in CI**:
 | iOS host project (`ios/`) - compiles + conformance core | verified in CI (macOS; Phase 8C) |
 | Android host project (`android/`) - compiles + conformance core | verified in CI (Linux; Phase 8D) |
 | Hosts **render the command stream into correct native view trees** | verified in CI (iOS Simulator XCTest; Android Robolectric, incl. click dispatch; Phase 8E) |
-| Android example app (embedded QuickJS + JS<->native command bridge) | Phase 8F-A/B; CI unit-tests bridge + assembles APK + runs an API 35 emulator smoke test |
-| iOS embedded JavaScriptCore bridge + UIKit button smoke | Phase 8F-C; CI tests model bridge + runs iOS Simulator smoke |
+| Android example app (embedded QuickJS + JS<->native command bridge) | Phase 8F-A/B; CI unit-tests bridge + assembles APK + runs a multi-screen, routed app (signals + Atlas + Quantum router + Helix) on an API 35 emulator |
+| iOS embedded JavaScriptCore bridge + UIKit button smoke | Phase 8F-C; CI tests model bridge + runs an iOS Simulator counter smoke |
+| Renderer parity (flex, scroll, text/styling, images, TextInput, ActivityIndicator, elevation; Android per-corner radii + overlay) | implemented + asserted by the platform render tests |
+| Value-carrying native events (`onChangeText` etc.) | implemented + tested (both hosts) |
 | Full app **on a physical device** | Phase 8F pending |
 
-**You cannot build a real mobile app with MindeesNative today.** The host projects
-compile, pass their conformance cores, and are verified to render the command stream
-into correct native view trees in CI. Android now has an embedded-QuickJS example
-app and bridge with **emulator smoke testing in CI**, and iOS has an embedded
-JavaScriptCore bridge with **iOS Simulator smoke testing in CI**. Physical-device
-proof is still pending (the rest of Phase 8F).
+**You cannot ship a production mobile app with MindeesNative today.** But the host
+projects compile, pass their conformance cores, and are verified to render the command
+stream into correct native view trees in CI. Android runs a **real multi-screen,
+file-based-routed TypeScript app** in an embedded QuickJS engine with **emulator smoke
+testing in CI** (it navigates routes, reacts to input, and re-themes light/dark), and
+iOS runs an embedded JavaScriptCore counter app with **iOS Simulator smoke testing in
+CI**. What's still missing: physical-device proof and a published native host library
+(Maven/SPM) - the rest of Phase 8F.

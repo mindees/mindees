@@ -19,7 +19,9 @@ See [STATUS.md](./STATUS.md) for current maturity.
   Working SSR-capable DOM backend + headless test backend; `NativeBackend`
   interface defined.
 - [x] **Phase 4 — `@mindees/compiler` (MDC): build-time optimizer** ✅
-  Type-check gate, TSX transform, tree-flattening, per-route splitting
+  Type-check gate, TSX transform, tree-flattening, per-route splitting, a build-time
+  route manifest, opt-in **perf-lint**, and **enforced perf budgets**
+  (`compileChecked(src, { budget })` fails the build over a budget)
   (TS→native AOT is a labeled research track with a working fallback).
 - [x] **Phase 5 — `@mindees/cli` (Forge) + `create-mindees`** ✅
   `create` / `dev` (web HMR) / `build` / `doctor`; tested templates.
@@ -35,10 +37,12 @@ See [STATUS.md](./STATUS.md) for current maturity.
   (`AbortSignal` cancellation, `invalidate`, `preload`), **navigation guards**
   (`beforeNavigate` cancel/redirect + idempotent navigation), and **web view
   transitions** (`document.startViewTransition`, feature-detected). Built on
-  `@mindees/core` (renderer is a test-only devDependency). Deferred to a later
-  router phase: the global typed route registry, file-based route scanning + a
-  bundler/Metro plugin, per-key fine-grained loader signals, native shared-element
-  transitions.
+  `@mindees/core` (renderer is a test-only devDependency). **File-based routing now
+  lands**: `createFileRouter`/`routesFromModules` (`@mindees/router`) plus a build-time
+  route manifest (`@mindees/compiler`) wired through the CLI build — Expo-parity
+  convention-over-config routing (the Android example app generates its routes this way).
+  Still deferred to a later router phase: the global typed route registry, per-key
+  fine-grained loader signals, native shared-element transitions.
 - **Phase 8 — `@mindees/renderer` (Helix): the native strand**
   The framework-defining piece — render to real native platforms, not a web view.
   Built as a sub-phased track so each step is real and tested:
@@ -92,7 +96,17 @@ See [STATUS.md](./STATUS.md) for current maturity.
       model bridge tests via `swift test` and an iOS Simulator smoke test that invokes
       a `UIButton` `.touchUpInside` target/action callback and observes the JS-driven
       label update.
+    - [x] **Phase 8F-D — Native renderer parity.** Both mobile hosts now have broad parity:
+      flex (Android `FlexboxLayout`, iOS `UIStackView`), vertical + horizontal scroll, text +
+      composition + styling, images (data-URI/asset), `TextInput`, `ActivityIndicator`,
+      elevation/shadow, per-corner radii, a full-screen **portal overlay layer** (Modal/Toast
+      paint last and overlap), and **value-carrying events** (`onChangeText` delivers the field
+      text across the bridge on both hosts).
     - [ ] Physical-device smoke execution for the Android/iOS example bridges.
+  - [x] **Phase 8G — Helix Canvas strand** ✅ a reconciler-driven 2D scene graph painted to a 2D
+    context (`createCanvas2DBackend`, `SceneNode`/`Scene2DContext`), WebGPU-ready. The
+    GPU-accelerated `createCanvasBackend` (and the direct-to-platform `createNativeBackend`) remain
+    🔬 research tracks that throw `NotImplementedError`.
 - **Phase 9 — `@mindees/updates` (Pulse): signed differential OTA + SDUI**
   Ship new JS + assets to installed apps with no app-store release, safely.
   Sub-phased so each step is real and tested:
@@ -127,6 +141,10 @@ See [STATUS.md](./STATUS.md) for current maturity.
     defense, and hard depth/node/string/prop limits. Incremental updates via pure-TS
     RFC 7396 merge-patch + a safe RFC 6902 subset (`add`/`remove`/`replace`), re-validated
     before render. See [ADR-0011](./docs/adr/0011-pulse-sdui.md). **Phase 9 (Pulse) complete.**
+  - [x] **Phase 9E — Sandboxed WASM module runtime** ✅ `createWasmModuleRuntime` ships signed,
+    capability-secure feature modules that run at runtime in their own linear memory, reachable
+    only through the capabilities you grant (core WebAssembly today; the full Component Model /
+    WASI 0.2/0.3 is a follow-up behind the same seam — was a research track, now real).
 - **Phase 10 — `@mindees/data` (Continuum): local-first store & sync**
   A reactive offline store, delta sync, and conflict resolution — hand-rolled pure-TS
   on `@mindees/core` signals (Automerge/Loro are WASM and can't run on Hermes; Yjs is
@@ -145,7 +163,8 @@ See [STATUS.md](./STATUS.md) for current maturity.
     encoding lands with the `Op` type in 10D.)
   - [x] **Phase 10C — CRDT conflict resolution** ✅
     Per-field LWW-Register/Map (HLC-stamped; same-stamp ties broken by content so merge
-    stays commutative even on adversarial input) + an add-wins OR-Set, proven
+    stays commutative even on adversarial input), an add-wins OR-Set, and a **PN-Counter**
+    (`Counter` — `counterInc`/`counterDec`/`mergeCounter`), proven
     commutative/associative/idempotent/convergent (fast-check) and prototype-pollution
     safe. See [ADR-0014](./docs/adr/0014-continuum-crdt.md).
   - [x] **Phase 10D — Local-first sync engine + transport** ✅
@@ -160,10 +179,11 @@ See [STATUS.md](./STATUS.md) for current maturity.
   - [x] **Phase 10E/10F — Reference sync server + persistence** ✅
     A capability-injected `createSyncServer` over an injected `OpLogStore`
     (`@mindees/data/server`) + a runnable `node:http` adapter in `examples/`; and a
-    `Persistence` contract + `createMemoryPersistence` + engine `export()`/restore so a
-    replica resumes after restart with stable identity (closing the op-id hazard). Native
-    durable adapters, production sync hardening, and Yjs/Automerge/Loro rich-text interop
-    are 🔬 research tracks. See
+    `Persistence` contract + `createMemoryPersistence` + a browser-backed
+    `createWebStoragePersistence` (`localStorage`/`sessionStorage`) + engine `export()`/restore
+    so a replica resumes after restart with stable identity (closing the op-id hazard). Native
+    durable adapters (for example SQLite-backed storage), production sync hardening, and
+    Yjs/Automerge/Loro rich-text interop are 🔬 research tracks. See
     [ADR-0016](./docs/adr/0016-continuum-server-persistence.md). **Phase 10 (Continuum) complete.**
 - **Phase 11 — `@mindees/ai` (Synapse): provider-agnostic AI + dev-time AI**
   A pure-TS, hand-rolled AI contract (no vendor SDK) with backends that work everywhere;
@@ -196,8 +216,11 @@ See [STATUS.md](./STATUS.md) for current maturity.
     `generateObject`, plus a `mindees ai explain <error>` CLI command (server backend wired
     from `MINDEES_AI_*` env). Dev/build path only — never bundled on device. See
     [ADR-0021](./docs/adr/0021-synapse-devtools.md). **Phase 11 (Synapse) complete.**
-- [x] **Phase 12 — `@mindees/atlas` (Atlas): accessible UI primitives + recycling list** ✅
-  Web implementations now; native is a labeled research track. Sub-phased:
+- [x] **Phase 12 — `@mindees/atlas` (Atlas): accessible UI primitives, component library + recycling list** ✅
+  Web implementations render on the DOM today; the same primitives now also drive the native
+  strand (the native renderers in `examples/native-hosts` have broad parity — flex, scroll,
+  text/styling, images, `TextInput`, `ActivityIndicator`, elevation, per-corner radii, and a
+  portal overlay layer). Sub-phased:
   - [x] **Phase 12A — Primitives, style & theme** ✅ accessible signals-native primitives
     (`View`/`Text`/`Image`/`TextInput`/`Pressable`/`Button`/`Stack`/`Row`/`Column`/`Spacer`/
     `ScrollView`) over `createElement`, a curated cross-platform `StyleObject` (numbers → `px`
@@ -209,7 +232,15 @@ See [STATUS.md](./STATUS.md) for current maturity.
     identity and `renderItem` runs once per row as it scrolls in; pure `computeWindow` math,
     spacer-based scrollbar, `transform`-positioned rows, `onEndReached`, headless-testable
     (`@mindees/atlas/list`). Fixed-height; variable-height is a research track. See
-    [ADR-0023](./docs/adr/0023-atlas-list.md).
+    [ADR-0023](./docs/adr/0023-atlas-list.md). A virtualized `SectionList` lives alongside it.
+  - [x] **Phase 12C — Component library, hooks, theming + dark mode** ✅ Atlas now ships **27+
+    components** — the primitives plus `Card`/`Switch`/`Badge`/`Avatar`/`Chip`/`Divider`/
+    `ProgressBar`/`ActivityIndicator`/`SafeAreaView`/`KeyboardAvoidingView`/`Checkbox`/
+    `RadioGroup`/`Skeleton`/`Tabs`/`Accordion`/`Stepper`/`SegmentedControl`/`Toast`/`Modal`/
+    `FocusScope`/`GestureView` — plus **12+ hooks** (`useToggle`/`useCounter`/`usePrevious`/
+    `useReducer`/`useAsync`/`useForm`/`usePersistentSignal`/`useDebounce`/`useInterval`/
+    `useTimeout` + device hooks), design-token theming with dark mode, and the **animated
+    stack navigator** (`@mindees/atlas/stack`).
 - [~] **Phase 13 — Release pipeline & governance**
   - [x] **Release infrastructure** ✅ version-source sync (`scripts/sync-versions.mjs` keeps each
     package's source `VERSION` equal to its `package.json` — wired into `version-packages`, so the
@@ -220,7 +251,13 @@ See [STATUS.md](./STATUS.md) for current maturity.
     See [ADR-0024](./docs/adr/0024-release-pipeline.md) + [RELEASING.md](./RELEASING.md).
   - [x] **First publish (`v0.1.0`)** ✅ all 10 packages (`@mindees/*` + `create-mindees`) published
     to npm at `0.1.0`, triggered by merging the version PR.
-  - [ ] Deferred: runnable web example, docs site, enforced perf budgets, codemods.
+  - [x] **Ongoing releases (now `v0.13.0`)** ✅ the same automated version-PR → publish pipeline
+    has shipped the locked line forward; all 10 packages (`@mindees/*` + `create-mindees`) are
+    published to npm at `0.13.0` (single locked version, verified against every
+    `packages/*/src/index.ts` + `package.json`).
+  - [x] **Enforced perf budgets** ✅ `compileChecked(src, { budget })` (`checkBudget`) **fails the
+    build** when a budget is exceeded, alongside the opt-in `perfLint` (`compileChecked(src, { perf: true })`).
+  - [ ] Deferred: runnable web example, docs site, codemods.
 
 > Phases are gated: each is completed and reviewed before the next begins.
 > Native rendering (Phase 8) is prioritized ahead of OTA/data/AI because it is the

@@ -6,15 +6,17 @@ Zod / Valibot / ArkType schema), and **fine-grained reactive route state** with
 selector-based re-render isolation. A modern, type-safe alternative to Expo
 Router and React Router for TypeScript cross-platform apps.
 
-> **Status: 🧪 Experimental (Phase 6 — Router I + Phase 7 — Router II).** The
+> **Status: 🧪 Experimental (pre-1.0).** The
 > typed routing core (typed params, Standard Schema search validation, the
 > signals-native router, typed + relative navigation, dynamic reconfiguration,
 > memory + browser history), **render integration** (`createRouterView` —
-> fine-grained, layout-preserving nested rendering; typed `createLink`), and
-> **data/guards/transitions** (SWR loaders + `preload`/`invalidate`, navigation
-> guards, web view transitions) are implemented and tested. The global typed
-> route registry and file-based route scanning are a later phase — see
-> [ROADMAP](../../ROADMAP.md).
+> fine-grained, layout-preserving nested rendering; typed `createLink`; bound
+> `Link` + `useRouter`/`useParams`/`useSearch`/`usePathname` hooks),
+> **data/guards/transitions** (SWR loaders + `preload`/`invalidate`,
+> auto-prefetch links, navigation guards, web view transitions), and
+> **file-based routing** (`createFileRouter` / `routesFromModules` — Expo-style
+> conventions, no hand-written route config) are implemented and tested. The
+> global typed route registry is a later phase — see [ROADMAP](../../ROADMAP.md).
 
 ## Install
 
@@ -30,6 +32,8 @@ pnpm add @mindees/router
 | Typed **search** params | ✅ via Standard Schema | ❌ not typed | ❌ raw `URLSearchParams` |
 | Validation lock-in | ✅ none — any Standard Schema (Zod/Valibot/ArkType) | — | — |
 | Reactivity | ✅ fine-grained signals; select a slice, re-run on *that* change | ⚠️ global-vs-local re-render footgun | React renders |
+| File-based routing | ✅ `createFileRouter` (Expo-style conventions) **or** explicit config | ✅ filesystem-only | ⚠️ optional plugin |
+| Auto-prefetch links | ✅ `<Link>` warms loaders on intent (hover / press-in / focus) | ❌ manual `router.prefetch` only | ⚠️ manual |
 | Build/dev-server required for types | ❌ pure TypeScript inference | ✅ dev server | ✅ typegen step |
 
 Relative navigation (`navigate('./edit')`, `'../'`) and `#fragment` targets are
@@ -132,6 +136,45 @@ type D = PathParams<'/about'>                // {}
 
 No generated `.d.ts`, no dev server, no stale type files — just TypeScript.
 
+## File-based routing (Expo-style conventions)
+
+Prefer filesystem conventions to an explicit config? `createFileRouter` turns a
+module map into a router using the same conventions Expo Router uses — feeding
+Quantum's better core (validated/typed params, loaders, re-render isolation):
+
+```ts
+import { createFileRouter, createBrowserHistory } from '@mindees/router'
+
+// web (Vite): a glob; native: a generated table — either way, no hand-written config
+const modules = import.meta.glob('./app/**/*.tsx', { eager: true })
+const router = createFileRouter(modules, { history: createBrowserHistory() })
+```
+
+Conventions (file path → route): `index` → the directory's path · `[param]` →
+`:param` · `[...rest]` → catch-all (`:rest*`) · `(group)` → a layout group that
+doesn't affect the URL · `_layout` → a layout that wraps the directory (renders
+its outlet) · `+not-found` → the fallback route. Each module's `default` export is
+the screen; named exports (`loader`, `loaderDeps`, `searchSchema`, `staleTime`,
+`meta`) configure the route. `routesFromModules` returns the route table directly
+if you'd rather build the router yourself.
+
+## Hooks + a bound `<Link>`
+
+Resolve the active router without prop-drilling — the familiar Expo Router surface
+on Quantum's fine-grained, validated core. The hooks return reactive **accessors**
+(call them inside JSX/effects), so reads stay fine-grained:
+
+```ts
+import { Link, useRouter, useParams, useSearch, usePathname } from '@mindees/router'
+
+const router = useRouter()        // throws if no router has been created
+const params = useParams()        // () => Record<string, string>
+const search = useSearch()        // () => validated search params
+const pathname = usePathname()    // () => string, re-render isolated
+
+Link({ to: '/posts/:id', params: { id: '42' }, children: 'Open' })
+```
+
 ## Data, guards & transitions
 
 ```ts
@@ -168,10 +211,12 @@ transparent no-op outside a DOM (SSR / native).
 ## API surface
 
 - **Render (Router II)** — `createRouterView`, `createLink`, `RouterViewOptions`,
-  `LinkProps`, `LinkComponent`, `LinkOptions`, `RouteComponentProps`.
+  `LinkProps`, `LinkComponent`, `LinkOptions`, `PrefetchMode`, `RouteComponentProps`.
+- **File-based routing** — `createFileRouter`, `routesFromModules`, `RouteModule`.
+- **Hooks** — `useRouter`, `useParams`, `useSearch`, `usePathname`, bound `Link`.
 - **Data / guards / transitions** — route `loader` / `loaderDeps` / `staleTime`,
   `router.loaderData` / `invalidate` / `preload`, `LoaderContext`, `LoaderData`,
-  `LoaderFn`, `LoaderStatus`; `BeforeNavigate`, `NavigateOptions` (`force`,
+  `LoaderDepsFn`, `LoaderFn`, `LoaderStatus`; `BeforeNavigate`, `NavigateOptions` (`force`,
   `viewTransition`), `CreateRouterOptions` (`beforeNavigate`, `viewTransitions`).
 - **Router** — `createRouter`, `Router`, `RouteRecord` (with `children` for
   nesting), `RouteMatch`, `RouterState` (with `matches` chain), `NavTarget`,
