@@ -1,5 +1,12 @@
 # @mindees/compiler
 
+## 0.19.0
+
+### Patch Changes
+
+- Updated dependencies [e8622ed]
+  - @mindees/core@0.19.0
+
 ## 0.18.0
 
 ### Minor Changes

@@ -1,5 +1,14 @@
 # @mindees/core
 
+## 0.19.0
+
+### Minor Changes
+
+- e8622ed: Add **`on`** — make an `effect`/`memo` react to an _explicit_ dependency only. The body runs untracked
+  (signals it reads don't subscribe); only the `deps` accessor does. The callback gets the current dep
+  value, the previous, and its own previous return. `{ defer: true }` skips the first run (still tracking),
+  so you react to _changes_ not the initial value. `effect(on(() => id(), (id) => load(id)))`.
+
 ## 0.18.0
 
 ## 0.17.0
