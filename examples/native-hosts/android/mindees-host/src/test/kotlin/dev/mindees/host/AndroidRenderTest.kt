@@ -20,6 +20,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.ProgressBar
@@ -504,5 +505,33 @@ class AndroidRenderTest {
         )
         et.setText("y") // input detached; change still fires
         assertEquals(listOf("ch1" to "y"), fired)
+    }
+
+    @Test
+    fun overlayLayerFillsAndStacksAboveContent() {
+        // The host root is a FrameLayout (like MainActivity) so the portal `overlay` layer z-stacks
+        // ABOVE the app content instead of being laid out beneath it.
+        val context = RuntimeEnvironment.getApplication()
+        val container = FrameLayout(context)
+        val host = MindeesNativeHost<View>("host-root", container, AndroidViewRenderer(context)) { _, _ -> }
+        host.apply(
+            NativeCommandCodec.decodeBatch(
+                """
+                [
+                  {"type":"createNode","id":"content","tag":"view"},
+                  {"type":"insertChild","parentId":"host-root","childId":"content","index":0},
+                  {"type":"createNode","id":"ov","tag":"overlay"},
+                  {"type":"createNode","id":"scrim","tag":"view"},
+                  {"type":"insertChild","parentId":"ov","childId":"scrim","index":0},
+                  {"type":"insertChild","parentId":"host-root","childId":"ov","index":1}
+                ]
+                """.trimIndent(),
+            ),
+        )
+        assertEquals(2, container.childCount)
+        val overlay = container.getChildAt(1) as FlexboxLayout // last child → drawn on top
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, overlay.layoutParams.width)
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, overlay.layoutParams.height) // fills the screen
+        assertEquals(1, overlay.childCount) // the scrim routed into the overlay layer
     }
 }
