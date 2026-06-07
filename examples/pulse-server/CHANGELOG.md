@@ -1,5 +1,11 @@
 # @mindees/example-pulse-server
 
+## 0.15.0
+
+### Patch Changes
+
+- @mindees/updates@0.15.0
+
 ## 0.14.0
 
 ### Patch Changes
