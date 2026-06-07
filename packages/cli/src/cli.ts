@@ -190,7 +190,15 @@ function cmdCreate(args: readonly string[], ctx: CliContext): CommandResult {
     ctx.write,
     `Created "${target.packageName}" from the ${result.template} template (${result.written.length} files).`,
   )
-  out(ctx.write, `Next: cd ${quoteShellPath(target.displayDir)} && pnpm install && mindees dev`)
+  const dir = quoteShellPath(target.displayDir)
+  // The `android` template is a native multi-module project with a two-phase build
+  // (app-js bundle from npm, then the APK) — not the `mindees dev` web flow.
+  out(
+    ctx.write,
+    result.template === 'android'
+      ? `Next: cd ${dir} — build the JS bundle (cd mindees-example-app/app-js && npm install && npm run build), then the APK (gradle wrapper --gradle-version 9.4.1 && ./gradlew :mindees-example-app:assembleDebug). See README.md.`
+      : `Next: cd ${dir} && pnpm install && mindees dev`,
+  )
   return { exitCode: 0 }
 }
 
