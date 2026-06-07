@@ -1,0 +1,118 @@
+name: Android create template
+
+# Proves the experimental `android` create template produces a STANDALONE, buildable
+# Android project: it scaffolds OUTSIDE the monorepo, builds the app-js bundle by
+# resolving @mindees/* FROM THE PUBLIC NPM REGISTRY (exactly as an end user would),
+# then runs `gradle assembleDebug` and asserts the APK contains the JS bundle. This is
+# the only honest end-to-end proof of the published-from-npm scaffold flow. The native
+# host is vendored as Kotlin source (no Maven dep on MindeesNative). Path-filtered; not
+# a required check (the template is experimental).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/cli/**'
+      - 'packages/create-mindees/**'
+      - 'examples/native-hosts/android/**'
+      - '.github/workflows/android-template.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/cli/**'
+      - 'packages/create-mindees/**'
+      - 'examples/native-hosts/android/**'
+      - '.github/workflows/android-template.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-template:
+    name: Scaffold + gradle assembleDebug (app-js from npm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Third-party actions pinned to full commit SHAs (see ci.yml).
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Build the CLI (and its deps) from THIS checkout, so the scaffolder under test
+      # reflects the PR — not whatever is published.
+      - name: Build the CLI
+        run: pnpm turbo build --filter=@mindees/cli
+
+      # Scaffold OUTSIDE the monorepo so pnpm-workspace resolution can't leak into the
+      # standalone build. `create <name> --template android` (positional name).
+      - name: Scaffold the android template
+        run: node packages/cli/dist/bin.js create "$RUNNER_TEMP/myapp" --template android
+
+      - name: Assert scaffold structure
+        run: |
+          APP="$RUNNER_TEMP/myapp"
+          test -f "$APP/settings.gradle.kts"
+          test -f "$APP/mindees-host/src/main/kotlin/dev/mindees/host/AndroidViewRenderer.kt"
+          test -f "$APP/mindees-example-app/app-js/package.json"
+          test -f "$APP/mindees-example-app/app-js/tsdown.config.ts"
+          # the standalone build glue must NOT carry monorepo-relative resolution
+          ! grep -q "repoRoot" "$APP/mindees-example-app/app-js/tsdown.config.ts"
+          ! grep -q "alias" "$APP/mindees-example-app/app-js/tsdown.config.ts"
+          # the JS bundle is generated, never vendored
+          test ! -f "$APP/mindees-example-app/src/main/assets/mindees-app.bundle.js"
+
+      # The load-bearing proof: resolve @mindees/* from the PUBLIC npm registry (use npm,
+      # not pnpm, with an isolated cache so nothing redirects the @mindees scope).
+      - name: Build the app-js bundle from npm
+        working-directory: ${{ runner.temp }}/myapp/mindees-example-app/app-js
+        run: |
+          npm install --cache "$RUNNER_TEMP/npm-cache" --no-audit --no-fund
+          npm run build
+          BUNDLE="$RUNNER_TEMP/myapp/mindees-example-app/src/main/assets/mindees-app.bundle.js"
+          test -s "$BUNDLE"
+          grep -q "MindeesAppBundle" "$BUNDLE"
+
+      - name: Select JDK 17
+        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+
+      - name: Install Android SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "platforms;android-36"
+
+      # The scaffold ships no wrapper jar (binary); bootstrap one with the preinstalled
+      # Gradle (AGP 9.2 requires Gradle >= 9.4.1), then use it for the real build.
+      - name: Bootstrap Gradle wrapper
+        working-directory: ${{ runner.temp }}/myapp
+        run: gradle wrapper --gradle-version 9.4.1
+
+      - name: Assemble the debug APK
+        working-directory: ${{ runner.temp }}/myapp
+        run: ./gradlew :mindees-example-app:assembleDebug --no-daemon --stacktrace
+
+      # Prove the APK exists AND actually packaged the JS bundle.
+      - name: Assert the APK contains the bundle
+        run: |
+          APK=$(find "$RUNNER_TEMP/myapp/mindees-example-app/build/outputs/apk/debug" -name '*.apk' | head -1)
+          echo "APK: $APK"
+          test -s "$APK"
+          unzip -l "$APK" | grep -q "assets/mindees-app.bundle.js"

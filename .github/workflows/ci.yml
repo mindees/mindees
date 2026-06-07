@@ -50,6 +50,11 @@ jobs:
       - name: Check version sync
         run: pnpm run check:versions
 
+      # The `android` create template is codegen'd from examples/native-hosts/android;
+      # fail if it was edited without regenerating the committed module.
+      - name: Check android template in sync
+        run: pnpm run check:android-template
+
       - name: Typecheck
         run: pnpm run typecheck
 

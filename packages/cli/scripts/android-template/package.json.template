@@ -1,0 +1,22 @@
+{
+  "name": "mindees-android-app-js",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen-routes": "node scripts/gen-routes.mjs",
+    "build": "npm run gen-routes && tsdown --config tsdown.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mindees/core": "__VERSION__",
+    "@mindees/atlas": "__VERSION__",
+    "@mindees/renderer": "__VERSION__",
+    "@mindees/router": "__VERSION__",
+    "@mindees/compiler": "__VERSION__"
+  },
+  "devDependencies": {
+    "tsdown": "0.22.1",
+    "typescript": "6.0.3"
+  }
+}

@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_TEMPLATE, getTemplate, TEMPLATES, templateNames } from './templates'
 
 describe('templates', () => {
-  it('every template carries a package.json, tsconfig, and a main entry', () => {
-    for (const name of templateNames()) {
+  // The web templates (blank/counter/app) are single-package JS apps rooted at the
+  // project dir. The `android` template is a multi-module native project (its app-js
+  // package.json/tsconfig live under mindees-example-app/app-js/), so it's exempt here
+  // and covered by android-template.test.ts instead.
+  const WEB_TEMPLATES = ['blank', 'counter', 'app']
+  it('every web template carries a package.json, tsconfig, and a main entry', () => {
+    for (const name of WEB_TEMPLATES) {
       const t = getTemplate(name)
       expect(t).toBeDefined()
       expect(t?.files['package.json']).toBeTruthy()

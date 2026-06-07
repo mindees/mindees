@@ -1,0 +1,32 @@
+/**
+ * File-based-routing codegen. Scans `src/app/` and writes `src/routes.gen.ts` — a
+ * static-import module map the app feeds to `createFileRouter` (the QuickJS bundle has
+ * no `import.meta.glob`). Run by `npm run build` before bundling. The reusable codegen
+ * lives in `@mindees/compiler` (`generateRouteModule`); this script supplies the file
+ * list. `routes.gen.ts` is generated (git-ignored) — never edit it by hand.
+ */
+
+import { readdirSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { generateRouteModule } from '@mindees/compiler'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const appDir = join(here, '..', 'src', 'app')
+const outFile = join(here, '..', 'src', 'routes.gen.ts')
+
+/** Collect route files (relative, POSIX), skipping tests. */
+function collect(dir, base = '') {
+  const out = []
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    const rel = base ? `${base}/${name}` : name
+    if (statSync(full).isDirectory()) out.push(...collect(full, rel))
+    else if (/\.(tsx|ts|jsx|js)$/.test(name) && !/\.test\./.test(name)) out.push(rel)
+  }
+  return out
+}
+
+const files = collect(appDir)
+writeFileSync(outFile, generateRouteModule(files, { importBase: './app' }))
+process.stdout.write(`gen-routes: wrote ${files.length} route(s) to src/routes.gen.ts\n`)
