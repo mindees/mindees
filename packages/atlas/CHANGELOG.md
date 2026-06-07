@@ -1,5 +1,21 @@
 # @mindees/atlas
 
+## 0.12.0
+
+### Minor Changes
+
+- 1ed00c2: Add **`Stepper`** (−/+ numeric stepper with min/max/step) and **`SegmentedControl`** (compact connected
+  single-select) components — both RN ships none of built-in (tenet #8). Flex-only + accessible
+  (`role="group"` / `radiogroup`+`radio`), so they render on web and native alike and stay fine-grained.
+- 1ed00c2: Add a **`Toast`** (Snackbar) component — a portal-backed transient notification, controlled by `visible`
+  with optional `duration` auto-dismiss, anchored bottom/top, `role="status"` (or `alert`). RN ships none
+  built-in (tenet #8).
+
+### Patch Changes
+
+- @mindees/core@0.12.0
+- @mindees/router@0.12.0
+
 ## 0.11.0
 
 ### Patch Changes
