@@ -179,17 +179,26 @@ export function pan(config: {
     y$.set(e.y)
   }
 
-  const reset = (): void => {
-    pointers.clear()
-    id = null
-    active = false
+  // Snap the rich reactive state back to rest (active + translation + velocity + position). Used by
+  // reset() and on the final pointer-up/cancel — so `state.translationX()` etc. don't stay stuck at the
+  // last drag offset after release (consistent with tap/longPress, which reset on up).
+  const restState = (): void => {
     batch(() => {
       active$.set(false)
       tx$.set(0)
       ty$.set(0)
       vx$.set(0)
       vy$.set(0)
+      x$.set(0)
+      y$.set(0)
     })
+  }
+
+  const reset = (): void => {
+    pointers.clear()
+    id = null
+    active = false
+    restState()
   }
 
   return {
@@ -241,7 +250,9 @@ export function pan(config: {
         if (s.pointerId === id) {
           id = pointers.keys().next().value ?? null
           active = false
-          active$.set(false)
+          // Last pointer up → snap state to rest; otherwise hand off to the remaining pointer.
+          if (id === null) restState()
+          else active$.set(false)
         }
       },
       onPointerCancel(e): void {
@@ -255,7 +266,8 @@ export function pan(config: {
           // Hand off to another still-down pointer (mirror onPointerUp) so it can re-claim the pan.
           id = pointers.keys().next().value ?? null
           active = false
-          active$.set(false)
+          if (id === null) restState()
+          else active$.set(false)
         }
       },
     },

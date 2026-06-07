@@ -124,12 +124,19 @@ export function perfLint(
   // above. This works uniformly for `//` comments AND JSX `{/* … */}` comment children (whose comment
   // text isn't in the flagged node's leading trivia).
   const sourceLines = source.split('\n')
+  const matchesIgnore = (text: string, code: string): boolean => {
+    const m = /mdc-perf-ignore(?:\s+(MDC_PERF_\d+))?/.exec(text)
+    return !!m && (!m[1] || m[1] === code)
+  }
   const isSuppressed = (node: ts.Node, code: string): boolean => {
     const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf))
-    for (const ln of [line, line - 1]) {
-      const m = /mdc-perf-ignore(?:\s+(MDC_PERF_\d+))?/.exec(sourceLines[ln] ?? '')
-      if (m && (!m[1] || m[1] === code)) return true
-    }
+    // The finding's OWN line: an inline or trailing `// mdc-perf-ignore` suppresses just this line.
+    if (matchesIgnore(sourceLines[line] ?? '', code)) return true
+    // The line ABOVE: honored ONLY when it is a STANDALONE ignore comment (the documented "line above"
+    // affordance + the JSX `{/* … */}` child case) — a TRAILING ignore on the previous code statement
+    // must not bleed onto this, unrelated, next finding.
+    const above = sourceLines[line - 1] ?? ''
+    if (/^\s*(\/\/|\{?\s*\/\*)/.test(above) && matchesIgnore(above, code)) return true
     return false
   }
   const emit = (node: ts.Node, code: string, message: string): void => {

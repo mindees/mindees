@@ -353,4 +353,27 @@ describe('navigation guards', () => {
     expect(router.location().pathname).toBe('/a')
     router.dispose()
   })
+
+  it('does not run a route loader on search that failed schema validation (surfaces an error)', () => {
+    const loader = vi.fn((ctx: { search: Record<string, unknown> }) => ctx.search.page)
+    const searchSchema = {
+      '~standard': {
+        version: 1 as const,
+        vendor: 'test',
+        validate: (input: unknown) => {
+          const page = (input as { page?: unknown }).page
+          return typeof page === 'string' && /^[0-9]+$/.test(page)
+            ? { value: { page: Number(page) } }
+            : { issues: [{ message: 'page must be a number' }] }
+        },
+      },
+    }
+    const router = createRouter({
+      routes: [{ path: '/list', searchSchema: searchSchema as never, loader }],
+      history: createMemoryHistory({ initialEntries: ['/list?page=notanum'] }),
+    })
+    expect(router.loaderData(leafOf(router)).status).toBe('error') // never pending/success
+    expect(loader).not.toHaveBeenCalled() // never executed on the raw, unvalidated search
+    router.dispose()
+  })
 })
