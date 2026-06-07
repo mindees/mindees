@@ -208,13 +208,27 @@ export function templateNames(): string[] {
 }
 
 /**
- * Materialize a template's files for `appName`: substitutes the `{{appName}}`
- * placeholder and returns a fresh path → contents map. Pure (no I/O).
+ * A valid Android `applicationId` derived from the app name (reverse-DNS, sanitized to a Java
+ * identifier segment). Gives each scaffold a unique install id so two MindeesNative Android apps
+ * coexist on a device. The `com.example.*` prefix is a conventional placeholder users can change.
+ */
+function androidAppId(appName: string): string {
+  let segment = appName.toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (segment.length === 0) segment = 'app'
+  if (/^[0-9]/.test(segment)) segment = `app${segment}`
+  return `com.example.${segment}`
+}
+
+/**
+ * Materialize a template's files for `appName`: substitutes the `{{appName}}` and
+ * `{{androidAppId}}` placeholders and returns a fresh path → contents map. Pure (no I/O).
+ * Placeholders a template doesn't use are simply no-ops.
  */
 export function materialize(template: Template, appName: string): Record<string, string> {
+  const appId = androidAppId(appName)
   const out: Record<string, string> = {}
   for (const [path, contents] of Object.entries(template.files)) {
-    out[path] = contents.replaceAll('{{appName}}', appName)
+    out[path] = contents.replaceAll('{{appName}}', appName).replaceAll('{{androidAppId}}', appId)
   }
   return out
 }

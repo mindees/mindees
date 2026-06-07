@@ -64,12 +64,30 @@ const TRANSFORMED = {
     readOverride('gen-routes.mjs.template'),
 }
 
+/**
+ * In-place content patches that inject scaffold placeholders into otherwise-verbatim files.
+ * `materialize` substitutes them per app: `{{androidAppId}}` (a unique install id so two scaffolds
+ * coexist on a device) and `{{appName}}` (the Gradle project name). The compile `namespace` stays
+ * `dev.mindees.example` — Android keys install identity on `applicationId`, not the code package.
+ */
+const CONTENT_PATCHES = {
+  'mindees-example-app/build.gradle.kts': (c) =>
+    c.replace('applicationId = "dev.mindees.example"', 'applicationId = "{{androidAppId}}"'),
+  'settings.gradle.kts': (c) =>
+    c.replace(
+      'rootProject.name = "mindees-native-host-android"',
+      'rootProject.name = "{{appName}}"',
+    ),
+}
+
 const files = {}
 for (const path of tracked) {
   if (!path.startsWith(PREFIX)) continue
   const relKey = path.slice(PREFIX.length)
   if (isOmitted(relKey)) continue
-  files[relKey] = (TRANSFORMED[relKey] ?? (() => readExample(relKey)))()
+  let content = (TRANSFORMED[relKey] ?? (() => readExample(relKey)))()
+  if (CONTENT_PATCHES[relKey]) content = CONTENT_PATCHES[relKey](content)
+  files[relKey] = content
 }
 
 // SYNTHESIZED files (not present, or replaced, in the reference tree).
