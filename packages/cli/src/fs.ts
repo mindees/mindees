@@ -18,6 +18,8 @@ export interface FileSystem {
   mkdir(path: string): void
   /** List files (recursively) under `dir`, returned as POSIX-relative paths. */
   readDir(dir: string): string[]
+  /** Remove a file or directory (recursively). No-op if missing. */
+  rm(path: string): void
 }
 
 /** An in-memory {@link FileSystem} for tests and dry runs. */
@@ -68,6 +70,14 @@ export function createMemoryFileSystem(initial: Record<string, string> = {}): Fi
         }
       }
       return out.sort()
+    },
+    rm: (path) => {
+      const p = norm(path)
+      files.delete(p)
+      dirs.delete(p)
+      const prefix = `${p}/`
+      for (const f of [...files.keys()]) if (f.startsWith(prefix)) files.delete(f)
+      for (const d of [...dirs]) if (d.startsWith(prefix)) dirs.delete(d)
     },
     snapshot: () => Object.fromEntries([...files.entries()].sort()),
   }

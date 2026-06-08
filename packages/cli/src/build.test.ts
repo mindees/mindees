@@ -204,4 +204,27 @@ export const App = W`,
     expect(result.ok).toBe(true)
     expect(fs.snapshot()['dist/App.js']).toContain('"./widgets/index.js"') // directory → /index.js, not .js
   })
+
+  it('does not let a side-effect asset import (CSS) brick the build', () => {
+    const fs = createMemoryFileSystem({
+      'src/main.tsx': `import "./styles.css"
+export const main = 1`,
+    })
+    const result = buildProject(fs)
+    expect(result.ok).toBe(true) // TS2882 downgraded → build still succeeds
+    expect(fs.snapshot()['dist/main.js']).toBeDefined()
+  })
+
+  it('cleans stale output on rebuild (a deleted source leaves no dist module)', () => {
+    const fs = createMemoryFileSystem({
+      'src/main.tsx': 'export const main = 1',
+      'src/Old.tsx': 'export const old = 1',
+    })
+    buildProject(fs)
+    expect(fs.snapshot()['dist/Old.js']).toBeDefined()
+    fs.rm('src/Old.tsx') // delete the source
+    buildProject(fs) // rebuild
+    expect(fs.snapshot()['dist/Old.js']).toBeUndefined() // stale module removed
+    expect(fs.snapshot()['dist/main.js']).toBeDefined()
+  })
 })

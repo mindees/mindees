@@ -154,3 +154,13 @@ describe('renderDevPage', () => {
     expect(body).not.toContain('var v=null')
   })
 })
+
+describe('createDevServer — encoded asset paths', () => {
+  it('decodes percent-encoded request paths (a spaced filename resolves)', () => {
+    const server = createDevServer()
+    server.setFiles({ 'index.html': '<body></body>', 'My Card.js': 'export const C = 1' })
+    const res = server.handle('GET', '/My%20Card.js')
+    expect(res.status).toBe(200)
+    expect(res.body).toContain('export const C')
+  })
+})

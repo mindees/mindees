@@ -14,6 +14,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs'
@@ -54,6 +55,9 @@ function nodeFileSystem(): FileSystem {
         return acc
       }
       return walk(dir, []).sort()
+    },
+    rm: (path) => {
+      rmSync(path, { recursive: true, force: true })
     },
   }
 }
