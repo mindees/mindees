@@ -28,7 +28,14 @@ export const maturity: Maturity = 'experimental'
  */
 export const info: PackageInfo = Object.freeze({ name, version: VERSION, maturity })
 
-export { type A11yProps, type A11yState, type Role, toA11yProps } from './a11y'
+export {
+  type A11yProps,
+  type A11yState,
+  type Announce,
+  announce,
+  type Role,
+  toA11yProps,
+} from './a11y'
 export {
   Accordion,
   type AccordionProps,
