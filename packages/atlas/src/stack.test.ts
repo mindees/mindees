@@ -1,4 +1,5 @@
-import { _resetAnimation, createElement, manualFrameSource, setFrameSource } from '@mindees/core'
+import { createElement, manualFrameSource, setFrameSource } from '@mindees/core'
+import { _resetAnimation } from '@mindees/core/testing'
 import {
   createHeadlessBackend,
   createHeadlessRoot,

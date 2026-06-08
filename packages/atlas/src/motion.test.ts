@@ -1,10 +1,5 @@
-import {
-  _resetAnimation,
-  animate,
-  cubicBezier,
-  manualFrameSource,
-  setFrameSource,
-} from '@mindees/core'
+import { animate, cubicBezier, manualFrameSource, setFrameSource } from '@mindees/core'
+import { _resetAnimation } from '@mindees/core/testing'
 import { afterEach, describe, expect, it } from 'vitest'
 import { animateTo, motion } from './motion'
 import { easing } from './tokens'
