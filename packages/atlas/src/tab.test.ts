@@ -2,7 +2,7 @@
 /// <reference lib="dom" />
 import { createElement } from '@mindees/core'
 import { createDomBackend, render } from '@mindees/renderer'
-import { createMemoryHistory, createRouter } from '@mindees/router'
+import { createMemoryHistory, createRouter, type RouteComponentProps } from '@mindees/router'
 import { describe, expect, it } from 'vitest'
 import { Text } from './primitives'
 import { createTabNavigator } from './tab'
@@ -66,6 +66,23 @@ describe('createTabNavigator', () => {
     const { root } = setup('/settings')
     const tabs = root.querySelectorAll('[role="tab"]')
     expect(tabs[1]?.getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('threads the router screen contract (params + loader data) into the tab screen', () => {
+    const User = (props: RouteComponentProps) =>
+      createElement(Text, {}, () => `id=${props.params().id} status=${props.data().status}`)
+    const router = createRouter({
+      routes: [{ path: '/user/:id', component: User }],
+      history: createMemoryHistory({ initialEntries: ['/user/42'] }),
+    })
+    const Tabs = createTabNavigator(router, {
+      tabs: [{ path: '/user', label: 'User', component: User }],
+    })
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    render(createElement(Tabs, {}), createDomBackend(doc()), root as never)
+    expect(root.textContent).toContain('id=42') // params() threaded through
+    expect(root.textContent).toContain('status=idle') // data() accessor present (no loader → idle)
   })
 
   it('selects/shows nothing when the URL matches no tab', () => {
