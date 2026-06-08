@@ -105,7 +105,7 @@ export const VERSION = '0.37.0'
  * (iOS/Android) and the GPU canvas are research tracks (throw
  * `NotImplementedError`). See the repository `STATUS.md`.
  */
-export const maturity: Maturity = 'experimental'
+export const maturity: Maturity = 'stable'
 
 /**
  * Static identity + maturity metadata for this package. Frozen so the

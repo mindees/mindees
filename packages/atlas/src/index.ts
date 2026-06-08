@@ -19,7 +19,7 @@ export const name = '@mindees/atlas'
 export const VERSION = '0.37.0'
 
 /** Current maturity of this package. See the repository `STATUS.md`. */
-export const maturity: Maturity = 'experimental'
+export const maturity: Maturity = 'stable'
 
 /**
  * Static identity + maturity metadata for this package. Frozen so the

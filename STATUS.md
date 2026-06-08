@@ -4,10 +4,16 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** v0.30.2. All `@mindees/*` packages + `create-mindees` share the single locked **0.30.2**
-line (verified against every `packages/*/src/index.ts` + `package.json`), published to npm.
+**Last updated: 1.0.0.** All `@mindees/*` packages + `create-mindees` share the single locked **1.0.0** line,
+published to npm. **The web stack is `maturity: 'stable'` and follows semver** — `@mindees/core`,
+`@mindees/compiler`, `@mindees/cli`, `@mindees/router`, `@mindees/renderer`, `@mindees/atlas`.
+`@mindees/ai`, `@mindees/data`, and `@mindees/updates` share the 1.0 version line but stay
+`maturity: 'experimental'` (feature-complete + tested; surface still stabilizing). **On-device native
+rendering remains a labeled research track** (the same TypeScript app is render-verified on a real Android
+emulator + iOS Simulator in CI, but a published native host library + physical-device proof are not done).
+Upgrading from 0.x? See [`docs/migration-1.0.md`](./docs/migration-1.0.md).
 
-**v1-readiness milestone (the web target is now adoptable end-to-end):**
+**v1 (web target — adoptable end-to-end):**
 
 - **Runnable web loop** — `mindees dev` serves your app with live-reload (+ a build-error overlay) and
   `mindees build` emits a deployable `dist/` (native ESM + an import-map to the CDN; no bundler step).

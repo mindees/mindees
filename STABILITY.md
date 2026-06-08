@@ -43,8 +43,31 @@ Each package self-reports a `maturity` (introspectable via its exported `info`).
 | `planned` / `scaffold` | declared shape, not yet implemented | ❌ |
 | `deprecated` | still works; scheduled for removal (see below) | ✅ until removed |
 
-The whole framework is `experimental` until the 1.0 release flips the production-ready packages to
-`stable` (the genuinely-unbuilt seams — native/AOT/on-device — stay `research-track`).
+As of **1.0**, the web stack is `stable` — `@mindees/core`, `@mindees/compiler`, `@mindees/cli`,
+`@mindees/router`, `@mindees/renderer`, `@mindees/atlas`. `@mindees/ai`, `@mindees/data`, and
+`@mindees/updates` share the 1.0 version line but remain `experimental` (feature-complete + tested; surface
+still stabilizing). The genuinely-unbuilt seams — native on-device rendering, TS→native AOT — stay
+`research-track` and throw `NotImplementedError`.
+
+## 1.0 accepted API decisions
+
+A pre-1.0 freeze audit surfaced a few judgment calls deliberately **accepted** as-is (not changed), recorded
+here so they're conscious, not accidental:
+
+- **`Stack`/`Tabs` (layout/widget) vs `createStackNavigator`/`createTabNavigator` (router navigators)** are
+  distinct identifiers on distinct import paths — kept as-is; the navigators are the `@mindees/atlas/stack`
+  and `/tab` subpaths.
+- **`@mindees/data` CRDT helper naming** (`counterInc`/`orMerge`/`lwwSet`/`vvMerge`) is uneven across the
+  four CRDTs but each is internally consistent and the package is `experimental`, so names may still change
+  before `@mindees/data` goes `stable`.
+- **`@mindees/ai`** uses a positional `(backend, request, schema?, options?)` shape across its operations —
+  intentional and consistent.
+- **`createScheduler()`** is the recommended constructor; the `Scheduler` class is also exported for
+  `instanceof`/typing.
+- **`compileToNative`** is a `research-track` stub (throws `NotImplementedError`); its signature is not a
+  stability commitment.
+- The list utilities **`computeWindow`/`flattenSections`** (and `ListWindow`/`Entry`) on `@mindees/atlas/list`
+  are intentionally public, pure, exhaustively-tested helpers for building custom virtualization.
 
 ## Deprecation lifecycle
 

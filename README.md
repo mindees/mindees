@@ -15,7 +15,7 @@ OTA updates. Built in the open.
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
-[![Status: v0.30.2 experimental](https://img.shields.io/badge/status-v0.30.2%20experimental-orange.svg)](./STATUS.md)
+[![Status: v1.0 — web stable](https://img.shields.io/badge/status-v1.0%20web%20stable-2ea44f.svg)](./STATUS.md)
 [![npm](https://img.shields.io/badge/npm-%40mindees%2F*-cb3837.svg)](https://www.npmjs.com/org/mindees)
 
 [Status](./STATUS.md) · [Roadmap](./ROADMAP.md) · [Contributing](./CONTRIBUTING.md) · [RFCs](./rfcs/README.md) · [Discussions](https://github.com/mindees/mindees/discussions)
@@ -24,11 +24,16 @@ OTA updates. Built in the open.
 
 ---
 
-> ### ⚠️ v0.30.2 — experimental, building in the open (all 10 packages on npm)
+> ### 🎉 v1.0 — the web stack is stable (all 10 packages on npm)
 >
-> MindeesNative is **not production-ready yet** — we are building it in public and
-> follow one rule above all: **everything we ship actually works.**
-> [`STATUS.md`](./STATUS.md) is the honest, per-package source of truth.
+> The **web target is 1.0 and follows semver**: `@mindees/core`, `@mindees/compiler`, `@mindees/cli`,
+> `@mindees/router`, `@mindees/renderer`, and `@mindees/atlas` are `maturity: 'stable'`. `@mindees/ai`,
+> `@mindees/data`, and `@mindees/updates` share the 1.0 version line but stay **experimental** (still
+> stabilizing). **On-device native** rendering remains a **labeled research track** — the *same* app is
+> render-verified on a real Android emulator + iOS Simulator in CI, but a published native host library and
+> physical-device proof are not done. We follow one rule above all: **everything we ship actually works.**
+> [`STATUS.md`](./STATUS.md) is the honest, per-package source of truth; upgrading from 0.x? see
+> [`docs/migration-1.0.md`](./docs/migration-1.0.md).
 >
 > **The headline, real and CI-verified today: the *same* TypeScript app renders and is
 > interactive on web, Android, and iOS.** The Helix renderer drives a web/DOM target

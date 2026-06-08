@@ -151,7 +151,7 @@ export const VERSION = '0.37.0'
  * abstraction (Web Worker + inline) are all implemented and tested. Native
  * multi-threading remains a research track (throws `NotImplementedError`).
  */
-export const maturity: Maturity = 'experimental'
+export const maturity: Maturity = 'stable'
 
 /**
  * Static identity + maturity metadata for this package. Frozen so the

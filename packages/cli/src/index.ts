@@ -76,7 +76,7 @@ export { VERSION }
  * preview; on-device NL→app generation is Phase 10 (today `--prompt` maps to a
  * template deterministically).
  */
-export const maturity: Maturity = 'experimental'
+export const maturity: Maturity = 'stable'
 
 /**
  * Static identity + maturity metadata for this package. Frozen so the
