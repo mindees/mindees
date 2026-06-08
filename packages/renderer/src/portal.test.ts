@@ -1,4 +1,11 @@
-import { createElement, portal, signal } from '@mindees/core'
+import {
+  createContext,
+  createElement,
+  portal,
+  provideContext,
+  signal,
+  useContext,
+} from '@mindees/core'
 import { describe, expect, it } from 'vitest'
 import { createHeadlessBackend, createHeadlessRoot } from './headless'
 import { render } from './render'
@@ -14,6 +21,25 @@ describe('bindPortalChild', () => {
     expect(backend.serialize(root)).not.toContain('modal')
     // The overlay holds the relocated content.
     expect(overlay.children.map((c) => backend.serialize(c)).join('')).toContain('modal')
+  })
+
+  it('resolves tree-scoped context from the portal’s LOGICAL scope, not the overlay target', () => {
+    const overlay = createHeadlessRoot('overlay')
+    const backend = createHeadlessBackend({ overlayRoot: overlay })
+    const root = createHeadlessRoot()
+    const Theme = createContext('light')
+    const Screen = () => {
+      provideContext(Theme, 'dark')
+      // The portaled content's host node lives in the overlay, but its logical owner is here — so
+      // `useContext` must find 'dark' (the basis for hiding an overlay when its owning tab is inactive).
+      return createElement(
+        'view',
+        {},
+        portal(() => createElement('text', {}, `theme:${useContext(Theme)}`)),
+      )
+    }
+    render(createElement(Screen, {}), backend, root)
+    expect(overlay.children.map((c) => backend.serialize(c)).join('')).toContain('theme:dark')
   })
 
   it('keeps following siblings ordered around the portal slot marker', () => {

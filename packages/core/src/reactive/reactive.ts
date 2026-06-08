@@ -35,6 +35,14 @@ interface OwnerNode {
   owned: AnyComputation[] | null
   /** Cleanup callbacks registered via {@link onCleanup}. */
   cleanups: Array<() => void> | null
+  /**
+   * The enclosing scope at creation time — the chain {@link getOwnerContext} walks for tree-scoped
+   * context. Distinct from ownership-for-disposal (`owned`): a {@link createRoot} is disposed
+   * independently yet still chains to its creator for context lookup.
+   */
+  parent: OwnerNode | null
+  /** Tree-scoped context values provided in this scope (lazily created; cleared each re-run). */
+  contexts: Map<symbol, unknown> | null
 }
 
 /** @internal Phantom brand making {@link Owner} nominal — see below. */
@@ -181,6 +189,10 @@ class Computation<T> implements OwnerNode {
   observers: AnyComputation[] | null = null
   owned: AnyComputation[] | null = null
   cleanups: Array<() => void> | null = null
+  /** Enclosing scope at creation (for tree-scoped context walk) — see {@link OwnerNode.parent}. */
+  parent: OwnerNode | null = currentOwner
+  /** Tree-scoped context values provided in this scope (see {@link OwnerNode.contexts}). */
+  contexts: Map<symbol, unknown> | null = null
   equals: EqualsFn<T> | false
   readonly isEffect: boolean
   /**
@@ -343,6 +355,7 @@ class Computation<T> implements OwnerNode {
     try {
       do {
         this.restaleRequested = false
+        this.contexts = null // re-provided by the body below; cleared so a conditional provide can't go stale
         try {
           disposeChildren(this)
         } catch (err) {
@@ -829,7 +842,9 @@ export function onCleanup(fn: () => void): void {
  * dispose() // tear down the effect
  */
 export function createRoot<T>(fn: (dispose: () => void) => T): T {
-  const root: OwnerNode = { owned: null, cleanups: null }
+  // Disposal is independent (the root isn't added to prevOwner.owned), but `parent` still chains to the
+  // creator so tree-scoped context flows INTO a component subtree / portal rendered under a fresh root.
+  const root: OwnerNode = { owned: null, cleanups: null, parent: currentOwner, contexts: null }
   const prevObserver = currentObserver
   const prevOwner = currentOwner
   currentObserver = null
@@ -860,6 +875,25 @@ export function runWithOwner<T>(owner: Owner | null, fn: () => T): T {
   } finally {
     currentOwner = prev
   }
+}
+
+/**
+ * @internal Low-level tree-scoped context primitives backing `provideContext`/`useContext`. Kept here (not
+ * in the component layer) because they read/write the private owner chain. Keyed by an opaque symbol.
+ */
+export function setOwnerContext(id: symbol, value: unknown): void {
+  if (!currentOwner) return // outside any reactive scope → no-op (providing context is a tree operation)
+  if (!currentOwner.contexts) currentOwner.contexts = new Map()
+  currentOwner.contexts.set(id, value)
+}
+
+/** @internal Walk the owner `parent` chain for the nearest provided value. `found:false` ⇒ use the default. */
+export function getOwnerContext(id: symbol): { found: boolean; value: unknown } {
+  for (let node = currentOwner; node !== null; node = node.parent) {
+    const map = node.contexts
+    if (map?.has(id)) return { found: true, value: map.get(id) }
+  }
+  return { found: false, value: undefined }
 }
 
 // ---------------------------------------------------------------------------

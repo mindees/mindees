@@ -53,8 +53,10 @@ export {
   PORTAL,
   type PortalRegion,
   portal,
+  provideContext,
   renderComponent,
   type SelectorEquals,
+  useContext,
 } from './component'
 export { NotImplementedError } from './errors'
 /**
