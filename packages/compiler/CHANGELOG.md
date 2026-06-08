@@ -1,5 +1,11 @@
 # @mindees/compiler
 
+## 0.32.0
+
+### Patch Changes
+
+- @mindees/core@0.32.0
+
 ## 0.31.1
 
 ### Patch Changes
