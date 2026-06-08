@@ -4,6 +4,7 @@ import { createElement } from '@mindees/core'
 import { createDomBackend, render } from '@mindees/renderer'
 import { createMemoryHistory, createRouter, type RouteComponentProps } from '@mindees/router'
 import { describe, expect, it } from 'vitest'
+import { Modal } from './overlay'
 import { Text } from './primitives'
 import { createTabNavigator } from './tab'
 
@@ -110,5 +111,36 @@ describe('createTabNavigator', () => {
     // tabBarPosition:'top' → the tablist is the FIRST child of the outer container (before the panels).
     const outer = root.firstElementChild as HTMLElement
     expect(outer.firstElementChild?.getAttribute('role')).toBe('tablist')
+  })
+
+  it('hides a screen-opened Modal from the overlay when its tab is left (ADR-0025)', () => {
+    const HomeWithModal = () =>
+      createElement(Modal, {
+        visible: true,
+        label: 'HomeModal',
+        children: createElement(Text, {}, 'hi'),
+      })
+    const router = createRouter({
+      routes: [
+        { path: '/home', component: HomeWithModal },
+        { path: '/settings', component: Settings },
+      ],
+      history: createMemoryHistory({ initialEntries: ['/home'] }),
+    })
+    const Tabs = createTabNavigator(router, {
+      tabs: [
+        { path: '/home', label: 'Home', component: HomeWithModal },
+        { path: '/settings', label: 'Settings', component: Settings },
+      ],
+    })
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    render(createElement(Tabs, {}), createDomBackend(doc()), root as never)
+    const modal = () => document.querySelector('[aria-label="HomeModal"]')
+    expect(modal()).toBeTruthy() // on /home → modal shown
+    router.navigate('/settings') // leave Home → the portaled modal must NOT float over Settings
+    expect(modal()).toBeNull()
+    router.navigate('/home') // back → modal reappears (Home kept alive)
+    expect(modal()).toBeTruthy()
   })
 })

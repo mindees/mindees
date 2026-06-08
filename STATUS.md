@@ -40,8 +40,6 @@ file-based routing.
   glob needed. (Explicit `createRouter({ routes })` remains available.)
 - **Nested routes under a tab** aren't auto-rendered: a `createTabNavigator` tab whose route has children
   should render its own `createRouterView`. Leaf tabs get the full `params`/`search`/`data` contract.
-- **An overlay opened by a screen inside a tab** (a `Modal`/`Toast`) portals to the app's overlay layer, so
-  it isn't auto-hidden when you switch tabs — close it on tab change.
 
 The headline: the **same TypeScript app** renders and is **interactive** on web (DOM/SSR),
 a real **Android emulator**, and a real **iOS Simulator** — all CI-verified (no local Mac
