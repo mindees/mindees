@@ -168,4 +168,28 @@ export const x = () => <view/>`,
     expect(buildProject(withMain, { html: false }).htmlEmitted).toBeUndefined() // explicitly disabled
     expect(withMain.snapshot()['dist/index.html']).toBeUndefined()
   })
+
+  it('enforces a perf budget from options (over-budget fails the build)', () => {
+    const fs = createMemoryFileSystem({
+      'src/App.tsx': `import { createElement } from "@mindees/core"
+export const App = () => <view><text>a</text></view>`,
+    })
+    const result = buildProject(fs, { budget: { maxElements: 1 } }) // 2 elements > 1
+    expect(result.ok).toBe(false)
+    expect(
+      result.diagnostics.some((d) => d.code === 'MDC_BUDGET_ELEMENTS' && d.severity === 'error'),
+    ).toBe(true)
+  })
+
+  it('perf-lint emits warnings without failing the build', () => {
+    const fs = createMemoryFileSystem({
+      'src/List.tsx': `import { createElement } from "@mindees/core"
+export const List = (xs: number[]) => <view>{xs.map((x) => <text>{x}</text>)}</view>`,
+    })
+    const result = buildProject(fs, { perf: true })
+    expect(result.ok).toBe(true) // warnings never block
+    expect(
+      result.diagnostics.some((d) => d.code.startsWith('MDC_PERF') && d.severity === 'warning'),
+    ).toBe(true)
+  })
 })
