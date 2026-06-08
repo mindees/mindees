@@ -22,6 +22,7 @@ import {
   type Signal,
   signal,
 } from '@mindees/core'
+import { AtlasError } from './errors'
 import type { Reactive } from './host'
 import { ScrollView } from './primitives'
 import { flattenStyle, type StyleInput } from './style'
@@ -100,15 +101,15 @@ function readScrollTop(event: unknown): number {
 /**
  * Create a virtualized recycling list as a renderer-agnostic `MindeesNode`.
  *
- * @throws RangeError if `itemHeight`/`height` are not positive finite numbers.
+ * @throws AtlasError (`INVALID_PROP`) if `itemHeight`/`height` are not positive finite numbers.
  */
 export function createList<T>(options: ListOptions<T>): MindeesNode {
   const { renderItem, itemHeight, height } = options
   if (!Number.isFinite(itemHeight) || itemHeight <= 0) {
-    throw new RangeError('List itemHeight must be a positive number')
+    throw new AtlasError('INVALID_PROP', 'List itemHeight must be a positive number')
   }
   if (!Number.isFinite(height) || height <= 0) {
-    throw new RangeError('List height must be a positive number')
+    throw new AtlasError('INVALID_PROP', 'List height must be a positive number')
   }
   const overscan = Math.max(0, Math.min(50, Math.floor(options.overscan ?? 3)))
   const itemsOf: () => readonly T[] =
@@ -251,8 +252,8 @@ export interface Section<T> {
   readonly key?: string
 }
 
-/** A flattened section-list entry: a header or a row. */
-type Entry<T> =
+/** A flattened section-list entry: a header or a row (the element type returned by {@link flattenSections}). */
+export type Entry<T> =
   | { readonly kind: 'header'; readonly section: Section<T>; readonly sectionIndex: number }
   | {
       readonly kind: 'item'

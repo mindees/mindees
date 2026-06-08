@@ -6,6 +6,7 @@ import {
   render,
 } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
+import { AtlasError } from './errors'
 import { computeWindow, createList, createSectionList, flattenSections } from './list'
 import { Text } from './primitives'
 
@@ -74,10 +75,10 @@ describe('createList — validation', () => {
   it('rejects a non-positive itemHeight/height', () => {
     const renderItem = () => Text({ children: 'x' })
     expect(() => createList({ items: [], renderItem, itemHeight: 0, height: 100 })).toThrow(
-      RangeError,
+      AtlasError,
     )
     expect(() => createList({ items: [], renderItem, itemHeight: 20, height: 0 })).toThrow(
-      RangeError,
+      AtlasError,
     )
   })
 })
