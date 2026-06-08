@@ -13,6 +13,7 @@ import { parseArgs } from 'node:util'
 import type { AiBackend } from '@mindees/ai'
 import { runAiCommand } from './ai'
 import { buildProject } from './build'
+import { loadConfig } from './config'
 import { quoteShellPath, resolveCreateTarget } from './create-target'
 import { doctorSummary, renderDoctor, runDoctor } from './doctor'
 import type { FileSystem } from './fs'
@@ -210,10 +211,14 @@ function cmdBuild(args: readonly string[], ctx: CliContext): CommandResult {
     options: { 'out-dir': { type: 'string' }, 'no-source-map': { type: 'boolean' } },
   })
 
+  const config = loadConfig(ctx.fs, ctx.cwd)
   const result = buildProject(ctx.fs, {
     root: ctx.cwd,
     outDir: typeof values['out-dir'] === 'string' ? values['out-dir'] : `${ctx.cwd}/dist`,
     sourceMap: values['no-source-map'] !== true,
+    perf: config.perf ?? true, // perf-lint ON by default (warnings, never blocks)
+    ...(config.budget ? { budget: config.budget } : {}),
+    ...(config.appName ? { appName: config.appName } : {}),
   })
 
   for (const d of result.diagnostics) {

@@ -10,7 +10,16 @@
  * @module
  */
 
-import { buildRouteManifest, compile, type Diagnostic, typecheck } from '@mindees/compiler'
+import {
+  type BudgetOptions,
+  buildRouteManifest,
+  checkBudget,
+  compile,
+  type Diagnostic,
+  type PerfLintOptions,
+  perfLint,
+  typecheck,
+} from '@mindees/compiler'
 import type { FileSystem } from './fs'
 import { VERSION } from './version'
 
@@ -111,6 +120,17 @@ export interface BuildOptions {
   html?: boolean
   /** Title for the emitted `index.html`. Default `"Mindees App"`. */
   appName?: string
+  /**
+   * Run the MDC perf-lint (build-time advice neither RN nor Flutter ships, e.g. `MDC_PERF_001`: a bare
+   * `.map()` re-mounts every row). Emits **warnings** only (never fails the build). `true` for defaults,
+   * or pass {@link PerfLintOptions} to tune. The CLI enables this by default.
+   */
+  perf?: boolean | PerfLintOptions
+  /**
+   * Enforce a per-module performance budget (spec §12: "100% optimized, enforced"). A violation is an
+   * **error** that fails the build (non-zero exit). Opt-in via `mindees.config`.
+   */
+  budget?: BudgetOptions
 }
 
 /** Result of a project build. */
@@ -162,6 +182,8 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     sourceMap = true,
     html = true,
     appName = 'Mindees App',
+    perf = false,
+    budget,
   } = options
   const srcDir = root === '.' ? 'src' : `${root}/src`
 
@@ -190,6 +212,13 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     const moduleHasError = moduleDiags.some((d) => d.severity === 'error')
     if (!moduleHasError) {
       const emitted = compile(source, { fileName: rel, sourceMap })
+      // Flagship build-time DX: perf-lint (warnings — advice, never blocks) + an enforced perf budget
+      // (errors — fails the build). Previously wired only into compiler unit tests; now reachable from
+      // `mindees build`/`dev` so the "100% optimized, enforced" claim is real, not aspirational.
+      if (perf) diagnostics.push(...perfLint(source, rel, typeof perf === 'object' ? perf : {}))
+      if (budget) {
+        for (const d of checkBudget(emitted, budget)) diagnostics.push({ ...d, file: rel })
+      }
       stats.flattenedNodes += emitted.stats.flattenedNodes
       stats.totalElements += emitted.stats.totalElements
       const outPath = `${outDir}/${rel.replace(COMPILABLE, '.js')}`

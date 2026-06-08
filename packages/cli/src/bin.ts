@@ -24,6 +24,7 @@ import type { AiBackend } from '@mindees/ai'
 import { type AdapterName, createServerBackend, type FetchLike } from '@mindees/ai/server'
 import { detectImageSupport, itermImage, renderBanner } from './banner'
 import { type CliContext, runCliAsync } from './cli'
+import { loadConfig } from './config'
 import { startDev } from './dev'
 import { createDevServer, createNodeWatcher, renderDevPage } from './dev-server'
 import type { FileSystem } from './fs'
@@ -117,7 +118,10 @@ function runDevServer(ctx: CliContext): void {
         listener(event, typeof filename === 'string' ? filename : null),
       ),
   })
+  const config = loadConfig(ctx.fs, ctx.cwd)
   startDev(ctx.fs, watcher, {
+    perf: config.perf ?? true, // perf-lint ON in dev (warnings surfaced in the rebuild console)
+    ...(config.budget ? { budget: config.budget } : {}),
     onRebuild: (result) => {
       // Serve the built app on success; show the diagnostics overlay (at `/`) on failure.
       if (result.ok) server.setFiles(collectDist())
