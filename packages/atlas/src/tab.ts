@@ -63,9 +63,10 @@ export function createTabNavigator(
 
   return () => {
     // Active tab = the LONGEST tab path that prefixes the current pathname (deep-link + nested-route aware).
+    // Returns -1 when the URL belongs to NO tab — better to select/show nothing than a misleading tab 0.
     const activeIndex = (): number => {
       const path = router.location().pathname
-      let best = 0
+      let best = -1
       let bestLen = -1
       tabs.forEach((t, i) => {
         if ((path === t.path || path.startsWith(`${t.path}/`)) && t.path.length > bestLen) {

@@ -121,6 +121,10 @@ export type Announce = 'polite' | 'assertive'
 
 // One persistent visually-hidden live region per politeness, reused across calls (created lazily).
 const liveRegions: Partial<Record<Announce, { textContent: string }>> = {}
+// Messages queued within the current frame per politeness — joined into ONE flush so two same-frame
+// announce() calls both speak (a single region can hold one string; last-write-wins would drop the first).
+const pendingMessages: Partial<Record<Announce, string[]>> = {}
+const flushScheduled: Partial<Record<Announce, boolean>> = {}
 
 interface DocLike {
   createElement(tag: string): {
@@ -135,7 +139,7 @@ interface DocLike {
  * Imperatively announce `message` to screen readers (programmatic, not tied to a rendered node) — for
  * results that aren't otherwise voiced ("3 results found", "Saved", validation errors). Writes into a
  * persistent visually-hidden `aria-live` region (one per politeness), clearing first so the SAME message
- * re-announces. SSR/native-safe: a no-op without a DOM.
+ * re-announces. Multiple calls in the same frame are queued and joined (none is lost). SSR/native-safe.
  */
 export function announce(message: string, politeness: Announce = 'polite'): void {
   const doc = (globalThis as unknown as { document?: DocLike }).document
@@ -153,13 +157,23 @@ export function announce(message: string, politeness: Announce = 'polite'): void
     region = el
     liveRegions[politeness] = el
   }
-  // Clear then set on the next tick so a repeated identical message is still re-announced.
+  let queue = pendingMessages[politeness]
+  if (queue === undefined) {
+    queue = []
+    pendingMessages[politeness] = queue
+  }
+  queue.push(message)
+  if (flushScheduled[politeness]) return // a flush is already queued this frame; messages will join
+  flushScheduled[politeness] = true
+  // Clear now so a repeated identical message still re-announces; set the joined batch on the next tick.
   region.textContent = ''
   const r = region
   const schedule =
     (globalThis as { requestAnimationFrame?: (cb: () => void) => void }).requestAnimationFrame ??
     ((cb: () => void) => setTimeout(cb, 16))
   schedule(() => {
-    r.textContent = message
+    r.textContent = (pendingMessages[politeness] ?? []).join(' ')
+    pendingMessages[politeness] = []
+    flushScheduled[politeness] = false
   })
 }
