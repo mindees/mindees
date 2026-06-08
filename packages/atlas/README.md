@@ -41,10 +41,10 @@ The Atlas component library — MindeesNative's batteries-included UI primitives
   `animateTo` drive spring/interpolated animations on the same scene.
 - **Theming** — design tokens in two tiers: primitive scales (`space`, `radius`,
   `fontSize`, `palette`, …) and semantic `tokens`/`Theme` (`bg`/`surface`/`text`/
-  `primary`/…). `useTheme` returns a reactive theme driven by `useColorScheme`, so
-  **dark mode** is a fine-grained token-set swap — only the color nodes update. The
-  `@mindees/atlas/theme` subpath additionally exports a structural `createTheme()`
-  with `@mindees/core` selector isolation.
+  `primary`/…), all on the main entry. `useTheme` returns a reactive theme driven by
+  `useColorScheme`, so **dark mode** is a fine-grained token-set swap — only the color
+  nodes update. Every built-in component reads its colors via `useTheme`, so a token
+  swap re-themes them automatically.
 - **List** — `@mindees/atlas/list` exports `List`, `createList`, and `computeWindow`.
   It renders a fixed pool of recycled row regions for fixed-height virtualization;
   variable-height measurement is a 🔬 research track.
@@ -57,12 +57,11 @@ The Atlas component library — MindeesNative's batteries-included UI primitives
 ## Quick start
 
 ```ts
-import { Button, Column, Text } from '@mindees/atlas'
+import { Button, Column, Text, useTheme } from '@mindees/atlas'
 import { List } from '@mindees/atlas/list'
-import { createTheme } from '@mindees/atlas/theme'
 
-const theme = createTheme({ colors: { primary: '#2563eb' } })
-const primary = theme.select((tokens) => tokens.colors.primary)
+const theme = useTheme() // reactive; tracks color-scheme (dark mode) automatically
+const primary = () => theme().color.primary
 
 export const Screen = Column({
   gap: 12,
