@@ -135,4 +135,37 @@ export const App = () => <view/>`,
     expect(result.ok).toBe(false)
     expect(result.diagnostics.some((d) => d.code === 'MDC_OUTPUT_COLLISION')).toBe(true)
   })
+
+  it('emits a runnable index.html with an import-map when an app entry compiles', () => {
+    const fs = createMemoryFileSystem({
+      'src/App.tsx': `import { createElement } from "@mindees/core"
+export const App = () => <view>hi</view>`,
+      'src/main.tsx': `import { App } from "./App"
+export const main = App`,
+    })
+    const result = buildProject(fs, { appName: 'My App' })
+    expect(result.ok).toBe(true)
+    expect(result.htmlEmitted).toBe(true)
+    const snap = fs.snapshot()
+    const html = snap['dist/index.html'] as string
+    expect(html).toContain('<div id="app"></div>')
+    expect(html).toContain('<title>My App</title>')
+    expect(html).toContain('"@mindees/renderer": "https://esm.sh/@mindees/renderer@')
+    expect(html).toContain('"@mindees/atlas/": "https://esm.sh/@mindees/atlas@') // subpath mapping
+    expect(html).toContain('<script type="module" src="./main.js">')
+    expect(snap['dist/main.js']).toContain('from "./App.js"') // relative imports rewritten for native ESM
+  })
+
+  it('does not emit index.html without an app entry, or when html:false', () => {
+    const fs = createMemoryFileSystem({
+      'src/util.tsx': `import { createElement } from "@mindees/core"
+export const x = () => <view/>`,
+    })
+    expect(buildProject(fs).htmlEmitted).toBeUndefined() // no src/main → no shell
+    expect(fs.snapshot()['dist/index.html']).toBeUndefined()
+
+    const withMain = createMemoryFileSystem({ 'src/main.tsx': 'export const main = 1' })
+    expect(buildProject(withMain, { html: false }).htmlEmitted).toBeUndefined() // explicitly disabled
+    expect(withMain.snapshot()['dist/index.html']).toBeUndefined()
+  })
 })

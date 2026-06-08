@@ -68,8 +68,9 @@ describe('createNodeWatcher', () => {
 })
 
 describe('createDevServer', () => {
-  it('serves the app HTML with the live-reload client injected before </body>', () => {
-    const server = createDevServer({ html: '<html><body><div id="app"></div></body></html>' })
+  it('serves index.html with the live-reload client injected before </body>', () => {
+    const server = createDevServer()
+    server.setFiles({ 'index.html': '<html><body><div id="app"></div></body></html>' })
     const res = server.handle('GET', '/')
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toContain('text/html')
@@ -78,8 +79,25 @@ describe('createDevServer', () => {
     expect(res.body.indexOf('location.reload()')).toBeLessThan(res.body.indexOf('</body>'))
   })
 
+  it('serves built JS assets, resolving extensionless relative imports (/App → App.js)', () => {
+    const server = createDevServer()
+    server.setFiles({
+      'index.html': '<body></body>',
+      'main.js': "import { App } from './App.js'",
+      'App.js': 'export const App = () => null',
+    })
+    const js = server.handle('GET', '/main.js')
+    expect(js.status).toBe(200)
+    expect(js.headers['content-type']).toContain('application/javascript')
+    expect(js.body).toContain("from './App.js'")
+    // a browser request for the extensionless specifier resolves to the .js file
+    const ext = server.handle('GET', '/App')
+    expect(ext.status).toBe(200)
+    expect(ext.body).toContain('export const App')
+  })
+
   it('serves the build version and bumps it on rebuild (drives reload)', () => {
-    const server = createDevServer({ html: '<body></body>' })
+    const server = createDevServer()
     expect(server.handle('GET', '/__mindees/version').body).toBe('0')
     server.bump()
     server.bump()
@@ -89,23 +107,29 @@ describe('createDevServer', () => {
   })
 
   it('404s unknown paths and 405s non-GET', () => {
-    const server = createDevServer({ html: '<body></body>' })
-    expect(server.handle('GET', '/nope').status).toBe(404)
+    const server = createDevServer()
+    expect(server.handle('GET', '/nope.js').status).toBe(404)
     expect(server.handle('POST', '/').status).toBe(405)
+  })
+
+  it('shows a build-error overlay at / until the next successful build', () => {
+    const server = createDevServer()
+    server.setError(
+      renderDevPage({
+        ok: false,
+        compiled: [],
+        diagnostics: [{ severity: 'error', message: 'boom' }],
+      }),
+    )
+    const fail = server.handle('GET', '/')
+    expect(fail.body).toContain('build failed')
+    expect(fail.body).toContain('location.reload()') // overlay still live-reloads → recovers automatically
+    server.setFiles({ 'index.html': '<body>recovered</body>' }) // a good build clears the overlay
+    expect(server.handle('GET', '/').body).toContain('recovered')
   })
 })
 
-describe('createDevServer.setHtml + renderDevPage', () => {
-  it('serves updated HTML after setHtml (rebuild output changes)', () => {
-    const server = createDevServer({ html: '<body>old</body>' })
-    expect(server.handle('GET', '/').body).toContain('old')
-    server.setHtml('<body>new</body>')
-    const res = server.handle('GET', '/')
-    expect(res.body).toContain('new')
-    expect(res.body).not.toContain('old')
-    expect(res.body).toContain('location.reload()') // client still injected after update
-  })
-
+describe('renderDevPage', () => {
   it('renders a build status page (ok and failed)', () => {
     const ok = renderDevPage({ ok: true, compiled: ['a.tsx', 'b.tsx'], diagnostics: [] })
     expect(ok).toContain('build ok')
@@ -121,7 +145,8 @@ describe('createDevServer.setHtml + renderDevPage', () => {
   })
 
   it('embeds the current build version as the live-reload baseline (no missed reload)', () => {
-    const server = createDevServer({ html: '<body></body>' })
+    const server = createDevServer()
+    server.setFiles({ 'index.html': '<body></body>' })
     server.bump() // version 1
     server.bump() // version 2
     const body = server.handle('GET', '/').body

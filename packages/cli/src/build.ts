@@ -12,6 +12,73 @@
 
 import { buildRouteManifest, compile, type Diagnostic, typecheck } from '@mindees/compiler'
 import type { FileSystem } from './fs'
+import { VERSION } from './version'
+
+/** Runtime packages a web app imports — mapped in the emitted index.html's import-map (to the esm.sh CDN). */
+const WEB_RUNTIME_PACKAGES = [
+  'core',
+  'renderer',
+  'router',
+  'atlas',
+  'data',
+  'updates',
+  'ai',
+] as const
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/**
+ * The runnable HTML shell. Loads the compiled entry as a native ES module; the bare `@mindees/*`
+ * specifiers in the compiled output resolve via the import-map to the published packages on the esm.sh
+ * CDN (which serves their transitive graph), so the app runs in a browser with no bundler step. Both the
+ * bare name and a trailing-slash mapping are emitted so subpath imports (e.g. `@mindees/atlas/list`) work.
+ */
+function renderIndexHtml(appName: string, entry: string, version: string): string {
+  const imports = WEB_RUNTIME_PACKAGES.flatMap((p) => [
+    `      "@mindees/${p}": "https://esm.sh/@mindees/${p}@${version}"`,
+    `      "@mindees/${p}/": "https://esm.sh/@mindees/${p}@${version}/"`,
+  ]).join(',\n')
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(appName)}</title>
+    <script type="importmap">
+{
+  "imports": {
+${imports}
+  }
+}
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./${entry}"></script>
+  </body>
+</html>
+`
+}
+
+/**
+ * Add explicit `.js` extensions to RELATIVE import/export specifiers in emitted code. The compiler emits
+ * `from './App'` (TS preserves the extensionless source specifier), which a browser's native ESM loader
+ * cannot resolve. Bare specifiers (`@mindees/*`) are left untouched (the import-map resolves them). Only
+ * touches `./`/`../` specifiers that lack a file extension. (Minor source-map drift on import lines only.)
+ */
+function rewriteRelativeImports(code: string): string {
+  const addExt = (spec: string): string => (/\.[a-zA-Z0-9]+$/.test(spec) ? spec : `${spec}.js`)
+  return code.replace(
+    /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.\.?\/[^'"]*)\2/g,
+    (_m, pre: string, q: string, spec: string) => `${pre}${q}${addExt(spec)}${q}`,
+  )
+}
 
 /**
  * Diagnostic codes that are artifacts of type-checking a module **in isolation**
@@ -40,6 +107,10 @@ export interface BuildOptions {
   outDir?: string
   /** Emit source maps. Default `true`. */
   sourceMap?: boolean
+  /** Emit a runnable `index.html` (web target) when an app entry compiled. Default `true`. */
+  html?: boolean
+  /** Title for the emitted `index.html`. Default `"Mindees App"`. */
+  appName?: string
 }
 
 /** Result of a project build. */
@@ -53,6 +124,8 @@ export interface BuildResult {
   routes?: ReturnType<typeof buildRouteManifest>
   /** Optimizer totals across all modules. */
   stats: { flattenedNodes: number; totalElements: number }
+  /** Whether a runnable `index.html` was emitted (an app entry `src/main.{tsx,ts}` compiled). */
+  htmlEmitted?: boolean
 }
 
 const COMPILABLE = /\.(tsx|ts)$/
@@ -83,7 +156,13 @@ function relativePath(fromDir: string, toPath: string): string {
  * errors but collects diagnostics from all modules so the report is complete.
  */
 export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildResult {
-  const { root = '.', outDir = 'dist', sourceMap = true } = options
+  const {
+    root = '.',
+    outDir = 'dist',
+    sourceMap = true,
+    html = true,
+    appName = 'Mindees App',
+  } = options
   const srcDir = root === '.' ? 'src' : `${root}/src`
 
   const diagnostics: Diagnostic[] = []
@@ -146,7 +225,8 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
           `//# sourceMappingURL=${baseOf(outPath)}.map`,
         )
       }
-      fs.writeFile(outPath, code)
+      // Make relative specifiers browser-resolvable (`./App` → `./App.js`) so the output runs as native ESM.
+      fs.writeFile(outPath, rewriteRelativeImports(code))
       compiled.push(rel)
     }
   }
@@ -175,9 +255,18 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     }
   }
 
+  // Emit a runnable index.html when an app entry (`src/main.{tsx,ts}` → `dist/main.js`) compiled, so
+  // `mindees build`/`dev` produce something that actually renders in a browser (import-map → CDN; no bundler).
+  let htmlEmitted = false
+  if (html && writtenOutPaths.has(`${outDir}/main.js`)) {
+    fs.writeFile(`${outDir}/index.html`, renderIndexHtml(appName, 'main.js', VERSION))
+    htmlEmitted = true
+  }
+
   compiled.sort()
   const ok = !diagnostics.some((d) => d.severity === 'error')
   const result: BuildResult = { ok, compiled, diagnostics, stats }
   if (routes) result.routes = routes
+  if (htmlEmitted) result.htmlEmitted = true
   return result
 }
