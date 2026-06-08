@@ -50,6 +50,7 @@ What becomes easier or harder as a result?
 | [0022](./0022-atlas-primitives.md) | Atlas (Phase 12) — UI primitives, style & theme | Accepted |
 | [0023](./0023-atlas-list.md) | Atlas (Phase 12B) — virtualized recycling `List` | Accepted |
 | [0024](./0024-release-pipeline.md) | Release pipeline & version-source sync (Phase 13) | Accepted |
+| [0025](./0025-tree-scoped-context.md) | Tree-scoped context & portal-aware visibility (overlay-in-tab) | Proposed |
 
 > ADR-0001 is finalized in Phase 0 once the research-verified tool versions are
 > pinned, so its rationale cites real current versions rather than guesses.
