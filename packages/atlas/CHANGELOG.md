@@ -1,5 +1,12 @@
 # @mindees/atlas
 
+## 0.30.3
+
+### Patch Changes
+
+- @mindees/core@0.30.3
+- @mindees/router@0.30.3
+
 ## 0.30.2
 
 ### Patch Changes
