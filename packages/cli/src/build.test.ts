@@ -47,27 +47,35 @@ describe('buildProject', () => {
     expect(result.compiled).toEqual(['App.tsx'])
   })
 
-  it('emits a route manifest when src/routes exists', () => {
+  it('emits a route manifest + routes.gen.js when src/app exists', () => {
     const fs = createMemoryFileSystem({
-      'src/routes/index.tsx':
+      'src/app/index.tsx':
         'import { createElement } from "@mindees/core"\nexport default () => <view/>',
-      'src/routes/blog/[slug].tsx':
+      'src/app/blog/[slug].tsx':
         'import { createElement } from "@mindees/core"\nexport default () => <view/>',
     })
     const result = buildProject(fs)
     expect(result.ok).toBe(true)
     expect(result.routes?.routes.some((r) => r.routePath === '/blog/:slug')).toBe(true)
     expect(fs.snapshot()['dist/routes.manifest.json']).toContain('/blog/:slug')
+    // The static-import module map for file-based routing: imports the compiled chunks with `.js`
+    // (native ESM) and exports a `routes` map keyed by the route file path. It's a real source file
+    // (`src/routes.gen.ts`) that compiles like any module → `dist/routes.gen.js`.
+    expect(fs.snapshot()['src/routes.gen.ts']).toContain('export const routes')
+    const gen = fs.snapshot()['dist/routes.gen.js'] as string
+    expect(gen).toContain('export const routes')
+    expect(gen).toMatch(/['"]\.\/app\/index\.js['"]/) // .js added for the browser
+    expect(gen).toMatch(/['"]\.\/app\/blog\/\[slug\]\.js['"]/)
   })
 
   it('reports a duplicate route path as a build error instead of crashing', () => {
-    // `src/routes/index.tsx` and the route-group `src/routes/(app)/index.tsx`
+    // `src/app/index.tsx` and the route-group `src/app/(app)/index.tsx`
     // both map to "/", which makes buildRouteManifest throw. The CLI must catch
     // it and fail cleanly, not propagate a raw exception.
     const fs = createMemoryFileSystem({
-      'src/routes/index.tsx':
+      'src/app/index.tsx':
         'import { createElement } from "@mindees/core"\nexport default () => <view/>',
-      'src/routes/(app)/index.tsx':
+      'src/app/(app)/index.tsx':
         'import { createElement } from "@mindees/core"\nexport default () => <view/>',
     })
     let result!: ReturnType<typeof buildProject>
@@ -77,13 +85,13 @@ describe('buildProject', () => {
     expect(result.ok).toBe(false)
     const routeErr = result.diagnostics.find((d) => d.code === 'MDC_ROUTES')
     expect(routeErr?.severity).toBe('error')
-    expect(routeErr?.file).toBe('src/routes') // points at the routes dir, not hardcoded elsewhere
+    expect(routeErr?.file).toBe('src/app') // points at the app dir, not hardcoded elsewhere
   })
 
   it('reports a non-terminal catch-all route as a build error instead of crashing', () => {
     // `[...rest]` is not the last segment → fileToRoute throws; must be reported.
     const fs = createMemoryFileSystem({
-      'src/routes/[...rest]/edit.tsx':
+      'src/app/[...rest]/edit.tsx':
         'import { createElement } from "@mindees/core"\nexport default () => <view/>',
     })
     let result!: ReturnType<typeof buildProject>
@@ -103,9 +111,9 @@ describe('buildProject', () => {
 
   it('does not manifest a .jsx route the build never compiles (no dangling chunk)', () => {
     const fs = createMemoryFileSystem({
-      'src/routes/index.tsx': `import { createElement } from "@mindees/core"
+      'src/app/index.tsx': `import { createElement } from "@mindees/core"
 export default () => <view/>`,
-      'src/routes/about.jsx': 'export default () => null',
+      'src/app/about.jsx': 'export default () => null',
     })
     const result = buildProject(fs)
     expect(result.ok).toBe(true)
@@ -241,5 +249,17 @@ export const main = 1`,
     expect(snap['dist/logo.svg']).toBe('<svg></svg>')
     expect(snap['dist/styles.css']).toBe('body{margin:0}')
     expect(snap['dist/nested/icon.png']).toBe('PNGDATA') // nested structure preserved
+  })
+
+  it('regenerates routes.gen.ts idempotently (no dev rebuild loop)', () => {
+    const fs = createMemoryFileSystem({
+      'src/app/index.tsx': `import { createElement } from "@mindees/core"
+export default () => <view/>`,
+    })
+    buildProject(fs)
+    const first = fs.snapshot()['src/routes.gen.ts']
+    expect(first).toBeDefined()
+    buildProject(fs)
+    expect(fs.snapshot()['src/routes.gen.ts']).toBe(first) // unchanged across builds → no src-watch loop
   })
 })

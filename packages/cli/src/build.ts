@@ -3,9 +3,10 @@
  *
  * Walks `src/**` via an injected {@link FileSystem}, runs each TS/TSX module
  * through `@mindees/compiler`'s `typecheck` gate and then `compile` (emit),
- * writes the JS (and source map) to `dist/`, and — if a `src/routes/` dir
- * exists — emits a per-route manifest. Returns structured results so the CLI can
- * report diagnostics and fail the build on type errors.
+ * writes the JS (and source map) to `dist/`, and — if a `src/app/` dir exists —
+ * emits a per-route manifest plus a `routes.gen.js` module map for file-based
+ * routing. Returns structured results so the CLI can report diagnostics and fail
+ * the build on type errors.
  *
  * @module
  */
@@ -16,6 +17,7 @@ import {
   checkBudget,
   compile,
   type Diagnostic,
+  generateRouteModule,
   type PerfLintOptions,
   perfLint,
   rewriteImportSpecifiers,
@@ -98,12 +100,14 @@ function makeImportResolver(
 ): (spec: string) => string {
   const fromDir = dirOf(rel)
   return (spec) => {
-    if (/\.[a-zA-Z0-9]+$/.test(spec)) return spec // already has an extension (e.g. .json, .css)
     const target = resolveRelDir(fromDir, spec)
+    // Check the compiled source set FIRST, so a dotted basename (e.g. `./routes.gen`) is recognized as a
+    // module and gets `.js` — rather than `.gen` being mistaken for a real file extension below.
     if (sourceFiles.has(`${target}.tsx`) || sourceFiles.has(`${target}.ts`)) return `${spec}.js`
     if (sourceFiles.has(`${target}/index.tsx`) || sourceFiles.has(`${target}/index.ts`)) {
       return `${spec.replace(/\/$/, '')}/index.js`
     }
+    if (/\.[a-zA-Z0-9]+$/.test(spec)) return spec // a real asset extension (.json/.css/.js) — leave it
     return `${spec}.js` // best-effort default (covers the common sibling-file case)
   }
 }
@@ -161,7 +165,7 @@ export interface BuildResult {
   compiled: string[]
   /** All diagnostics across modules (errors fail the build). */
   diagnostics: Diagnostic[]
-  /** Route manifest, if `src/routes/` existed. */
+  /** Route manifest, if `src/app/` existed. */
   routes?: ReturnType<typeof buildRouteManifest>
   /** Optimizer totals across all modules. */
   stats: { flattenedNodes: number; totalElements: number }
@@ -207,10 +211,32 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     budget,
   } = options
   const srcDir = root === '.' ? 'src' : `${root}/src`
+  const appDir = `${srcDir}/app`
 
   // Clean the output dir first so a renamed/deleted source can't leave a stale module (or a
   // manifest-vs-chunk drift) behind — a full build owns its `outDir`.
   if (fs.exists(outDir)) fs.rm(outDir)
+
+  // File-based routing (`src/app/`, Expo-style): regenerate `src/routes.gen.ts` — a static-import module
+  // map the app feeds to `createFileRouter` — BEFORE compiling, so it compiles + type-resolves like any
+  // module (the browser/QuickJS has no `import.meta.glob`). The app does `import { routes } from
+  // './routes.gen'`; it lands at `dist/routes.gen.js` (route imports rewritten to `.js`). Regenerated each
+  // build → git-ignore it. (Generated only when `src/app/` has compilable routes.)
+  if (fs.exists(appDir)) {
+    const appRoutes = fs.readDir(appDir).filter((f) => COMPILABLE.test(f) && !DECLARATION.test(f))
+    if (appRoutes.length > 0) {
+      const genPath = `${srcDir}/routes.gen.ts`
+      const genContent = generateRouteModule(appRoutes, {
+        importBase: './app',
+        exportName: 'routes',
+      })
+      // Write only when the content actually changed — in `dev` the file watcher is on `src/`, so an
+      // unconditional rewrite of this file (under `src/`) would re-trigger itself into a rebuild loop.
+      if (!fs.exists(genPath) || fs.readFile(genPath) !== genContent) {
+        fs.writeFile(genPath, genContent)
+      }
+    }
+  }
 
   const diagnostics: Diagnostic[] = []
   const compiled: string[] = []
@@ -287,26 +313,23 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     }
   }
 
-  // Per-route manifest, if a routes dir is present. buildRouteManifest THROWS on
-  // a malformed routes dir (duplicate route path, or a non-terminal catch-all) —
-  // ordinary user misconfigurations that `mindees build` exists to report. Turn
-  // them into a build diagnostic + failing result so the CLI prints a clean error
-  // and exits non-zero, honoring runCli's "never throws for expected failures"
-  // contract instead of crashing with a raw stack trace.
+  // File-based routing convention dir — `src/app/` (Expo Router-style; the same dir the native example
+  // and `createFileRouter`'s conventions use). buildRouteManifest THROWS on a malformed dir (duplicate
+  // route path, or a non-terminal catch-all) — ordinary user misconfigurations that `mindees build`
+  // reports as a clean diagnostic + failing result rather than crashing with a raw stack trace.
   let routes: BuildResult['routes']
-  const routesDir = `${srcDir}/routes`
-  if (fs.exists(routesDir)) {
+  if (fs.exists(appDir)) {
+    // Only consider routes the build actually COMPILES (.tsx/.ts) — buildRouteManifest otherwise accepts
+    // .jsx/.js too, which the compile loop skips, leaving a manifest entry with no emitted chunk.
     try {
-      // Only manifest routes the build actually COMPILES (.tsx/.ts) — buildRouteManifest otherwise
-      // accepts .jsx/.js too, which the compile loop skips, leaving a manifest entry with no emitted chunk.
-      routes = buildRouteManifest(fs.readDir(routesDir).filter((f) => COMPILABLE.test(f)))
+      routes = buildRouteManifest(fs.readDir(appDir).filter((f) => COMPILABLE.test(f)))
       fs.writeFile(`${outDir}/routes.manifest.json`, `${JSON.stringify(routes, null, 2)}\n`)
     } catch (e) {
       diagnostics.push({
         severity: 'error',
         code: 'MDC_ROUTES',
         message: e instanceof Error ? e.message : String(e),
-        file: routesDir,
+        file: appDir,
       })
     }
   }
