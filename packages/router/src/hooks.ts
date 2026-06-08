@@ -11,13 +11,15 @@
 
 import { getActiveRouter } from './active'
 import { createLink, type LinkComponent } from './components'
+import { RouterError } from './errors'
 import type { Router } from './router'
 
-/** The active router. Throws if none has been created (call `createRouter`/`createFileRouter`). */
+/** The active router. Throws a {@link RouterError} if none has been created (call `createRouter`/`createFileRouter`). */
 export function useRouter(): Router {
   const router = getActiveRouter()
   if (!router) {
-    throw new Error(
+    throw new RouterError(
+      'NO_ACTIVE_ROUTER',
       'useRouter(): no active router. Create one with createRouter() or createFileRouter() first.',
     )
   }

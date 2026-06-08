@@ -61,6 +61,7 @@ export {
 export {
   createReferenceHost,
   NativeHostError,
+  type NativeHostErrorCode,
   type ReferenceHost,
   type ReferenceHostNode,
 } from './native-host'

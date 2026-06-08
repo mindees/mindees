@@ -5,6 +5,7 @@
  * @module
  */
 
+import { MindeesError } from '@mindees/core'
 import type { StandardSchemaV1 } from './standard-schema'
 
 /** Stable code identifying why an AI operation failed. */
@@ -32,17 +33,16 @@ export interface AiErrorOptions {
   readonly issues?: ReadonlyArray<StandardSchemaV1.Issue>
 }
 
-/** An AI error carrying a stable {@link AiErrorCode}. */
-export class AiError extends Error {
-  /** Stable, machine-readable cause. */
-  readonly code: AiErrorCode
+/** An AI error carrying a stable {@link AiErrorCode}. Extends {@link MindeesError}. */
+export class AiError extends MindeesError {
+  /** Stable, machine-readable cause (narrows {@link MindeesError.code}). */
+  declare readonly code: AiErrorCode
   /** Validation issues, when the failure came from schema validation. */
   readonly issues?: ReadonlyArray<StandardSchemaV1.Issue>
 
   constructor(code: AiErrorCode, message: string, options?: AiErrorOptions) {
-    super(message)
+    super(code, message)
     this.name = 'AiError'
-    this.code = code
     // Set only when present (exactOptionalPropertyTypes-safe).
     if (options?.issues) this.issues = options.issues
   }

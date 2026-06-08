@@ -21,7 +21,7 @@
  * @module
  */
 
-import { type Component, createElement, type MindeesNode } from '@mindees/core'
+import { type Component, createElement, MindeesError, type MindeesNode } from '@mindees/core'
 
 /** A plain JSON value. SDUI markers (`$action`/`$bind`) are never interpreted inside one. */
 export type SduiJson = string | number | boolean | null | SduiJson[] | { [key: string]: SduiJson }
@@ -72,23 +72,24 @@ export interface SduiRegistry {
   readonly limits?: Partial<SduiLimits>
 }
 
-/** Stable code identifying why an SDUI operation failed. */
+/** Stable code identifying why an SDUI operation failed. (Bare codes — scoped by the `SduiError` class,
+ * matching the AiError/UpdateError/DataError convention; no redundant `SDUI_` prefix.) */
 export type SduiErrorCode =
-  | 'SDUI_INVALID'
-  | 'SDUI_UNKNOWN_TAG'
-  | 'SDUI_UNKNOWN_ACTION'
-  | 'SDUI_NO_BINDINGS'
-  | 'SDUI_LIMIT'
-  | 'SDUI_FORBIDDEN_KEY'
-  | 'SDUI_PATCH_INVALID'
+  | 'INVALID'
+  | 'UNKNOWN_TAG'
+  | 'UNKNOWN_ACTION'
+  | 'NO_BINDINGS'
+  | 'LIMIT'
+  | 'FORBIDDEN_KEY'
+  | 'PATCH_INVALID'
 
-/** An SDUI error carrying a stable {@link SduiErrorCode}. */
-export class SduiError extends Error {
-  readonly code: SduiErrorCode
+/** An SDUI error carrying a stable {@link SduiErrorCode}. Extends {@link MindeesError}. */
+export class SduiError extends MindeesError {
+  /** Narrows {@link MindeesError.code} to the SDUI codes. */
+  declare readonly code: SduiErrorCode
   constructor(code: SduiErrorCode, message: string) {
-    super(message)
+    super(code, message)
     this.name = 'SduiError'
-    this.code = code
   }
 }
 
@@ -123,7 +124,7 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
 
   const checkString = (s: string): void => {
     if (s.length > limits.maxStringLength) {
-      throw err('SDUI_LIMIT', `string exceeds max length ${limits.maxStringLength}`)
+      throw err('LIMIT', `string exceeds max length ${limits.maxStringLength}`)
     }
   }
 
@@ -131,9 +132,9 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
   // Every value counts against the shared node budget so a single node's props/args
   // can't carry an unbounded payload (DoS amplification).
   const compileJson = (value: unknown, depth: number): SduiJson => {
-    if (depth > limits.maxDepth) throw err('SDUI_LIMIT', 'value exceeds max depth')
+    if (depth > limits.maxDepth) throw err('LIMIT', 'value exceeds max depth')
     if (++nodeCount > limits.maxNodes)
-      throw err('SDUI_LIMIT', `payload exceeds max nodes ${limits.maxNodes}`)
+      throw err('LIMIT', `payload exceeds max nodes ${limits.maxNodes}`)
     if (value === null) return null
     const t = typeof value
     if (t === 'string') {
@@ -141,7 +142,7 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
       return value as string
     }
     if (t === 'number') {
-      if (!Number.isFinite(value)) throw err('SDUI_INVALID', 'numbers must be finite')
+      if (!Number.isFinite(value)) throw err('INVALID', 'numbers must be finite')
       return value as number
     }
     if (t === 'boolean') return value as boolean
@@ -149,15 +150,15 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
     if (isPlainObject(value)) {
       const keys = Object.keys(value)
       if (keys.length > limits.maxProps)
-        throw err('SDUI_LIMIT', `object exceeds max keys ${limits.maxProps}`)
+        throw err('LIMIT', `object exceeds max keys ${limits.maxProps}`)
       const out: Record<string, SduiJson> = {}
       for (const k of keys) {
-        if (FORBIDDEN_KEYS.has(k)) throw err('SDUI_FORBIDDEN_KEY', `forbidden key "${k}"`)
+        if (FORBIDDEN_KEYS.has(k)) throw err('FORBIDDEN_KEY', `forbidden key "${k}"`)
         out[k] = compileJson(value[k], depth + 1)
       }
       return out
     }
-    throw err('SDUI_INVALID', `unsupported value of type ${t}`)
+    throw err('INVALID', `unsupported value of type ${t}`)
   }
 
   // Compile a prop's DIRECT value: action/bind markers are recognized only here, never
@@ -166,16 +167,16 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
     if (isPlainObject(value) && Object.hasOwn(value, '$action')) {
       const keys = Object.keys(value)
       if (keys.some((k) => k !== '$action' && k !== 'args')) {
-        throw err('SDUI_INVALID', 'an $action ref may only contain $action and args')
+        throw err('INVALID', 'an $action ref may only contain $action and args')
       }
       const name = value.$action
-      if (typeof name !== 'string') throw err('SDUI_INVALID', '$action must be a string')
+      if (typeof name !== 'string') throw err('INVALID', '$action must be a string')
       const handler =
         registry.actions && Object.hasOwn(registry.actions, name)
           ? registry.actions[name]
           : undefined
       if (typeof handler !== 'function') {
-        throw err('SDUI_UNKNOWN_ACTION', `action "${name}" is not registered`)
+        throw err('UNKNOWN_ACTION', `action "${name}" is not registered`)
       }
       const args = value.args !== undefined ? compileJson(value.args, 0) : undefined
       return (...event: unknown[]) => handler(args, ...event)
@@ -183,11 +184,11 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
     if (isPlainObject(value) && Object.hasOwn(value, '$bind')) {
       const keys = Object.keys(value)
       if (keys.some((k) => k !== '$bind'))
-        throw err('SDUI_INVALID', 'a $bind ref may only contain $bind')
-      if (typeof value.$bind !== 'string') throw err('SDUI_INVALID', '$bind must be a string')
+        throw err('INVALID', 'a $bind ref may only contain $bind')
+      if (typeof value.$bind !== 'string') throw err('INVALID', '$bind must be a string')
       checkString(value.$bind)
       if (!registry.bindings)
-        throw err('SDUI_NO_BINDINGS', `$bind "${value.$bind}" but no bindings provider`)
+        throw err('NO_BINDINGS', `$bind "${value.$bind}" but no bindings provider`)
       return registry.bindings(value.$bind)
     }
     return compileJson(value, 0)
@@ -196,17 +197,17 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
   const compileProps = (rawProps: unknown): Record<string, unknown> => {
     const out: Record<string, unknown> = Object.create(null)
     if (rawProps === undefined) return out
-    if (!isPlainObject(rawProps)) throw err('SDUI_INVALID', 'node.props must be an object')
+    if (!isPlainObject(rawProps)) throw err('INVALID', 'node.props must be an object')
     const keys = Object.keys(rawProps)
     if (keys.length > limits.maxProps) {
-      throw err('SDUI_LIMIT', `node has more than ${limits.maxProps} props`)
+      throw err('LIMIT', `node has more than ${limits.maxProps} props`)
     }
     for (const key of keys) {
-      if (FORBIDDEN_KEYS.has(key)) throw err('SDUI_FORBIDDEN_KEY', `forbidden prop key "${key}"`)
+      if (FORBIDDEN_KEYS.has(key)) throw err('FORBIDDEN_KEY', `forbidden prop key "${key}"`)
       // `key` and `children` are structural: they must come through the validated
       // node.key (string) / node.children paths, never an arbitrary-typed prop value.
       if (key === 'key' || key === 'children') {
-        throw err('SDUI_INVALID', `"${key}" is reserved — use node.${key}, not a prop`)
+        throw err('INVALID', `"${key}" is reserved — use node.${key}, not a prop`)
       }
       out[key] = compilePropValue(rawProps[key])
     }
@@ -214,42 +215,41 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
   }
 
   const compileNode = (raw: unknown, depth: number): MindeesNode => {
-    if (depth > limits.maxDepth)
-      throw err('SDUI_LIMIT', `tree exceeds max depth ${limits.maxDepth}`)
+    if (depth > limits.maxDepth) throw err('LIMIT', `tree exceeds max depth ${limits.maxDepth}`)
     if (++nodeCount > limits.maxNodes)
-      throw err('SDUI_LIMIT', `tree exceeds max nodes ${limits.maxNodes}`)
-    if (!isPlainObject(raw)) throw err('SDUI_INVALID', 'node must be an object')
+      throw err('LIMIT', `tree exceeds max nodes ${limits.maxNodes}`)
+    if (!isPlainObject(raw)) throw err('INVALID', 'node must be an object')
     for (const k of Object.keys(raw)) {
-      if (!NODE_KEYS.has(k)) throw err('SDUI_INVALID', `unknown node key "${k}"`)
+      if (!NODE_KEYS.has(k)) throw err('INVALID', `unknown node key "${k}"`)
     }
-    if (raw.schema !== 1) throw err('SDUI_INVALID', 'node.schema must be 1')
+    if (raw.schema !== 1) throw err('INVALID', 'node.schema must be 1')
     if (typeof raw.tag !== 'string' || raw.tag.length === 0) {
-      throw err('SDUI_INVALID', 'node.tag must be a non-empty string')
+      throw err('INVALID', 'node.tag must be a non-empty string')
     }
     if (!Object.hasOwn(registry.components, raw.tag)) {
-      throw err('SDUI_UNKNOWN_TAG', `tag "${raw.tag}" is not in the component allowlist`)
+      throw err('UNKNOWN_TAG', `tag "${raw.tag}" is not in the component allowlist`)
     }
     const component = registry.components[raw.tag]
     if (component === undefined) {
-      throw err('SDUI_UNKNOWN_TAG', `tag "${raw.tag}" is not in the component allowlist`)
+      throw err('UNKNOWN_TAG', `tag "${raw.tag}" is not in the component allowlist`)
     }
 
     const props = compileProps(raw.props)
     if (raw.key !== undefined) {
-      if (typeof raw.key !== 'string') throw err('SDUI_INVALID', 'node.key must be a string')
+      if (typeof raw.key !== 'string') throw err('INVALID', 'node.key must be a string')
       checkString(raw.key)
       props.key = raw.key
     }
 
     const children: MindeesNode[] = []
     if (raw.children !== undefined) {
-      if (!Array.isArray(raw.children)) throw err('SDUI_INVALID', 'node.children must be an array')
+      if (!Array.isArray(raw.children)) throw err('INVALID', 'node.children must be an array')
       for (const child of raw.children) {
         if (typeof child === 'string') {
           // String children also count against the node budget (so a wide child list
           // can't slip past maxNodes and overflow the argument spread below).
           if (++nodeCount > limits.maxNodes) {
-            throw err('SDUI_LIMIT', `tree exceeds max nodes ${limits.maxNodes}`)
+            throw err('LIMIT', `tree exceeds max nodes ${limits.maxNodes}`)
           }
           checkString(child)
           children.push(child)
@@ -264,7 +264,7 @@ export function compileSdui(node: unknown, registry: SduiRegistry): MindeesNode 
     try {
       return createElement(component, props, ...children)
     } catch (e) {
-      if (e instanceof RangeError) throw err('SDUI_LIMIT', 'too many children to construct')
+      if (e instanceof RangeError) throw err('LIMIT', 'too many children to construct')
       throw e
     }
   }
@@ -281,12 +281,12 @@ const MAX_PATCH_DEPTH = 1000
 
 /** Deep-clone a JSON value, rejecting any prototype-pollution keys (fail closed). */
 function cloneJson(value: SduiJson, depth = 0): SduiJson {
-  if (depth > MAX_PATCH_DEPTH) throw err('SDUI_PATCH_INVALID', 'value exceeds max depth')
+  if (depth > MAX_PATCH_DEPTH) throw err('PATCH_INVALID', 'value exceeds max depth')
   if (Array.isArray(value)) return value.map((v) => cloneJson(v, depth + 1))
   if (isPlainObject(value)) {
     const out: Record<string, SduiJson> = {}
     for (const k of Object.keys(value)) {
-      if (FORBIDDEN_KEYS.has(k)) throw err('SDUI_FORBIDDEN_KEY', `forbidden key "${k}"`)
+      if (FORBIDDEN_KEYS.has(k)) throw err('FORBIDDEN_KEY', `forbidden key "${k}"`)
       out[k] = cloneJson(value[k] as SduiJson, depth + 1)
     }
     return out
@@ -296,7 +296,7 @@ function cloneJson(value: SduiJson, depth = 0): SduiJson {
 
 /** Recursive RFC 7396 merge (internal; depth-guarded, prototype-pollution-safe). */
 function mergePatch(target: SduiJson | undefined, patch: SduiJson, depth: number): SduiJson {
-  if (depth > MAX_PATCH_DEPTH) throw err('SDUI_PATCH_INVALID', 'patch exceeds max depth')
+  if (depth > MAX_PATCH_DEPTH) throw err('PATCH_INVALID', 'patch exceeds max depth')
   if (!isPlainObject(patch)) return cloneJson(patch, depth)
   const base = isPlainObject(target) ? target : {}
   const out: Record<string, SduiJson> = {}
@@ -305,11 +305,11 @@ function mergePatch(target: SduiJson | undefined, patch: SduiJson, depth: number
     // An own `__proto__` key (e.g. from JSON.parse of the prior OTA doc) would
     // otherwise hit the Object.prototype setter via `out[k] = ...` and corrupt the
     // returned object's prototype — mirroring the guard in the patch loop below.
-    if (FORBIDDEN_KEYS.has(k)) throw err('SDUI_FORBIDDEN_KEY', `forbidden key "${k}"`)
+    if (FORBIDDEN_KEYS.has(k)) throw err('FORBIDDEN_KEY', `forbidden key "${k}"`)
     if (!Object.hasOwn(patch, k)) out[k] = cloneJson(base[k] as SduiJson, depth + 1)
   }
   for (const k of Object.keys(patch)) {
-    if (FORBIDDEN_KEYS.has(k)) throw err('SDUI_FORBIDDEN_KEY', `forbidden key "${k}"`)
+    if (FORBIDDEN_KEYS.has(k)) throw err('FORBIDDEN_KEY', `forbidden key "${k}"`)
     const pv = patch[k] as SduiJson
     if (pv === null) continue // null deletes the key (RFC 7396)
     out[k] = mergePatch(isPlainObject(base) ? (base[k] as SduiJson) : undefined, pv, depth + 1)
@@ -336,24 +336,24 @@ export interface JsonPatchOp {
 /** Parse an RFC 6901 JSON Pointer into its decoded tokens; reject dangerous segments. */
 function parsePointer(path: string): string[] {
   if (path === '') return []
-  if (!path.startsWith('/')) throw err('SDUI_PATCH_INVALID', `invalid JSON Pointer "${path}"`)
+  if (!path.startsWith('/')) throw err('PATCH_INVALID', `invalid JSON Pointer "${path}"`)
   return path
     .slice(1)
     .split('/')
     .map((raw) => {
       const token = raw.replace(/~1/g, '/').replace(/~0/g, '~')
       if (FORBIDDEN_KEYS.has(token))
-        throw err('SDUI_FORBIDDEN_KEY', `forbidden pointer segment "${token}"`)
+        throw err('FORBIDDEN_KEY', `forbidden pointer segment "${token}"`)
       return token
     })
 }
 
 /** Parse + bounds-check an array-index pointer token (`allowEnd` permits `== length` for add). */
 function toArrayIndex(token: string, length: number, allowEnd: boolean): number {
-  if (!/^\d+$/.test(token)) throw err('SDUI_PATCH_INVALID', `invalid array index "${token}"`)
+  if (!/^\d+$/.test(token)) throw err('PATCH_INVALID', `invalid array index "${token}"`)
   const idx = Number(token)
   if (idx > length || (!allowEnd && idx >= length)) {
-    throw err('SDUI_PATCH_INVALID', `array index ${idx} out of range`)
+    throw err('PATCH_INVALID', `array index ${idx} out of range`)
   }
   return idx
 }
@@ -365,23 +365,23 @@ function toArrayIndex(token: string, length: number, allowEnd: boolean): number 
  * re-validated via {@link compileSdui} before render.
  */
 export function applyJsonPatch(doc: SduiJson, ops: readonly JsonPatchOp[]): SduiJson {
-  if (!Array.isArray(ops)) throw err('SDUI_PATCH_INVALID', 'ops must be an array')
+  if (!Array.isArray(ops)) throw err('PATCH_INVALID', 'ops must be an array')
   let root = cloneJson(doc)
   for (const op of ops) {
     // Fail closed (stable SduiError) on a malformed op envelope, not a raw TypeError.
     if (!isPlainObject(op) || typeof op.path !== 'string') {
-      throw err('SDUI_PATCH_INVALID', 'each op must be an object with a string path')
+      throw err('PATCH_INVALID', 'each op must be an object with a string path')
     }
     if (op.op !== 'add' && op.op !== 'remove' && op.op !== 'replace') {
-      throw err('SDUI_PATCH_INVALID', `unsupported op "${String((op as { op: unknown }).op)}"`)
+      throw err('PATCH_INVALID', `unsupported op "${String((op as { op: unknown }).op)}"`)
     }
     if (op.op !== 'remove' && op.value === undefined) {
-      throw err('SDUI_PATCH_INVALID', `op "${op.op}" requires a value`)
+      throw err('PATCH_INVALID', `op "${op.op}" requires a value`)
     }
     const tokens = parsePointer(op.path)
 
     if (tokens.length === 0) {
-      if (op.op === 'remove') throw err('SDUI_PATCH_INVALID', 'cannot remove the whole document')
+      if (op.op === 'remove') throw err('PATCH_INVALID', 'cannot remove the whole document')
       root = cloneJson(op.value as SduiJson)
       continue
     }
@@ -395,7 +395,7 @@ export function applyJsonPatch(doc: SduiJson, ops: readonly JsonPatchOp[]): Sdui
       } else if (isPlainObject(parent) && Object.hasOwn(parent, token)) {
         parent = parent[token] as SduiJson
       } else {
-        throw err('SDUI_PATCH_INVALID', `path not found: ${op.path}`)
+        throw err('PATCH_INVALID', `path not found: ${op.path}`)
       }
     }
 
@@ -410,16 +410,16 @@ export function applyJsonPatch(doc: SduiJson, ops: readonly JsonPatchOp[]): Sdui
         else parent.splice(idx, 1)
       }
     } else if (isPlainObject(parent)) {
-      if (FORBIDDEN_KEYS.has(last)) throw err('SDUI_FORBIDDEN_KEY', `forbidden key "${last}"`)
+      if (FORBIDDEN_KEYS.has(last)) throw err('FORBIDDEN_KEY', `forbidden key "${last}"`)
       if (op.op === 'remove' || op.op === 'replace') {
         if (!Object.hasOwn(parent, last)) {
-          throw err('SDUI_PATCH_INVALID', `target not found: ${op.path}`)
+          throw err('PATCH_INVALID', `target not found: ${op.path}`)
         }
       }
       if (op.op === 'remove') delete parent[last]
       else parent[last] = cloneJson(op.value as SduiJson)
     } else {
-      throw err('SDUI_PATCH_INVALID', `cannot apply at ${op.path}`)
+      throw err('PATCH_INVALID', `cannot apply at ${op.path}`)
     }
   }
   return root
