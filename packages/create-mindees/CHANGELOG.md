@@ -1,5 +1,13 @@
 # create-mindees
 
+## 0.24.0
+
+### Patch Changes
+
+- Updated dependencies [cefc953]
+  - @mindees/cli@0.24.0
+  - @mindees/core@0.24.0
+
 ## 0.23.0
 
 ### Patch Changes
