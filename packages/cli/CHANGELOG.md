@@ -1,5 +1,23 @@
 # @mindees/cli
 
+## 0.31.0
+
+### Minor Changes
+
+- 2dff962: **Static assets via `public/`.** `mindees build` now copies a conventional `public/` directory verbatim
+  into `dist/` (binary-safe), so favicons, images, fonts, and CSS referenced by absolute URL (`/logo.png`,
+  `<link href="/styles.css">`) are served alongside the app. The app's generated `index.html` still takes
+  precedence over a `public/index.html`. (Adds `FileSystem.copyFile`.)
+
+  This turns the "no static assets" limitation into a working, conventional asset story. Transforming
+  _relative_ asset module-imports (`import './x.png'`) remains future work.
+
+### Patch Changes
+
+- @mindees/ai@0.31.0
+- @mindees/compiler@0.31.0
+- @mindees/core@0.31.0
+
 ## 0.30.4
 
 ### Patch Changes

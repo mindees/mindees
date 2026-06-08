@@ -1,6 +1,6 @@
 {
   "name": "@mindees/example-pulse-server",
-  "version": "0.30.4",
+  "version": "0.31.0",
   "private": true,
   "type": "module",
   "description": "Runnable node:http reference adapter for the Pulse (@mindees/updates) update server core.",
