@@ -11,6 +11,7 @@ export {
 /** Helix Canvas strand — a 2D scene graph driven by the reconciler, painted to a 2D context (§6.2). */
 export {
   type Canvas2DBackend,
+  type Canvas2DBackendOptions,
   createCanvas2DBackend,
   type Scene2DContext,
   type SceneNode,
@@ -35,14 +36,14 @@ export {
 } from './headless'
 /**
  * Native backends. `createNativeCommandBackend` is implemented (emits a native
- * command stream); `createNativeBackend`/`createCanvasBackend` are research
+ * command stream); `createNativeBackend`/`createGpuCanvasBackend` are research
  * tracks that throw `NotImplementedError`.
  */
 export {
-  type CanvasBackend,
-  createCanvasBackend,
+  createGpuCanvasBackend,
   createNativeBackend,
   createNativeCommandBackend,
+  type GpuCanvasBackend,
   type NativeBackend,
   type NativeCommandBackend,
   type NativeCommandBackendOptions,
