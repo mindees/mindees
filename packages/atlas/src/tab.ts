@@ -37,13 +37,17 @@ export interface TabDef {
   readonly component: Component<RouteComponentProps>
 }
 
-/** Options for {@link createTabNavigator}. */
-export interface TabNavigatorOptions {
-  readonly tabs: readonly TabDef[]
-  /** Tab-bar edge (default `'bottom'`). */
+/** Per-render presentation overrides — mirror `createStackNavigator`'s per-render ergonomics. */
+export interface TabNavigatorProps {
+  /** Tab-bar edge (default `'bottom'`). Overrides the factory default for this render. */
   readonly tabBarPosition?: 'top' | 'bottom'
-  /** Extra style merged into the tab bar. */
+  /** Extra style merged into the tab bar. Overrides the factory default for this render. */
   readonly tabBarStyle?: Reactive<StyleInput>
+}
+
+/** Options for {@link createTabNavigator}. The `tabs` list is required at factory time. */
+export interface TabNavigatorOptions extends TabNavigatorProps {
+  readonly tabs: readonly TabDef[]
 }
 
 const styleFn = (extra: Reactive<StyleInput> | undefined, base: StyleInput): (() => StyleInput) => {
@@ -65,11 +69,13 @@ const styleFn = (extra: Reactive<StyleInput> | undefined, base: StyleInput): (()
 export function createTabNavigator(
   router: Router,
   options: TabNavigatorOptions,
-): Component<Record<string, never>> {
+): Component<TabNavigatorProps> {
   const tabs = options.tabs
-  const position = options.tabBarPosition ?? 'bottom'
 
-  return () => {
+  return (props = {}) => {
+    // Per-render overrides win over the factory defaults (parity with createStackNavigator).
+    const position = props.tabBarPosition ?? options.tabBarPosition ?? 'bottom'
+    const tabBarStyle = props.tabBarStyle ?? options.tabBarStyle
     // Active tab = the LONGEST tab path that prefixes the current pathname (deep-link + nested-route aware).
     // Returns -1 when the URL belongs to NO tab — better to select/show nothing than a misleading tab 0.
     const activeIndex = (): number => {
@@ -134,7 +140,7 @@ export function createTabNavigator(
       View,
       {
         role: 'tablist',
-        style: styleFn(options.tabBarStyle, { display: 'flex', flexDirection: 'row' }),
+        style: styleFn(tabBarStyle, { display: 'flex', flexDirection: 'row' }),
       },
       ...tabs.map((t, i) =>
         createElement(
