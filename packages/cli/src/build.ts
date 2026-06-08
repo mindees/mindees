@@ -18,6 +18,7 @@ import {
   type Diagnostic,
   type PerfLintOptions,
   perfLint,
+  rewriteImportSpecifiers,
   typecheck,
 } from '@mindees/compiler'
 import type { FileSystem } from './fs'
@@ -75,18 +76,36 @@ ${imports}
 `
 }
 
+/** Resolve a relative `./`/`../` specifier (from `fromDir`) to a normalized path, collapsing `.`/`..`. */
+function resolveRelDir(fromDir: string, spec: string): string {
+  const parts = fromDir ? fromDir.split('/') : []
+  for (const seg of spec.split('/')) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') parts.pop()
+    else parts.push(seg)
+  }
+  return parts.join('/')
+}
+
 /**
- * Add explicit `.js` extensions to RELATIVE import/export specifiers in emitted code. The compiler emits
- * `from './App'` (TS preserves the extensionless source specifier), which a browser's native ESM loader
- * cannot resolve. Bare specifiers (`@mindees/*`) are left untouched (the import-map resolves them). Only
- * touches `./`/`../` specifiers that lack a file extension. (Minor source-map drift on import lines only.)
+ * Build a specifier resolver for the module at `rel`: turns a relative, extensionless import into a
+ * browser-loadable one — `.js` for a sibling FILE, `/index.js` for a directory (barrel) import — by
+ * consulting the set of compiled source files. Leaves specifiers that already have an extension alone.
  */
-function rewriteRelativeImports(code: string): string {
-  const addExt = (spec: string): string => (/\.[a-zA-Z0-9]+$/.test(spec) ? spec : `${spec}.js`)
-  return code.replace(
-    /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.\.?\/[^'"]*)\2/g,
-    (_m, pre: string, q: string, spec: string) => `${pre}${q}${addExt(spec)}${q}`,
-  )
+function makeImportResolver(
+  rel: string,
+  sourceFiles: ReadonlySet<string>,
+): (spec: string) => string {
+  const fromDir = dirOf(rel)
+  return (spec) => {
+    if (/\.[a-zA-Z0-9]+$/.test(spec)) return spec // already has an extension (e.g. .json, .css)
+    const target = resolveRelDir(fromDir, spec)
+    if (sourceFiles.has(`${target}.tsx`) || sourceFiles.has(`${target}.ts`)) return `${spec}.js`
+    if (sourceFiles.has(`${target}/index.tsx`) || sourceFiles.has(`${target}/index.ts`)) {
+      return `${spec.replace(/\/$/, '')}/index.js`
+    }
+    return `${spec}.js` // best-effort default (covers the common sibling-file case)
+  }
 }
 
 /**
@@ -193,6 +212,7 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
   const writtenOutPaths = new Map<string, string>() // outPath → the rel that emitted it (collision guard)
 
   const entries = fs.exists(srcDir) ? fs.readDir(srcDir) : []
+  const sourceFiles = new Set(entries) // for directory-vs-file import resolution
   for (const rel of entries) {
     if (!COMPILABLE.test(rel) || DECLARATION.test(rel)) continue
     const srcPath = `${srcDir}/${rel}`
@@ -254,8 +274,9 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
           `//# sourceMappingURL=${baseOf(outPath)}.map`,
         )
       }
-      // Make relative specifiers browser-resolvable (`./App` → `./App.js`) so the output runs as native ESM.
-      fs.writeFile(outPath, rewriteRelativeImports(code))
+      // Make relative specifiers browser-resolvable (`./App` → `./App.js`, a directory → `/index.js`)
+      // so the output runs as native ESM. AST-based: never corrupts dynamic imports or string literals.
+      fs.writeFile(outPath, rewriteImportSpecifiers(code, makeImportResolver(rel, sourceFiles)))
       compiled.push(rel)
     }
   }

@@ -104,8 +104,14 @@ export const Image: Component<ImageProps> = (props) => {
   const fallback = props.fallbackSrc
   if (fallback !== undefined || props.onError) {
     host.onError = (e: unknown): void => {
-      const target = (e as { target?: { src?: string } } | null)?.target
-      if (fallback !== undefined && target && target.src !== fallback) target.src = fallback
+      const target = (e as { target?: { src?: string; dataset?: Record<string, string> } } | null)
+        ?.target
+      // Swap to the fallback exactly ONCE — guard with a marker, not `src !== fallback` (the live `src`
+      // is an absolute URL that never equals the literal fallback, which would re-swap + re-fire forever).
+      if (fallback !== undefined && target?.dataset && target.dataset.mindeesFellBack !== '1') {
+        target.dataset.mindeesFellBack = '1'
+        target.src = fallback
+      }
       props.onError?.()
     }
   }
@@ -193,6 +199,7 @@ export const TextInput: Component<TextInputProps> = (props) => {
     }
   }
   if (props.multiline) {
+    delete host.type // a <textarea> has no `type` attribute (a multiline + secureTextEntry combo is moot)
     if (props.rows !== undefined) host.rows = props.rows
     return createElement('textarea', host) // multi-line → real <textarea>
   }

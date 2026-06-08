@@ -9,6 +9,8 @@ export { type BudgetOptions, checkBudget } from './budget'
 export { createFlattenTransformer, STATIC_MARKER } from './flatten'
 /** Build-time perf-lint (opt-in via `compileChecked(src, { perf: true })`). */
 export { type PerfLintOptions, perfLint } from './perf-lint'
+/** Rewrite relative import specifiers in emitted JS for native-ESM (browser) loading. */
+export { rewriteImportSpecifiers } from './rewrite-imports'
 /** Per-route code-splitting manifest + file-based route codegen. */
 export {
   buildRouteManifest,

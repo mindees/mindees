@@ -192,4 +192,16 @@ export const List = (xs: number[]) => <view>{xs.map((x) => <text>{x}</text>)}</v
       result.diagnostics.some((d) => d.code.startsWith('MDC_PERF') && d.severity === 'warning'),
     ).toBe(true)
   })
+
+  it('rewrites a directory (barrel) import to /index.js for native ESM', () => {
+    const fs = createMemoryFileSystem({
+      'src/widgets/index.tsx': `import { createElement } from "@mindees/core"
+export const W = () => <view/>`,
+      'src/App.tsx': `import { W } from "./widgets"
+export const App = W`,
+    })
+    const result = buildProject(fs, { html: false })
+    expect(result.ok).toBe(true)
+    expect(fs.snapshot()['dist/App.js']).toContain('"./widgets/index.js"') // directory → /index.js, not .js
+  })
 })
