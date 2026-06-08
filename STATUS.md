@@ -28,6 +28,18 @@ Earlier foundation (still true): native-strand parity on both mobile hosts; Atla
 tokens + dark mode; Canvas strand; PN-Counter + web-storage persistence; real WASM module runtime;
 file-based routing.
 
+**Known web limitations (honest, in scope for follow-up):**
+
+- **Static assets aren't bundled.** `mindees build` compiles `.ts(x)` only; `import './x.css'`/`.json`/
+  images are left for the host and not copied to `dist/` (a CSS import no longer fails the build, but the
+  file won't be served). Inline styles/`StyleObject` are the supported styling path today.
+- **File-based routing isn't wired for the no-bundler web target yet.** A `src/routes/` dir emits a manifest
+  but the web runtime doesn't consume it — use an explicit `createRouter({ routes })` for web.
+- **Nested routes under a tab** aren't auto-rendered: a `createTabNavigator` tab whose route has children
+  should render its own `createRouterView`. Leaf tabs get the full `params`/`search`/`data` contract.
+- **An overlay opened by a screen inside a tab** (a `Modal`/`Toast`) portals to the app's overlay layer, so
+  it isn't auto-hidden when you switch tabs — close it on tab change.
+
 The headline: the **same TypeScript app** renders and is **interactive** on web (DOM/SSR),
 a real **Android emulator**, and a real **iOS Simulator** — all CI-verified (no local Mac
 needed). `native-android.yml` runs Robolectric + the QuickJS bridge + an API-35 emulator

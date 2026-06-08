@@ -14,10 +14,12 @@
  */
 
 import { type Component, createElement, effect, signal } from '@mindees/core'
-import type { Router } from '@mindees/router'
+import type { LoaderData, RouteComponentProps, Router } from '@mindees/router'
 import type { Reactive } from './host'
 import { Pressable, Text, View } from './primitives'
 import { flattenStyle, type StyleInput } from './style'
+
+const IDLE_LOADER: LoaderData = Object.freeze({ status: 'idle' })
 
 /** One tab in a {@link createTabNavigator}. */
 export interface TabDef {
@@ -25,8 +27,14 @@ export interface TabDef {
   readonly path: string
   /** Tab-bar label (also the tab's accessible name). */
   readonly label: string
-  /** The screen component shown when this tab is active. */
-  readonly component: Component
+  /**
+   * The screen component for this tab. Receives the full {@link RouteComponentProps} contract (`router`,
+   * reactive `params`/`search`, and `data` for the active route's loader) — the same props
+   * `createRouterView` passes — so a tab screen reads params + loader data the standard way. (A plain
+   * `() => …` component that ignores props is fine.) NOTE: nested routes *under* a tab are not auto-rendered
+   * into an outlet — a tab whose route has children should render its own `createRouterView` for them.
+   */
+  readonly component: Component<RouteComponentProps>
 }
 
 /** Options for {@link createTabNavigator}. */
@@ -98,7 +106,22 @@ export function createTabNavigator(
             minHeight: 0,
           }),
         },
-        () => (visited[i]?.() ? createElement(t.component, {}) : null),
+        // Thread the router screen contract so a tab screen reads params/search/loader-data the standard
+        // way (mirrors createRouterView). `data` resolves the active leaf match; `children` is null (a tab
+        // screen with nested routes renders its own createRouterView — see TabDef.component).
+        () =>
+          visited[i]?.()
+            ? createElement(t.component, {
+                router,
+                params: router.params,
+                search: router.search,
+                data: () => {
+                  const m = router.match()
+                  return m ? router.loaderData(m) : IDLE_LOADER
+                },
+                children: null,
+              })
+            : null,
       ),
     )
     const panelArea = createElement(

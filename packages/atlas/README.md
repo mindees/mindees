@@ -55,8 +55,9 @@ The Atlas component library — MindeesNative's batteries-included UI primitives
   swipe-back gesture drives the pop interactively, and surviving screens keep state.
 - **Tab navigator** — `@mindees/atlas/tab` exports `createTabNavigator`: the active
   tab is derived from the URL (deep-links + back/forward work), screens are lazily
-  mounted on first visit then kept alive (state preserved), with full
-  `tablist`/`tab`/`tabpanel` a11y.
+  mounted on first visit then kept alive (state preserved), each receives the router
+  screen contract (`params`/`search`/`data`), with full `tablist`/`tab`/`tabpanel`
+  a11y. (A tab whose route has *nested* children renders its own `createRouterView`.)
 
 ## Quick start
 
