@@ -94,4 +94,21 @@ describe('createTabNavigator', () => {
     ) as unknown as HTMLElement[]
     expect(panels.every((p) => p.style.display === 'none')).toBe(true)
   })
+
+  it('accepts per-render overrides (tabBarPosition) like the stack navigator', () => {
+    const router = createRouter({
+      routes: [{ path: '/home', component: Home }],
+      history: createMemoryHistory({ initialEntries: ['/home'] }),
+    })
+    const Tabs = createTabNavigator(router, {
+      tabs: [{ path: '/home', label: 'Home', component: Home }],
+      tabBarPosition: 'bottom',
+    })
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    render(createElement(Tabs, { tabBarPosition: 'top' }), createDomBackend(doc()), root as never)
+    // tabBarPosition:'top' → the tablist is the FIRST child of the outer container (before the panels).
+    const outer = root.firstElementChild as HTMLElement
+    expect(outer.firstElementChild?.getAttribute('role')).toBe('tablist')
+  })
 })
