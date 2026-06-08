@@ -1,5 +1,32 @@
 # @mindees/atlas
 
+## 1.0.0
+
+### Major Changes
+
+- 8a7ebda: # MindeesNative 1.0 🎉
+
+  The **web stack is stable** and follows semver: `@mindees/core`, `@mindees/compiler`, `@mindees/cli`,
+  `@mindees/router`, `@mindees/renderer`, and `@mindees/atlas` are now `maturity: 'stable'`. `@mindees/ai`,
+  `@mindees/data`, and `@mindees/updates` share the 1.0 version line but stay `experimental` (feature-complete
+
+  - tested; surface still stabilizing). On-device native rendering remains a labeled research track.
+
+  The same TypeScript app renders interactively on web (DOM + real SSR), with file-based routing on `src/app/`,
+  stack + tab navigators, accessible Atlas components + theming, fine-grained signals, a compiler with enforced
+  perf budgets, a runnable `mindees dev`/`build` loop, OTA (Pulse), local-first CRDTs (Continuum), and an AI
+  layer (Synapse). A shared `MindeesError` base gives every package a typed, coded error contract.
+
+  **Upgrading from 0.x:** see [`docs/migration-1.0.md`](https://github.com/mindees/mindees/blob/main/docs/migration-1.0.md)
+  — mainly the `src/routes/` → `src/app/` move, the `createCanvasBackend` → `createGpuCanvasBackend` rename,
+  test helpers moving to `@mindees/core/testing`, and errors now extending `MindeesError`.
+
+### Patch Changes
+
+- Updated dependencies [8a7ebda]
+  - @mindees/core@1.0.0
+  - @mindees/router@1.0.0
+
 ## 0.37.0
 
 ### Minor Changes

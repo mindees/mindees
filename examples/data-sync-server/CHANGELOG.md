@@ -1,5 +1,12 @@
 # @mindees/example-data-sync-server
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [8a7ebda]
+  - @mindees/data@1.0.0
+
 ## 0.37.0
 
 ### Patch Changes

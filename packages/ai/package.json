@@ -1,6 +1,6 @@
 {
   "name": "@mindees/ai",
-  "version": "0.37.0",
+  "version": "1.0.0",
   "description": "MindeesNative Synapse - provider-agnostic AI: a pure-TS contract with mock + server backends, streaming via async iterables, structured output, and tool calling (on-device runtime is a research track).",
   "license": "MIT OR Apache-2.0",
   "type": "module",
