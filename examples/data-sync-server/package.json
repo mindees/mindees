@@ -1,6 +1,6 @@
 {
   "name": "@mindees/example-data-sync-server",
-  "version": "0.34.1",
+  "version": "0.34.2",
   "private": true,
   "type": "module",
   "description": "Runnable node:http adapter for the Continuum (@mindees/data) reference sync server.",
