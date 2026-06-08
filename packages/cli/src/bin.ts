@@ -9,6 +9,7 @@
  */
 
 import {
+  copyFileSync,
   existsSync,
   watch as fsWatch,
   mkdirSync,
@@ -58,6 +59,10 @@ function nodeFileSystem(): FileSystem {
     },
     rm: (path) => {
       rmSync(path, { recursive: true, force: true })
+    },
+    copyFile: (src, dest) => {
+      mkdirSync(dirname(dest), { recursive: true })
+      copyFileSync(src, dest)
     },
   }
 }

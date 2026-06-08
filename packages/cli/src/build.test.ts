@@ -227,4 +227,19 @@ export const main = 1`,
     expect(fs.snapshot()['dist/Old.js']).toBeUndefined() // stale module removed
     expect(fs.snapshot()['dist/main.js']).toBeDefined()
   })
+
+  it('copies a public/ dir verbatim into dist (static assets)', () => {
+    const fs = createMemoryFileSystem({
+      'src/main.tsx': 'export const main = 1',
+      'public/logo.svg': '<svg></svg>',
+      'public/styles.css': 'body{margin:0}',
+      'public/nested/icon.png': 'PNGDATA',
+    })
+    const result = buildProject(fs)
+    expect(result.ok).toBe(true)
+    const snap = fs.snapshot()
+    expect(snap['dist/logo.svg']).toBe('<svg></svg>')
+    expect(snap['dist/styles.css']).toBe('body{margin:0}')
+    expect(snap['dist/nested/icon.png']).toBe('PNGDATA') // nested structure preserved
+  })
 })

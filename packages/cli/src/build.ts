@@ -311,6 +311,14 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     }
   }
 
+  // Copy a conventional `public/` dir verbatim into `dist/` (favicons, images, fonts, CSS — anything
+  // referenced by an ABSOLUTE URL like `/logo.png`). Binary-safe via `copyFile`. The app's generated
+  // index.html (below) takes precedence over a `public/index.html`.
+  const publicDir = root === '.' ? 'public' : `${root}/public`
+  if (fs.exists(publicDir)) {
+    for (const rel of fs.readDir(publicDir)) fs.copyFile(`${publicDir}/${rel}`, `${outDir}/${rel}`)
+  }
+
   // Emit a runnable index.html when an app entry (`src/main.{tsx,ts}` → `dist/main.js`) compiled, so
   // `mindees build`/`dev` produce something that actually renders in a browser (import-map → CDN; no bundler).
   let htmlEmitted = false
