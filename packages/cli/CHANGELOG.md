@@ -1,5 +1,14 @@
 # @mindees/cli
 
+## 0.27.2
+
+### Patch Changes
+
+- Updated dependencies [9040462]
+  - @mindees/core@0.27.2
+  - @mindees/ai@0.27.2
+  - @mindees/compiler@0.27.2
+
 ## 0.27.1
 
 ### Patch Changes
