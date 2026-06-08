@@ -13,7 +13,7 @@
  * @module
  */
 
-import { type Component, createElement } from '@mindees/core'
+import { type Component, createElement, effect, signal } from '@mindees/core'
 import type { Router } from '@mindees/router'
 import type { Reactive } from './host'
 import { Pressable, Text, View } from './primitives'
@@ -76,8 +76,15 @@ export function createTabNavigator(
       return best
     }
 
-    // One panel per tab — ALL mounted (state preserved); only the active one is shown. `display:none`
-    // also removes inactive panels from the a11y tree + tab order, so no extra aria-hidden is needed.
+    // Lazy + keep-alive (RN parity): a tab's screen mounts on its FIRST activation and stays mounted
+    // thereafter, so an unvisited tab's loaders/effects never run, and a visited tab keeps its state.
+    const visited = tabs.map(() => signal(false))
+    effect(() => {
+      visited[activeIndex()]?.set(true)
+    })
+
+    // One panel per tab; only the active one is shown (`display:none` also drops inactive panels from the
+    // a11y tree + tab order). The screen is mounted lazily (once visited) and never unmounted.
     const panels = tabs.map((t, i) =>
       createElement(
         View,
@@ -90,7 +97,7 @@ export function createTabNavigator(
             minHeight: 0,
           }),
         },
-        createElement(t.component, {}),
+        () => (visited[i]?.() ? createElement(t.component, {}) : null),
       ),
     )
     const panelArea = createElement(
