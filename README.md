@@ -15,7 +15,7 @@ OTA updates. Built in the open.
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
-[![Status: v0.13.0 experimental](https://img.shields.io/badge/status-v0.13.0%20experimental-orange.svg)](./STATUS.md)
+[![Status: v0.30.2 experimental](https://img.shields.io/badge/status-v0.30.2%20experimental-orange.svg)](./STATUS.md)
 [![npm](https://img.shields.io/badge/npm-%40mindees%2F*-cb3837.svg)](https://www.npmjs.com/org/mindees)
 
 [Status](./STATUS.md) · [Roadmap](./ROADMAP.md) · [Contributing](./CONTRIBUTING.md) · [RFCs](./rfcs/README.md) · [Discussions](https://github.com/mindees/mindees/discussions)
@@ -24,7 +24,7 @@ OTA updates. Built in the open.
 
 ---
 
-> ### ⚠️ v0.13.0 — experimental, building in the open (all 10 packages on npm)
+> ### ⚠️ v0.30.2 — experimental, building in the open (all 10 packages on npm)
 >
 > MindeesNative is **not production-ready yet** — we are building it in public and
 > follow one rule above all: **everything we ship actually works.**
@@ -325,11 +325,17 @@ Full plan: [ROADMAP.md](./ROADMAP.md).
 
 ## 🚀 Quickstart
 
-Scaffold a new app (the packages are published on npm at `0.13.0`, 🧪 experimental):
+Scaffold a new app, then run it — `mindees dev` serves it at `http://localhost:3000` with live-reload,
+and `mindees build` emits a deployable `dist/` (packages are on npm at `0.30.2`, 🧪 experimental):
 
 ```bash
 npm create mindees@latest my-app -- --template counter
+cd my-app && npm install
+npx mindees dev      # → http://localhost:3000 (live-reload)
+# npx mindees build  # → dist/ (static, deployable)
 ```
+
+See the [getting-started guide](./docs/getting-started.md) for the full walkthrough.
 
 Or add packages to an existing project:
 
@@ -380,7 +386,7 @@ you're into language runtimes, compilers, reactivity, mobile, or docs.
 That's the goal — a TypeScript cross-platform framework that keeps React
 Native's strengths (familiar language, native UI, OTA updates) while removing
 its pain points (dependency hell, single-thread limits, debugging). It's
-experimental (`v0.13.0`) but already renders the same app interactively on web,
+experimental (`v0.30.2`) but already renders the same app interactively on web,
 Android, and iOS in CI.
 
 **Is it a Flutter alternative?**
@@ -391,7 +397,7 @@ Android and web, and get fine-grained reactivity and native UI.
 100% TypeScript. No new language to learn.
 
 **Can I build mobile apps with it today?**
-Not for production yet — it's experimental (`v0.13.0`). But the *same* TypeScript app
+Not for production yet — it's experimental (`v0.30.2`). But the *same* TypeScript app
 already renders **styled, laid-out, interactive UI on web, a real Android emulator,
 and a real iOS Simulator** in CI — flex, scrolling, text, images, text inputs, and
 events that carry values (native `onChangeText` works) — through embedded QuickJS

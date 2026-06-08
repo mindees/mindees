@@ -4,11 +4,29 @@ This file is the **single source of truth** for MindeesNative's maturity. It is
 deliberately conservative. If something is not listed as working here, assume it
 does not work.
 
-**Last updated:** v0.13.0 (native-strand parity on both mobile hosts; Atlas component
-library, tokens + dark mode, and the animated stack navigator; Canvas strand; enforced
-perf budgets; PN-Counter + web-storage persistence; real WASM module runtime; file-based
-routing). All `@mindees/*` packages + `create-mindees` share the single locked **0.13.0**
+**Last updated:** v0.30.2. All `@mindees/*` packages + `create-mindees` share the single locked **0.30.2**
 line (verified against every `packages/*/src/index.ts` + `package.json`), published to npm.
+
+**v1-readiness milestone (the web target is now adoptable end-to-end):**
+
+- **Runnable web loop** — `mindees dev` serves your app with live-reload (+ a build-error overlay) and
+  `mindees build` emits a deployable `dist/` (native ESM + an import-map to the CDN; no bundler step).
+- **Enforced performance** — `mindees build`/`dev` run perf-lint (warnings) and an opt-in per-module
+  budget (`mindees.config.json` → build fails over budget). "100% optimized" is enforced, not aspirational.
+- **Live device hooks on web** — `connectWebEnvironment()` wires dark mode, safe-area, keyboard, and
+  window size into `useColorScheme`/`useSafeAreaInsets`/`useKeyboard`/`useWindowDimensions`.
+- **Forms + media** — `TextInput` (multiline, secure, keyboard/return-key/autocapitalize/maxLength,
+  focus/blur/submit) and `Image` (resizeMode, lazy `loading`, decode/fetch priority, fallback).
+- **Navigation** — animated **stack** (`@mindees/atlas/stack`) + **tab** (`@mindees/atlas/tab`, URL-driven,
+  lazy + keep-alive) navigators over the router.
+- **Accessibility** — imperative `announce()` + a real **modal focus trap** (WCAG 2.4.3).
+- **Engineering** — automatic-JSX scaffold (editor == compiler == docs), a [getting-started
+  guide](./docs/getting-started.md), **cross-platform CI** (Linux + Windows + macOS), a
+  [stability/deprecation policy](./STABILITY.md), and `engines.node >= 22.18.0` on every package.
+
+Earlier foundation (still true): native-strand parity on both mobile hosts; Atlas component library,
+tokens + dark mode; Canvas strand; PN-Counter + web-storage persistence; real WASM module runtime;
+file-based routing.
 
 The headline: the **same TypeScript app** renders and is **interactive** on web (DOM/SSR),
 a real **Android emulator**, and a real **iOS Simulator** — all CI-verified (no local Mac
