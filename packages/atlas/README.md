@@ -54,8 +54,9 @@ The Atlas component library — MindeesNative's batteries-included UI primitives
   animated stack over the Quantum router: push slides/fades a screen in, an edge
   swipe-back gesture drives the pop interactively, and surviving screens keep state.
 - **Tab navigator** — `@mindees/atlas/tab` exports `createTabNavigator`: the active
-  tab is derived from the URL (deep-links + back/forward work), every screen stays
-  mounted (state preserved), with full `tablist`/`tab`/`tabpanel` a11y.
+  tab is derived from the URL (deep-links + back/forward work), screens are lazily
+  mounted on first visit then kept alive (state preserved), with full
+  `tablist`/`tab`/`tabpanel` a11y.
 
 ## Quick start
 
