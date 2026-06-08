@@ -1,5 +1,12 @@
 # @mindees/atlas
 
+## 0.27.1
+
+### Patch Changes
+
+- @mindees/core@0.27.1
+- @mindees/router@0.27.1
+
 ## 0.27.0
 
 ### Minor Changes
