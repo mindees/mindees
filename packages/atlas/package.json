@@ -27,6 +27,10 @@
     "./stack": {
       "types": "./dist/stack.d.ts",
       "import": "./dist/stack.js"
+    },
+    "./tab": {
+      "types": "./dist/tab.d.ts",
+      "import": "./dist/tab.js"
     }
   },
   "publishConfig": {
