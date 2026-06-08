@@ -20,6 +20,8 @@ export interface FileSystem {
   readDir(dir: string): string[]
   /** Remove a file or directory (recursively). No-op if missing. */
   rm(path: string): void
+  /** Copy a file (binary-safe), creating parent dirs. Used for static assets that aren't UTF-8 text. */
+  copyFile(src: string, dest: string): void
 }
 
 /** An in-memory {@link FileSystem} for tests and dry runs. */
@@ -78,6 +80,10 @@ export function createMemoryFileSystem(initial: Record<string, string> = {}): Fi
       const prefix = `${p}/`
       for (const f of [...files.keys()]) if (f.startsWith(prefix)) files.delete(f)
       for (const d of [...dirs]) if (d.startsWith(prefix)) dirs.delete(d)
+    },
+    copyFile: (src, dest) => {
+      const c = files.get(norm(src))
+      if (c !== undefined) files.set(norm(dest), c)
     },
     snapshot: () => Object.fromEntries([...files.entries()].sort()),
   }

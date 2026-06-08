@@ -30,9 +30,11 @@ file-based routing.
 
 **Known web limitations (honest, in scope for follow-up):**
 
-- **Static assets aren't bundled.** `mindees build` compiles `.ts(x)` only; `import './x.css'`/`.json`/
-  images are left for the host and not copied to `dist/` (a CSS import no longer fails the build, but the
-  file won't be served). Inline styles/`StyleObject` are the supported styling path today.
+- **Static assets:** a conventional **`public/` dir is copied verbatim into `dist/`** (favicons, images,
+  fonts, CSS — reference them by absolute URL like `/logo.png`, or `<link>` a CSS file). What's *not* yet
+  supported is transforming **relative asset module-imports** (`import './x.css'`/`.json`/image) — those are
+  left for the host (a CSS import no longer fails the build, but isn't applied). Inline styles/`StyleObject`
+  remain the primary styling path.
 - **File-based routing isn't wired for the no-bundler web target yet.** A `src/routes/` dir emits a manifest
   but the web runtime doesn't consume it — use an explicit `createRouter({ routes })` for web.
 - **Nested routes under a tab** aren't auto-rendered: a `createTabNavigator` tab whose route has children
