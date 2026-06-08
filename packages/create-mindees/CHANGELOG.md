@@ -1,5 +1,13 @@
 # create-mindees
 
+## 0.32.0
+
+### Patch Changes
+
+- Updated dependencies [0a776f7]
+  - @mindees/cli@0.32.0
+  - @mindees/core@0.32.0
+
 ## 0.31.1
 
 ### Patch Changes
