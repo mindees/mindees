@@ -58,15 +58,57 @@ export interface TextProps extends BaseProps {
 export const Text: Component<TextProps> = (props) =>
   createElement('text', toHostProps(props), props.children)
 
+/** Merge extra style keys into a host prop bag, preserving a reactive (accessor) style. */
+function mergeHostStyle(host: Record<string, unknown>, extra: Record<string, unknown>): void {
+  const cur = host.style
+  if (cur === undefined) host.style = extra
+  else if (typeof cur === 'function') {
+    const acc = cur as () => Record<string, unknown>
+    host.style = () => ({ ...acc(), ...extra })
+  } else host.style = { ...(cur as Record<string, unknown>), ...extra }
+}
+
 /** An image (→ `image`/`img`). Requires `label` (alt) unless `decorative`. */
 export interface ImageProps extends BaseProps {
   readonly src: string
   /** Mark purely-decorative images so screen readers skip them (alt="" + aria-hidden). */
   readonly decorative?: boolean
+  /** How the image fills its box (→ CSS `object-fit`). */
+  readonly resizeMode?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down'
+  /** Native lazy-loading (→ `loading`). */
+  readonly loading?: 'lazy' | 'eager'
+  /** Decode hint (→ `decoding`). */
+  readonly decoding?: 'async' | 'sync' | 'auto'
+  /** Fetch-priority hint (→ `fetchpriority`). */
+  readonly fetchPriority?: 'high' | 'low' | 'auto'
+  /** Intrinsic width/height (px) — reserve layout space to avoid reflow on load. */
+  readonly width?: number
+  readonly height?: number
+  /** Swapped in if `src` fails to load (sets the element's `src` on the `error` event). */
+  readonly fallbackSrc?: string
+  /** Fires when the image finishes loading. */
+  readonly onLoad?: () => void
+  /** Fires when the image fails to load (after any `fallbackSrc` swap). */
+  readonly onError?: () => void
 }
 export const Image: Component<ImageProps> = (props) => {
   const host = toHostProps(props)
   host.src = props.src
+  if (props.resizeMode) mergeHostStyle(host, { objectFit: props.resizeMode })
+  if (props.loading) host.loading = props.loading
+  if (props.decoding) host.decoding = props.decoding
+  if (props.fetchPriority) host.fetchpriority = props.fetchPriority
+  if (props.width !== undefined) host.width = props.width
+  if (props.height !== undefined) host.height = props.height
+  if (props.onLoad) host.onLoad = () => props.onLoad?.()
+  const fallback = props.fallbackSrc
+  if (fallback !== undefined || props.onError) {
+    host.onError = (e: unknown): void => {
+      const target = (e as { target?: { src?: string } } | null)?.target
+      if (fallback !== undefined && target && target.src !== fallback) target.src = fallback
+      props.onError?.()
+    }
+  }
   if (props.decorative) {
     host.alt = ''
     host['aria-hidden'] = 'true'
@@ -83,26 +125,77 @@ export const Image: Component<ImageProps> = (props) => {
   return createElement('image', host)
 }
 
-/** A text field (→ `textinput`/`input`). `value` may be reactive (controlled). */
+/** Map a logical keyboard type to the HTML `inputmode` attribute. */
+const KEYBOARD_INPUTMODE: Record<string, string> = {
+  default: 'text',
+  numeric: 'numeric',
+  decimal: 'decimal',
+  email: 'email',
+  tel: 'tel',
+  url: 'url',
+  search: 'search',
+}
+
+/** A text field (→ `textinput`/`input`, or `textarea` when `multiline`). `value` may be reactive. */
 export interface TextInputProps extends BaseProps {
   readonly value?: Reactive<string>
   readonly placeholder?: string
   readonly type?: 'text' | 'password' | 'email' | 'number' | 'search' | 'tel' | 'url'
   readonly disabled?: boolean
+  /** Render a multi-line field (→ `textarea`). */
+  readonly multiline?: boolean
+  /** Visible rows when `multiline` (→ textarea `rows`). */
+  readonly rows?: number
+  /** Mask the input (→ `type="password"`); overrides `type`. */
+  readonly secureTextEntry?: boolean
+  /** On-screen keyboard hint (→ `inputmode`). */
+  readonly keyboardType?: 'default' | 'numeric' | 'decimal' | 'email' | 'tel' | 'url' | 'search'
+  /** Enter-key label hint (→ `enterkeyhint`). */
+  readonly returnKeyType?: 'enter' | 'done' | 'go' | 'next' | 'search' | 'send'
+  /** Auto-capitalization (→ `autocapitalize`). */
+  readonly autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters'
+  /** Autofill hint (→ `autocomplete`, e.g. `"email"`, `"current-password"`). */
+  readonly autoComplete?: string
+  /** Maximum length (→ `maxlength`). */
+  readonly maxLength?: number
+  /** Focus on mount (→ `autofocus`). */
+  readonly autoFocus?: boolean
   /** Fires on every keystroke with the current value (`input` event). */
   readonly onInput?: (value: string) => void
   /** Fires on commit/blur with the current value (`change` event). */
   readonly onChange?: (value: string) => void
+  readonly onFocus?: () => void
+  readonly onBlur?: () => void
+  /** Fires when the user presses Enter (single-line submit). */
+  readonly onSubmitEditing?: (value: string) => void
 }
 export const TextInput: Component<TextInputProps> = (props) => {
   const host = toHostProps(props)
   if (!host.role) host.role = 'textbox'
   if (props.value !== undefined) host.value = props.value
   if (props.placeholder !== undefined) host.placeholder = props.placeholder
-  if (props.type !== undefined) host.type = props.type
+  const type = props.secureTextEntry ? 'password' : props.type
+  if (type !== undefined) host.type = type
   if (props.disabled) host.disabled = true
+  if (props.keyboardType) host.inputmode = KEYBOARD_INPUTMODE[props.keyboardType]
+  if (props.returnKeyType) host.enterkeyhint = props.returnKeyType
+  if (props.autoCapitalize) host.autocapitalize = props.autoCapitalize
+  if (props.autoComplete !== undefined) host.autocomplete = props.autoComplete
+  if (props.maxLength !== undefined) host.maxlength = props.maxLength
+  if (props.autoFocus) host.autofocus = true
   if (props.onInput) host.onInput = (e: unknown) => props.onInput?.(eventValue(e))
   if (props.onChange) host.onChange = (e: unknown) => props.onChange?.(eventValue(e))
+  if (props.onFocus) host.onFocus = () => props.onFocus?.()
+  if (props.onBlur) host.onBlur = () => props.onBlur?.()
+  if (props.onSubmitEditing) {
+    host.onKeyDown = (e: unknown): void => {
+      if ((e as { key?: string } | null)?.key === 'Enter') props.onSubmitEditing?.(eventValue(e))
+    }
+  }
+  if (props.multiline) {
+    if (props.rows !== undefined) host.rows = props.rows
+    return createElement('textarea', host) // multi-line → real <textarea>
+  }
   return createElement('textinput', host)
 }
 
