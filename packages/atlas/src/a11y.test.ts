@@ -28,4 +28,13 @@ describe('announce', () => {
     announce('Saved again', 'assertive')
     expect(document.querySelectorAll('[aria-live="assertive"]').length).toBe(before) // not duplicated
   })
+
+  it('joins both same-frame messages (neither is lost)', async () => {
+    announce('First note', 'polite')
+    announce('Second note', 'polite')
+    await nextFrame()
+    const region = document.querySelector('[aria-live="polite"]') as unknown as HTMLElement
+    expect(region.textContent).toContain('First note')
+    expect(region.textContent).toContain('Second note')
+  })
 })

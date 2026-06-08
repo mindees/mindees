@@ -67,4 +67,14 @@ describe('createTabNavigator', () => {
     const tabs = root.querySelectorAll('[role="tab"]')
     expect(tabs[1]?.getAttribute('aria-selected')).toBe('true')
   })
+
+  it('selects/shows nothing when the URL matches no tab', () => {
+    const { root } = setup('/profile') // owned by neither /home nor /settings
+    const tabs = Array.from(root.querySelectorAll('[role="tab"]'))
+    expect(tabs.every((t) => t.getAttribute('aria-selected') === 'false')).toBe(true)
+    const panels = Array.from(
+      root.querySelectorAll('[role="tabpanel"]'),
+    ) as unknown as HTMLElement[]
+    expect(panels.every((p) => p.style.display === 'none')).toBe(true)
+  })
 })

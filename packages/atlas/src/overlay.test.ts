@@ -166,3 +166,33 @@ describe('FocusScope — focus trap', () => {
     expect(document.activeElement).toBe(b2)
   })
 })
+
+describe('FocusScope — focus trap skips hidden focusables', () => {
+  it('does not treat a display:none focusable as a Tab boundary', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    render(
+      createElement(
+        FocusScope,
+        { label: 'd' },
+        createElement('button', { id: 'v1' }, 'one'),
+        // a kept-alive-but-hidden subtree (mirrors a tab navigator's inactive panel)
+        createElement(
+          'view',
+          { style: { display: 'none' } },
+          createElement('button', { id: 'hid' }, 'hidden'),
+        ),
+        createElement('button', { id: 'v2' }, 'two'),
+      ),
+      createDomBackend(doc()),
+      container as never,
+    )
+    const dialog = container.querySelector('[role="dialog"]') as unknown as HTMLElement
+    const v1 = container.querySelector('#v1') as unknown as HTMLElement
+    const v2 = container.querySelector('#v2') as unknown as HTMLElement
+    v2.focus() // last VISIBLE focusable
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    // Without the visibility filter, the hidden button was the "last" → no wrap → focus would escape.
+    expect(document.activeElement).toBe(v1)
+  })
+})

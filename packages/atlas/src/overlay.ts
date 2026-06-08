@@ -7,10 +7,10 @@
  * the previously-focused element, auto-focuses its container, and restores focus on unmount —
  * DOM-feature-detected, so it no-ops on native/headless (the dialog markup + a11y still serialize).
  *
- * v1 scope: web is fully interactive (scrim dismiss, Escape, focus capture/restore). Native is
- * declarative — `role="dialog"` + `aria-modal` are carried to the host; a true focus trap +
- * tab-cycling and back-button handling are a host follow-up (see the portal-modal ADR). Tab
- * cycling within the scope is also deferred (needs a descendant query).
+ * v1 scope: web is fully interactive (scrim dismiss, Escape, focus capture/restore, AND a real Tab focus
+ * trap that cycles within the scope and skips hidden focusables — WCAG 2.4.3). Native is declarative —
+ * `role="dialog"` + `aria-modal` are carried to the host; native focus management + back-button handling
+ * remain a host follow-up (see the portal-modal ADR).
  *
  * @module
  */
@@ -55,10 +55,41 @@ export interface FocusScopeProps {
 const FOCUSABLE_SELECTOR =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
-interface FocusableNode {
+interface TabbableEl {
   focus?: () => void
-  querySelectorAll?: (selector: string) => ArrayLike<{ focus?: () => void }>
+  style?: { display?: string }
+  hidden?: boolean
+  getAttribute?: (name: string) => string | null
+  parentElement?: TabbableEl | null
+  getClientRects?: () => { length: number }
+}
+interface FocusableNode extends TabbableEl {
+  querySelectorAll?: (selector: string) => ArrayLike<TabbableEl>
   isConnected?: boolean
+}
+
+/**
+ * Whether `el` (a focusable in `scope`) is actually tabbable. The CSS selector can't see visibility, so a
+ * `display:none`/`hidden`/`aria-hidden` subtree (e.g. a tab navigator's inactive, kept-alive panels) would
+ * otherwise become a false trap boundary and let Tab escape. Walk inline hidden flags up to the scope
+ * (deterministic, layout-free), then — in real browsers — exclude anything with no box.
+ */
+function isTabbable(el: TabbableEl, scope: FocusableNode): boolean {
+  let n: TabbableEl | null = el
+  while (n && n !== scope.parentElement) {
+    if (
+      n.style?.display === 'none' ||
+      n.hidden === true ||
+      n.getAttribute?.('aria-hidden') === 'true'
+    ) {
+      return false
+    }
+    if (n === scope) break
+    n = n.parentElement ?? null
+  }
+  // happy-dom has no layout (returns rects for everything), so this only tightens the real-browser result.
+  if (typeof el.getClientRects === 'function' && el.getClientRects().length === 0) return false
+  return true
 }
 
 /** A focus-scoped, `aria-modal` container. Captures + restores focus AND traps Tab on web; declarative elsewhere. */
@@ -87,7 +118,10 @@ export const FocusScope: Component<FocusScopeProps> = (props) => {
   const trapTab = (e: { shiftKey?: boolean; preventDefault?: () => void }): void => {
     const node = scopeNode
     if (typeof document === 'undefined' || !node?.querySelectorAll) return
-    const all = Array.from(node.querySelectorAll(FOCUSABLE_SELECTOR))
+    // Only VISIBLE focusables are real Tab boundaries — a hidden one would let Tab escape the trap.
+    const all = Array.from(node.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) =>
+      isTabbable(el, node),
+    )
     if (all.length === 0) {
       e.preventDefault?.()
       node.focus?.() // nothing tabbable inside → keep focus on the dialog itself
