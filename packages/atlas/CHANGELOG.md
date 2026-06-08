@@ -1,5 +1,22 @@
 # @mindees/atlas
 
+## 0.37.0
+
+### Minor Changes
+
+- c67d375: 1.0 error-convention + surface consistency (from the freeze audit):
+
+  - New **`AtlasError`** (extends the shared `MindeesError`) with an `AtlasErrorCode`. `createList` (invalid
+    `itemHeight`/`height`) and `useForm` (async schema) now throw a typed `AtlasError` with a machine code
+    instead of a bare `RangeError`/`TypeError`, matching every other `@mindees/*` package.
+  - Exported the `Entry` type returned by `flattenSections`, so the public list utilities are fully nameable.
+
+### Patch Changes
+
+- Updated dependencies [a457873]
+  - @mindees/core@0.37.0
+  - @mindees/router@0.37.0
+
 ## 0.36.0
 
 ### Patch Changes
