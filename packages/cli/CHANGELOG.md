@@ -1,5 +1,13 @@
 # @mindees/cli
 
+## 0.34.0
+
+### Patch Changes
+
+- @mindees/ai@0.34.0
+- @mindees/compiler@0.34.0
+- @mindees/core@0.34.0
+
 ## 0.33.0
 
 ### Patch Changes
