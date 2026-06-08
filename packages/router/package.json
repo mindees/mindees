@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@mindees/renderer": "workspace:*",
-    "happy-dom": "20.9.0",
+    "happy-dom": "20.10.2",
     "valibot": "1.4.1",
     "zod": "4.4.3"
   }
