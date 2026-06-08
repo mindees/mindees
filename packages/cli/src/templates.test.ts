@@ -6,7 +6,7 @@ describe('templates', () => {
   // project dir. The `android` template is a multi-module native project (its app-js
   // package.json/tsconfig live under mindees-example-app/app-js/), so it's exempt here
   // and covered by android-template.test.ts instead.
-  const WEB_TEMPLATES = ['blank', 'counter', 'app']
+  const WEB_TEMPLATES = ['blank', 'counter', 'app', 'router']
   it('every web template carries a package.json, tsconfig, and a main entry', () => {
     for (const name of WEB_TEMPLATES) {
       const t = getTemplate(name)
@@ -30,5 +30,17 @@ describe('templates', () => {
     expect(pkg.dependencies['@mindees/atlas']).toBeTruthy()
     expect(t?.files['src/App.tsx']).toContain('@mindees/atlas')
     expect(t?.files['src/App.tsx']).toContain('useToggle')
+  })
+
+  it('scaffolds a file-based-routing starter (`router`) with src/app/ screens', () => {
+    const t = getTemplate('router')
+    expect(t).toBeDefined()
+    const pkg = JSON.parse(t?.files['package.json'] ?? '{}')
+    expect(pkg.dependencies['@mindees/router']).toBeTruthy()
+    expect(t?.files['src/app/index.tsx']).toContain('export default')
+    expect(t?.files['src/app/about.tsx']).toContain('export default')
+    expect(t?.files['src/main.tsx']).toContain('createFileRouter')
+    expect(t?.files['src/main.tsx']).toContain("from './routes.gen.js'")
+    expect(t?.files['.gitignore']).toContain('src/routes.gen.ts') // generated → ignored
   })
 })

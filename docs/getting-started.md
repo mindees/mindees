@@ -87,7 +87,36 @@ export function App() {
 Call `connectWebEnvironment()` once at startup (the `atlas` template does this) to make the device hooks
 (`useColorScheme`, `useWindowDimensions`, `useSafeAreaInsets`, `useKeyboard`, `useReducedMotion`) live on web.
 
-## 5. Configuration
+## 5. File-based routing
+
+Scaffold the routed starter (`npm create mindees@latest my-app -- --template router`), or add a
+**`src/app/`** directory to any project — every file under it becomes a route, Expo Router-style:
+
+| File | Route |
+| --- | --- |
+| `src/app/index.tsx` | `/` |
+| `src/app/about.tsx` | `/about` |
+| `src/app/blog/[slug].tsx` | `/blog/:slug` (dynamic param) |
+| `src/app/blog/[...rest].tsx` | catch-all |
+| `src/app/_layout.tsx` | layout wrapping the directory (render its `children` outlet) |
+| `src/app/(group)/…` | a group that doesn't affect the URL |
+
+Each screen is the file's `default` export and receives `RouteComponentProps` (`router`, reactive
+`params`/`search`, `data`); named exports (`loader`, `searchSchema`, …) configure the route. Wire it up once:
+
+```tsx
+import { createBrowserHistory, createFileRouter, createRouterView } from '@mindees/router'
+import { createDomBackend, render } from '@mindees/renderer'
+import { routes } from './routes.gen.js'
+
+const router = createFileRouter(routes, { history: createBrowserHistory() })
+render(() => createRouterView(router), {}, createDomBackend(), document.getElementById('app'))
+```
+
+`mindees dev`/`build` regenerate **`src/routes.gen.ts`** — a static-import module map (the browser has no
+bundler `import.meta.glob`) — and compile it to `dist/routes.gen.js`. It's git-ignored; just run `mindees dev`.
+
+## 6. Configuration
 
 `mindees.config.json` (optional, at the project root):
 

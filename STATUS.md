@@ -35,8 +35,9 @@ file-based routing.
   supported is transforming **relative asset module-imports** (`import './x.css'`/`.json`/image) — those are
   left for the host (a CSS import no longer fails the build, but isn't applied). Inline styles/`StyleObject`
   remain the primary styling path.
-- **File-based routing isn't wired for the no-bundler web target yet.** A `src/routes/` dir emits a manifest
-  but the web runtime doesn't consume it — use an explicit `createRouter({ routes })` for web.
+- **File-based routing works on web** via a `src/app/` dir (Expo-style; `--template router`). `mindees
+  dev`/`build` regenerate `src/routes.gen.ts` (a static-import module map) → `createFileRouter`, no bundler
+  glob needed. (Explicit `createRouter({ routes })` remains available.)
 - **Nested routes under a tab** aren't auto-rendered: a `createTabNavigator` tab whose route has children
   should render its own `createRouterView`. Leaf tabs get the full `params`/`search`/`data` contract.
 - **An overlay opened by a screen inside a tab** (a `Modal`/`Toast`) portals to the app's overlay layer, so
