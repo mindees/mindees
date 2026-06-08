@@ -18,8 +18,8 @@ describe('@mindees/router public API', () => {
   it('exposes honest package metadata', () => {
     expect(name).toBe('@mindees/router')
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+/)
-    expect(maturity).toBe('experimental')
-    expect(info).toEqual({ name: '@mindees/router', version: VERSION, maturity: 'experimental' })
+    expect(maturity).toBe('stable')
+    expect(info).toEqual({ name: '@mindees/router', version: VERSION, maturity: 'stable' })
   })
 
   it('re-exports a throwable NotImplementedError', () => {

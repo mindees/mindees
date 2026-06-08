@@ -104,7 +104,7 @@ export const VERSION = '0.37.0'
  * view transitions) are implemented and tested. The global typed route registry
  * and file-based route scanning are a later phase — see `STATUS.md`.
  */
-export const maturity: Maturity = 'experimental'
+export const maturity: Maturity = 'stable'
 
 /** Static identity + maturity metadata for this package (frozen — matches every other `@mindees/*`). */
 export const info: PackageInfo = Object.freeze({ name, version: VERSION, maturity })

@@ -46,7 +46,7 @@ export const VERSION = '0.37.0'
  * and tested on the TypeScript Compiler API. TS→native AOT is a research track
  * (throws `NotImplementedError`); the working path is TS → optimized JS.
  */
-export const maturity: Maturity = 'experimental'
+export const maturity: Maturity = 'stable'
 
 /**
  * Static identity + maturity metadata for this package. Frozen so the

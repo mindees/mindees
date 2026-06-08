@@ -5,8 +5,8 @@ describe('@mindees/atlas', () => {
   it('exposes honest package metadata', () => {
     expect(name).toBe('@mindees/atlas')
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+/)
-    expect(maturity).toBe('experimental')
-    expect(info).toEqual({ name: '@mindees/atlas', version: VERSION, maturity: 'experimental' })
+    expect(maturity).toBe('stable')
+    expect(info).toEqual({ name: '@mindees/atlas', version: VERSION, maturity: 'stable' })
   })
 
   it('info is frozen so its self-reported identity cannot be mutated at runtime', () => {
