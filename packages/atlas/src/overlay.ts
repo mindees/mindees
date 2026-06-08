@@ -22,11 +22,13 @@ import {
   type MindeesNode,
   onCleanup,
   portal,
+  useContext,
 } from '@mindees/core'
 import type { A11yProps, Role } from './a11y'
 import type { Reactive } from './host'
 import { Pressable, Text, View } from './primitives'
 import { flattenStyle, type StyleInput } from './style'
+import { VisibilityScope } from './visibility'
 
 function toAccessor<T>(value: Reactive<T>, fallback: T): () => T {
   return typeof value === 'function'
@@ -182,8 +184,11 @@ export interface ModalProps extends A11yProps {
 /** A portal-backed modal dialog: a dismissable scrim + a focus-scoped dialog above the tree. */
 export const Modal: Component<ModalProps> = (props) => {
   const isVisible = toAccessor(props.visible, false)
+  // Hide with the owning subtree: an overlay portals to the overlay layer, so `display:none` on an inactive
+  // tab panel doesn't reach it — gate on the tree-scoped VisibilityScope so it disappears when its tab does.
+  const visibleInScope = useContext(VisibilityScope)
   return () => {
-    if (!isVisible()) return null
+    if (!isVisible() || !visibleInScope()) return null
 
     const scrimStyle = (): StyleInput =>
       flattenStyle([
@@ -261,6 +266,7 @@ export interface ToastProps {
  */
 export const Toast: Component<ToastProps> = (props) => {
   const isVisible = toAccessor(props.visible, false)
+  const visibleInScope = useContext(VisibilityScope) // hide with the owning subtree (see Modal)
 
   // Auto-dismiss: (re)arm a timer whenever the toast is shown; clear it on hide/unmount/re-run.
   effect(() => {
@@ -273,7 +279,7 @@ export const Toast: Component<ToastProps> = (props) => {
   })
 
   return () => {
-    if (!isVisible()) return null
+    if (!isVisible() || !visibleInScope()) return null
     const atTop = props.position === 'top'
     const bubble = createElement(
       View,

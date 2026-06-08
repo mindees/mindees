@@ -13,11 +13,12 @@
  * @module
  */
 
-import { type Component, createElement, effect, signal } from '@mindees/core'
+import { type Component, createElement, effect, provideContext, signal } from '@mindees/core'
 import type { LoaderData, RouteComponentProps, Router } from '@mindees/router'
 import type { Reactive } from './host'
 import { Pressable, Text, View } from './primitives'
 import { flattenStyle, type StyleInput } from './style'
+import { VisibilityScope } from './visibility'
 
 const IDLE_LOADER: LoaderData = Object.freeze({ status: 'idle' })
 
@@ -115,19 +116,22 @@ export function createTabNavigator(
         // Thread the router screen contract so a tab screen reads params/search/loader-data the standard
         // way (mirrors createRouterView). `data` resolves the active leaf match; `children` is null (a tab
         // screen with nested routes renders its own createRouterView — see TabDef.component).
-        () =>
-          visited[i]?.()
-            ? createElement(t.component, {
-                router,
-                params: router.params,
-                search: router.search,
-                data: () => {
-                  const m = router.match()
-                  return m ? router.loaderData(m) : IDLE_LOADER
-                },
-                children: null,
-              })
-            : null,
+        () => {
+          if (!visited[i]?.()) return null
+          // Provide this panel's visibility to its subtree so an overlay (Modal/Toast) opened by the screen
+          // hides with the tab instead of floating on the overlay layer when another tab is active (ADR-0025).
+          provideContext(VisibilityScope, () => activeIndex() === i)
+          return createElement(t.component, {
+            router,
+            params: router.params,
+            search: router.search,
+            data: () => {
+              const m = router.match()
+              return m ? router.loaderData(m) : IDLE_LOADER
+            },
+            children: null,
+          })
+        },
       ),
     )
     const panelArea = createElement(

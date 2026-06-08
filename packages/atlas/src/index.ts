@@ -160,6 +160,7 @@ export {
   tokens,
   useTheme,
 } from './tokens'
+export { VisibilityScope } from './visibility'
 export { connectWebEnvironment, type WebEnvWindow } from './web-environment'
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }

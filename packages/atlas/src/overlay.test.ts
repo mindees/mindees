@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 /// <reference lib="dom" />
-import { createElement, signal } from '@mindees/core'
+import { createElement, provideContext, signal } from '@mindees/core'
 import { createDomBackend, render } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
 import { FocusScope, Modal, Toast } from './overlay'
+import { VisibilityScope } from './visibility'
 
 const doc = () => document as never
 
@@ -194,5 +195,30 @@ describe('FocusScope — focus trap skips hidden focusables', () => {
     dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
     // Without the visibility filter, the hidden button was the "last" → no wrap → focus would escape.
     expect(document.activeElement).toBe(v1)
+  })
+})
+
+describe('Modal — VisibilityScope', () => {
+  it('hides when its enclosing subtree is not visible, even while visible=true', () => {
+    const active = signal(true)
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const Wrapper = () => {
+      provideContext(VisibilityScope, () => active())
+      return Modal({
+        visible: true,
+        label: 'ScopeTest',
+        children: createElement('text', {}, 'scope-body'),
+      })
+    }
+    const mounted = render(createElement(Wrapper, {}), createDomBackend(doc()), container as never)
+    const dialog = () => document.querySelector('[aria-label="ScopeTest"]')
+    expect(dialog()).toBeTruthy() // visible + in-scope
+    active.set(false) // owning subtree hidden → overlay removed despite visible=true
+    expect(dialog()).toBeNull()
+    active.set(true) // back in scope → re-rendered
+    expect(dialog()).toBeTruthy()
+    mounted.dispose() // clean up so the overlay doesn't linger on the shared body layer
+    container.remove()
   })
 })

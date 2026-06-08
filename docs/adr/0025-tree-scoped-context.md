@@ -1,6 +1,6 @@
 # ADR-0025: Tree-scoped context & portal-aware visibility (overlay-in-tab)
 
-- **Status:** Proposed (design only — not yet implemented)
+- **Status:** Accepted (implemented — core `provideContext`/`useContext` + the `VisibilityScope` overlay fix)
 - **Date:** 2026-06-08
 
 ## Context
