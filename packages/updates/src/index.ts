@@ -17,7 +17,7 @@ import { NotImplementedError, notImplemented } from '@mindees/core'
 export const name = '@mindees/updates'
 
 /** The package version. All `@mindees/*` packages share one locked version line. */
-export const VERSION = '0.25.0'
+export const VERSION = '0.26.0'
 
 /** Current maturity. See the repository `STATUS.md`. */
 export const maturity: Maturity = 'experimental'
