@@ -172,7 +172,14 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
           body: String(version),
         }
       }
-      const rel = urlPath.replace(/^\/+/, '')
+      // Decode percent-encoding (a browser encodes e.g. spaces in a module URL) so the lookup matches the
+      // emitted file name — keeps `mindees dev` consistent with how a static host serves `mindees build`.
+      let rel: string
+      try {
+        rel = decodeURIComponent(urlPath).replace(/^\/+/, '')
+      } catch {
+        rel = urlPath.replace(/^\/+/, '') // malformed escape → fall back to the raw path
+      }
       if (rel === '' || rel === 'index.html') {
         if (errorPage !== null) return htmlResponse(errorPage)
         const shell = files.get('index.html')

@@ -8,7 +8,15 @@
  * @module
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import process from 'node:process'
 import { type FileSystem, quoteShellPath } from '@mindees/cli'
@@ -37,6 +45,9 @@ function nodeFileSystem(): FileSystem {
         return acc
       }
       return walk(dir, []).sort()
+    },
+    rm: (path) => {
+      rmSync(path, { recursive: true, force: true })
     },
   }
 }

@@ -117,6 +117,8 @@ function makeImportResolver(
  * - `TS2307` — "Cannot find module '…'": imports aren't resolved in single-module mode.
  * - `TS7026` — "no interface 'JSX.IntrinsicElements'": the framework's JSX env
  *   types aren't loaded in isolation.
+ * - `TS2882` — "no type declarations for a side-effect import" (e.g. `import './x.css'`): an asset
+ *   import shouldn't fail the build; the import is left for the host to resolve (assets aren't bundled).
  *
  * In practice the compiler's single-module gate already **filters** these upstream
  * (it drops unresolved-import codes and injects ambient JSX types), so they
@@ -125,7 +127,7 @@ function makeImportResolver(
  * are untouched and still fail the build. A full project-graph type-check is
  * future work (see ROADMAP).
  */
-const ISOLATION_NOISE = new Set(['TS2307', 'TS7026'])
+const ISOLATION_NOISE = new Set(['TS2307', 'TS7026', 'TS2882'])
 
 /** Options for {@link buildProject}. */
 export interface BuildOptions {
@@ -205,6 +207,10 @@ export function buildProject(fs: FileSystem, options: BuildOptions = {}): BuildR
     budget,
   } = options
   const srcDir = root === '.' ? 'src' : `${root}/src`
+
+  // Clean the output dir first so a renamed/deleted source can't leave a stale module (or a
+  // manifest-vs-chunk drift) behind — a full build owns its `outDir`.
+  if (fs.exists(outDir)) fs.rm(outDir)
 
   const diagnostics: Diagnostic[] = []
   const compiled: string[] = []
