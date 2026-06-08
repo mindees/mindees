@@ -103,7 +103,14 @@ function aiBackendFromEnv(): AiBackend | undefined {
  */
 function runDevServer(ctx: CliContext): void {
   const port = Number(process.env.MINDEES_DEV_PORT ?? 3000) || 3000
-  const server = createDevServer({ html: '<body>MindeesNative dev — building…</body>' })
+  const server = createDevServer()
+  // Collect the freshly-built `dist/` tree (recursive, POSIX-relative) to serve as the app.
+  const collectDist = (dir = 'dist'): Record<string, string> => {
+    if (!ctx.fs.exists(dir)) return {}
+    const out: Record<string, string> = {}
+    for (const rel of ctx.fs.readDir(dir)) out[rel] = ctx.fs.readFile(`${dir}/${rel}`)
+    return out
+  }
   const watcher = createNodeWatcher(['src'], {
     watch: (path, opts, listener) =>
       fsWatch(path, { recursive: opts.recursive ?? false }, (event, filename) =>
@@ -112,7 +119,9 @@ function runDevServer(ctx: CliContext): void {
   })
   startDev(ctx.fs, watcher, {
     onRebuild: (result) => {
-      server.setHtml(renderDevPage(result))
+      // Serve the built app on success; show the diagnostics overlay (at `/`) on failure.
+      if (result.ok) server.setFiles(collectDist())
+      else server.setError(renderDevPage(result))
       server.bump()
       ctx.write({
         text: result.ok

@@ -86,35 +86,54 @@ export interface DevServerResponse {
 
 /** Options for {@link createDevServer}. */
 export interface DevServerOptions {
-  /** The app HTML to serve at `/` (the live-reload client is injected automatically). */
-  readonly html: string
   /** Path the live-reload client polls for the build version (default `/__mindees/version`). */
   readonly reloadPath?: string
   /** Poll interval the injected client uses, in ms (default 1000). */
   readonly pollMs?: number
 }
 
-/** A pure dev-server: a request handler + a `bump()` that makes polling browsers reload. */
+/** A pure dev-server: serves the built app file tree (+ injected live-reload) and a version endpoint. */
 export interface DevServer {
-  /** Handle a request → a response (pure given the current html + version). */
+  /** Handle a request → a response (pure given the current files + error + version). */
   handle(method: string, url: string): DevServerResponse
-  /** Replace the served app HTML (call after a rebuild changes the output). */
-  setHtml(html: string): void
+  /** Replace the served build output (relative paths → contents, e.g. `index.html`, `main.js`). Clears any error. */
+  setFiles(files: Record<string, string> | Map<string, string>): void
+  /** Show a build-error overlay at `/` until the next {@link setFiles} (pass `null` to clear). */
+  setError(html: string | null): void
   /** Bump the build version (call after each rebuild) so connected clients reload. */
   bump(): void
   /** The current build version. */
   version(): number
 }
 
+const CONTENT_TYPES: Record<string, string> = {
+  html: 'text/html; charset=utf-8',
+  js: 'application/javascript; charset=utf-8',
+  mjs: 'application/javascript; charset=utf-8',
+  json: 'application/json; charset=utf-8',
+  map: 'application/json; charset=utf-8',
+  css: 'text/css; charset=utf-8',
+}
+function contentTypeFor(path: string): string {
+  const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+  return CONTENT_TYPES[ext] ?? 'text/plain; charset=utf-8'
+}
+
 const LIVE_RELOAD = (reloadPath: string, pollMs: number, version: number): string =>
   `<script>(function(){var v=${JSON.stringify(String(version))};setInterval(function(){fetch(${JSON.stringify(reloadPath)}).then(function(r){return r.text()}).then(function(t){if(t!==v){location.reload()}}).catch(function(){})},${pollMs})})()</script>`
 
-/** Create a live-reload {@link DevServer}. The handler serves the app HTML + a version endpoint. */
-export function createDevServer(options: DevServerOptions): DevServer {
+/**
+ * Create a live-reload {@link DevServer}. Serves the built file tree as native ES modules — `index.html`
+ * at `/` (live-reload client injected), each emitted asset at its path, with extensionless resolution
+ * (`/App` → `App.js`) so the compiled output's relative imports load. A failed build shows an error
+ * overlay at `/` until the next successful build.
+ */
+export function createDevServer(options: DevServerOptions = {}): DevServer {
   const reloadPath = options.reloadPath ?? '/__mindees/version'
   const pollMs = options.pollMs ?? 1000
   let version = 0
-  let html = options.html
+  let files = new Map<string, string>()
+  let errorPage: string | null = null
 
   // Inject the live-reload client just before </body> (or append if there's no body tag). Built
   // PER-REQUEST with the CURRENT version as the client's baseline — so a rebuild that lands within the
@@ -123,11 +142,20 @@ export function createDevServer(options: DevServerOptions): DevServer {
     const client = LIVE_RELOAD(reloadPath, pollMs, version)
     return h.includes('</body>') ? h.replace('</body>', `${client}</body>`) : h + client
   }
+  const htmlResponse = (body: string): DevServerResponse => ({
+    status: 200,
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+    body: withClient(body),
+  })
 
   return {
     version: () => version,
-    setHtml(next): void {
-      html = next
+    setFiles(next): void {
+      files = next instanceof Map ? new Map(next) : new Map(Object.entries(next))
+      errorPage = null // a successful build clears any prior error overlay
+    },
+    setError(html): void {
+      errorPage = html
     },
     bump(): void {
       version += 1
@@ -136,19 +164,30 @@ export function createDevServer(options: DevServerOptions): DevServer {
       if (method !== 'GET') {
         return { status: 405, headers: { allow: 'GET' }, body: 'Method Not Allowed' }
       }
-      const path = url.split('?', 1)[0]
-      if (path === '/' || path === '/index.html') {
-        return {
-          status: 200,
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-          body: withClient(html),
-        }
-      }
-      if (path === reloadPath) {
+      const urlPath = url.split('?', 1)[0] ?? '/'
+      if (urlPath === reloadPath) {
         return {
           status: 200,
           headers: { 'content-type': 'text/plain', 'cache-control': 'no-store' },
           body: String(version),
+        }
+      }
+      const rel = urlPath.replace(/^\/+/, '')
+      if (rel === '' || rel === 'index.html') {
+        if (errorPage !== null) return htmlResponse(errorPage)
+        const shell = files.get('index.html')
+        return htmlResponse(
+          shell ?? '<!doctype html><body>MindeesNative dev — no build output yet.</body>',
+        )
+      }
+      // Asset: exact match, then extensionless (`/App` → `App.js`) for native-ESM relative imports.
+      const exact = files.get(rel)
+      const served = exact !== undefined ? rel : files.has(`${rel}.js`) ? `${rel}.js` : null
+      if (served !== null) {
+        return {
+          status: 200,
+          headers: { 'content-type': contentTypeFor(served) },
+          body: files.get(served) as string,
         }
       }
       return { status: 404, headers: { 'content-type': 'text/plain' }, body: 'Not Found' }
