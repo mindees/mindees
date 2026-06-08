@@ -1,5 +1,11 @@
 # @mindees/data
 
+## 0.31.1
+
+### Patch Changes
+
+- @mindees/core@0.31.1
+
 ## 0.31.0
 
 ### Patch Changes
