@@ -255,7 +255,7 @@ describe('TextInput / Image — extended props', () => {
     }) as MindeesElement
     expect(node.type).toBe('textarea')
     expect(node.props.rows).toBe(4)
-    expect(node.props.type).toBe('password') // secureTextEntry overrides type
+    expect(node.props.type).toBeUndefined() // a <textarea> carries no `type` attribute
     expect(node.props.inputmode).toBe('email')
     expect(node.props.enterkeyhint).toBe('send')
     expect(node.props.autocapitalize).toBe('none')
@@ -293,8 +293,12 @@ describe('TextInput / Image — extended props', () => {
     expect(node.props.width).toBe(100)
     expect(node.props.height).toBe(80)
     const onError = node.props.onError as (e: unknown) => void
-    const target = { src: 'a.png' }
-    onError({ target }) // a load failure swaps in the fallback
+    // The browser resolves `.src` to an absolute URL, so the swap is guarded by a marker, not equality.
+    const target = { src: 'https://h/a.png', dataset: {} as Record<string, string> }
+    onError({ target }) // first failure → swap in the fallback, once
     expect(target.src).toBe('fb.png')
+    target.src = 'https://h/fb.png' // browser absolutizes it
+    onError({ target }) // fallback also fails → must NOT re-swap (no infinite loop)
+    expect(target.src).toBe('https://h/fb.png')
   })
 })
