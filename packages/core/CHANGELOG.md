@@ -1,5 +1,7 @@
 # @mindees/core
 
+## 0.23.0
+
 ## 0.22.8
 
 ### Patch Changes
