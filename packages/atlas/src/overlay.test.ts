@@ -221,4 +221,30 @@ describe('Modal — VisibilityScope', () => {
     mounted.dispose() // clean up so the overlay doesn't linger on the shared body layer
     container.remove()
   })
+
+  it('does not auto-dismiss a Toast while it is hidden by VisibilityScope (off-screen)', () => {
+    vi.useFakeTimers()
+    try {
+      const active = signal(true)
+      const onDismiss = vi.fn()
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const Wrapper = () => {
+        provideContext(VisibilityScope, () => active())
+        return Toast({ visible: true, message: 'hi', duration: 3000, onDismiss })
+      }
+      const mounted = render(
+        createElement(Wrapper, {}),
+        createDomBackend(doc()),
+        container as never,
+      )
+      active.set(false) // tab left before the timer elapses → toast scope-hidden (panel kept alive)
+      vi.advanceTimersByTime(3000)
+      expect(onDismiss).not.toHaveBeenCalled() // must NOT fire off-screen
+      mounted.dispose()
+      container.remove()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

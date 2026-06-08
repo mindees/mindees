@@ -268,9 +268,11 @@ export const Toast: Component<ToastProps> = (props) => {
   const isVisible = toAccessor(props.visible, false)
   const visibleInScope = useContext(VisibilityScope) // hide with the owning subtree (see Modal)
 
-  // Auto-dismiss: (re)arm a timer whenever the toast is shown; clear it on hide/unmount/re-run.
+  // Auto-dismiss: (re)arm a timer whenever the toast is shown AND in-scope; clear it on hide/unmount/re-run.
+  // Reading visibleInScope() here too means a toast hidden because its tab was left does not fire onDismiss
+  // off-screen (its panel is kept alive, so this effect would otherwise survive the tab switch).
   effect(() => {
-    if (!isVisible()) return
+    if (!isVisible() || !visibleInScope()) return
     const ms = props.duration
     if (ms && ms > 0 && typeof setTimeout === 'function' && props.onDismiss) {
       const id = setTimeout(() => props.onDismiss?.(), ms)

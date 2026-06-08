@@ -492,6 +492,10 @@ function disposeComputation(node: AnyComputation): void {
     unlinkSources(node)
     node.observers = null
     node.state = DISPOSED
+    // Release tree-scoped context: a disposed scope provides nothing, so a later `getOwnerContext` walk
+    // through a captured-then-disposed owner (e.g. deferred work re-entered via runWithOwner) resolves to
+    // the default rather than a STALE value, and the Map's referenced values become collectable.
+    node.contexts = null
     // Cancel a pending deferred flush so a torn-down effect never runs against a dead graph.
     // (Always null on the synchronous default path — zero behavior change there.)
     if (node.pendingTask) {
@@ -850,7 +854,12 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
   currentObserver = null
   currentOwner = root
   try {
-    return fn(() => disposeChildren(root))
+    // Disposing the root tears down its children AND releases its own tree-scoped context, so re-entering
+    // this (now dead) scope via runWithOwner resolves context to the default, not a stale provided value.
+    return fn(() => {
+      disposeChildren(root)
+      root.contexts = null
+    })
   } finally {
     currentObserver = prevObserver
     currentOwner = prevOwner
