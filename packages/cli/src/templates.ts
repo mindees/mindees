@@ -161,8 +161,12 @@ export function App() {
   )
 }
 `,
-    'src/main.tsx': `import { createDomBackend, render } from '@mindees/renderer'
+    'src/main.tsx': `import { connectWebEnvironment } from '@mindees/atlas'
+import { createDomBackend, render } from '@mindees/renderer'
 import { App } from './App'
+
+// Live device hooks on web (dark mode, window size, safe-area insets, keyboard).
+connectWebEnvironment()
 
 const root = document.getElementById('app')
 if (root) render(App, {}, createDomBackend(), root)
