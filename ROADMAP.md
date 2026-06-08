@@ -251,9 +251,9 @@ See [STATUS.md](./STATUS.md) for current maturity.
     See [ADR-0024](./docs/adr/0024-release-pipeline.md) + [RELEASING.md](./RELEASING.md).
   - [x] **First publish (`v0.1.0`)** ✅ all 10 packages (`@mindees/*` + `create-mindees`) published
     to npm at `0.1.0`, triggered by merging the version PR.
-  - [x] **Ongoing releases (now `v0.13.0`)** ✅ the same automated version-PR → publish pipeline
+  - [x] **Ongoing releases (now `v0.30.2`)** ✅ the same automated version-PR → publish pipeline
     has shipped the locked line forward; all 10 packages (`@mindees/*` + `create-mindees`) are
-    published to npm at `0.13.0` (single locked version, verified against every
+    published to npm at `0.30.2` (single locked version, verified against every
     `packages/*/src/index.ts` + `package.json`).
   - [x] **Enforced perf budgets** ✅ `compileChecked(src, { budget })` (`checkBudget`) **fails the
     build** when a budget is exceeded, alongside the opt-in `perfLint` (`compileChecked(src, { perf: true })`).
