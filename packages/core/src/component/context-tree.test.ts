@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRoot, effect, signal } from '../reactive'
+import { createRoot, effect, getOwner, runWithOwner, signal } from '../reactive'
 import { createContext, provideContext, useContext } from './component'
 
 describe('tree-scoped context (provideContext / useContext)', () => {
@@ -75,5 +75,35 @@ describe('tree-scoped context (provideContext / useContext)', () => {
     const Ctx = createContext('default')
     expect(() => provideContext(Ctx, 'x')).not.toThrow()
     expect(useContext(Ctx)).toBe('default')
+  })
+
+  it('a DISPOSED root scope no longer provides context (re-entry → default, not stale)', () => {
+    const Ctx = createContext('DEFAULT')
+    let captured: ReturnType<typeof getOwner> = null
+    const dispose = createRoot((d) => {
+      provideContext(Ctx, 'PROVIDED')
+      createRoot(() => {
+        captured = getOwner() // a captured child scope (e.g. for deferred work)
+      })
+      return d
+    })
+    expect(runWithOwner(captured, () => useContext(Ctx))).toBe('PROVIDED') // live
+    dispose() // the provider scope is torn down
+    expect(runWithOwner(captured, () => useContext(Ctx))).toBe('DEFAULT') // not a stale 'PROVIDED'
+  })
+
+  it('a DISPOSED effect scope releases its provided context', () => {
+    const Ctx = createContext('DEFAULT')
+    let captured: ReturnType<typeof getOwner> = null
+    const dispose = createRoot((d) => {
+      effect(() => {
+        provideContext(Ctx, 'E')
+        captured = getOwner() // the effect's own scope
+      })
+      return d
+    })
+    expect(runWithOwner(captured, () => useContext(Ctx))).toBe('E')
+    dispose() // disposes the effect → its contexts map is cleared
+    expect(runWithOwner(captured, () => useContext(Ctx))).toBe('DEFAULT')
   })
 })
