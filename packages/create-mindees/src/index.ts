@@ -41,8 +41,6 @@ export function runCreate(fs: FileSystem, args: CreateArgs): ScaffoldResult {
   return scaffold(fs, options)
 }
 
-export { naturalLanguageToTemplate } from '@mindees/cli'
-
 /** The npm package name. */
 export const name = 'create-mindees'
 

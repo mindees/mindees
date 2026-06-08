@@ -8,6 +8,8 @@ export { type AiCommandContext, runAiCommand } from './ai'
 export { type BuildOptions, type BuildResult, buildProject } from './build'
 /** CLI dispatch. `runCli` is synchronous; `runCliAsync` adds the async `ai` command. */
 export { type CliContext, runCli, runCliAsync } from './cli'
+/** `mindees.config.json` loader + shape (the user-facing build/dev config). */
+export { CONFIG_FILE, loadConfig, type MindeesConfig } from './config'
 /** Create target path + package-name resolution. */
 export {
   type CreateTarget,
@@ -23,6 +25,7 @@ export {
   type DevBuildStatus,
   type DevServer,
   type DevServerOptions,
+  type DevServerResponse,
   type NodeWatcherOptions,
   renderDevPage,
   type WatchFn,

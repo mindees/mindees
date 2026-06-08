@@ -92,12 +92,14 @@ export {
   type WebStorageLike,
 } from './persist'
 export {
+  type AbortLike,
   type Cursor,
   createMemoryHub,
   createMutationLog,
   createSyncEngine,
   type MutationLog,
   type Op,
+  type RecordState,
   type SyncEngine,
   type SyncEngineOptions,
   type SyncSnapshot,

@@ -6,6 +6,7 @@ export {
   type HostBackend,
   isSerializable,
   type SerializableBackend,
+  type SerializeOptions,
 } from './backend'
 /** Helix Canvas strand — a 2D scene graph driven by the reconciler, painted to a 2D context (§6.2). */
 export {
@@ -29,8 +30,8 @@ export { bindKeyedChild } from './for'
 export {
   createHeadlessBackend,
   createHeadlessRoot,
+  type HeadlessBackendOptions,
   type HeadlessNode,
-  isEventProp,
 } from './headless'
 /**
  * Native backends. `createNativeCommandBackend` is implemented (emits a native
