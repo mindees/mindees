@@ -10,6 +10,7 @@
 
 import { type Accessor, batch, signal, untrack } from '@mindees/core'
 import type { StandardSchemaV1 } from '@mindees/router'
+import { AtlasError } from './errors'
 
 /** A bound field: reactive value/error/touched plus setters. */
 export interface Field<V> {
@@ -70,7 +71,8 @@ export function useForm<T extends object>(options: UseFormOptions<T>): FormApi<T
     if (!options.schema) return {}
     const result = options.schema['~standard'].validate(vals)
     if (result instanceof Promise) {
-      throw new TypeError(
+      throw new AtlasError(
+        'ASYNC_SCHEMA',
         'useForm: async Standard Schema validation is not supported (use a sync schema)',
       )
     }

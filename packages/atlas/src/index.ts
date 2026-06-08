@@ -91,6 +91,7 @@ export {
   type WindowDimensions,
 } from './environment'
 export { ErrorBoundary, type ErrorBoundaryProps } from './error-boundary'
+export { AtlasError, type AtlasErrorCode } from './errors'
 export { type Field, type FormApi, type UseFormOptions, useForm } from './form'
 export { type AttachableGesture, GestureView, type GestureViewProps } from './gesture'
 export {
