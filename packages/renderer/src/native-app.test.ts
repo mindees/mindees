@@ -1,5 +1,4 @@
 import {
-  _resetAnimation,
   animate,
   deferred,
   createElement as h,
@@ -8,6 +7,7 @@ import {
   signal,
   timing,
 } from '@mindees/core'
+import { _resetAnimation } from '@mindees/core/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { _resetNativeAppEngines, createNativeApp } from './native-app'
 import type { NativeCommand } from './native-protocol'

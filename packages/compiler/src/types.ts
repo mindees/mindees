@@ -90,5 +90,7 @@ export interface MdcPlugin {
    * `(ts, program?) => TransformerFactory<SourceFile>`.
    * Receives the `typescript` module so plugins don't import it themselves.
    */
-  transformer: (ts: typeof import('typescript')) => unknown
+  transformer: (
+    ts: typeof import('typescript'),
+  ) => import('typescript').TransformerFactory<import('typescript').SourceFile>
 }

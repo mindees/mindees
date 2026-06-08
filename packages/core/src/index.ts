@@ -5,8 +5,6 @@ import type { Maturity, PackageInfo } from './types'
  * injected frame source (RN Animated/Reanimated + Flutter AnimationController parity).
  */
 export {
-  _activeAnimationCount,
-  _resetAnimation,
   type AnimatedValue,
   type AnimationHandle,
   animate,
@@ -64,7 +62,6 @@ export { MindeesError, NotImplementedError } from './errors'
  * animation engine (RN Gesture Handler / Flutter GestureDetector parity).
  */
 export {
-  _setGestureClock,
   composeGestures,
   type GestureHandlers,
   longPress,
