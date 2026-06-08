@@ -4,6 +4,9 @@
   "description": "MindeesNative Pulse - signed over-the-air (OTA) updates: hash-addressed manifests, Ed25519 signing, content-addressed storage, atomic generations with crash-loop rollback.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "sideEffects": false,
   "files": [
     "dist"

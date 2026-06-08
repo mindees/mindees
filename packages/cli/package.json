@@ -4,6 +4,9 @@
   "description": "MindeesNative Forge — the `mindees` CLI: create, build (via the compiler), dev (rebuild orchestrator), doctor, info.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "sideEffects": false,
   "bin": {
     "mindees": "./dist/bin.js"

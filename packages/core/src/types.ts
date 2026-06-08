@@ -4,7 +4,13 @@
  * Mirrors the legend in the repository `STATUS.md`. Used so tooling and
  * consumers can introspect, honestly, how finished a piece of the framework is.
  */
-export type Maturity = 'stable' | 'experimental' | 'research-track' | 'planned' | 'scaffold'
+export type Maturity =
+  | 'stable'
+  | 'deprecated'
+  | 'experimental'
+  | 'research-track'
+  | 'planned'
+  | 'scaffold'
 
 /**
  * Static identity + maturity metadata exported by every `@mindees/*` package.
