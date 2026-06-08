@@ -1,5 +1,15 @@
 # @mindees/atlas
 
+## 0.30.1
+
+### Patch Changes
+
+- 2d654a2: `createTabNavigator` now **lazily mounts** each tab's screen on its first activation (then keeps it
+  alive), matching React Navigation's default: an unvisited tab's loaders and effects never run, while a
+  visited tab retains its state across switches.
+  - @mindees/core@0.30.1
+  - @mindees/router@0.30.1
+
 ## 0.30.0
 
 ### Minor Changes
