@@ -65,9 +65,8 @@ const TSCONFIG = `${JSON.stringify(
       module: 'esnext',
       moduleResolution: 'bundler',
       target: 'es2023',
-      jsx: 'react',
-      jsxFactory: 'createElement',
-      jsxFragmentFactory: 'Fragment',
+      jsx: 'react-jsx',
+      jsxImportSource: '@mindees/core',
       verbatimModuleSyntax: true,
     },
     include: ['src'],
@@ -85,9 +84,7 @@ const blank: Template = {
     '.gitignore': GITIGNORE,
     'tsconfig.json': TSCONFIG,
     'README.md': `# {{appName}}\n\nA MindeesNative app. Start with \`mindees dev\`.\n`,
-    'src/App.tsx': `import { createElement } from '@mindees/core'
-
-export function App() {
+    'src/App.tsx': `export function App() {
   return (
     <view>
       <text>Hello from {{appName}} 👋</text>
@@ -113,7 +110,7 @@ const counter: Template = {
     '.gitignore': GITIGNORE,
     'tsconfig.json': TSCONFIG,
     'README.md': `# {{appName}}\n\nA reactive counter built with MindeesNative signals.\n`,
-    'src/App.tsx': `import { createElement, signal } from '@mindees/core'
+    'src/App.tsx': `import { signal } from '@mindees/core'
 
 export function App() {
   const count = signal(0)
@@ -146,8 +143,7 @@ const app: Template = {
     '.gitignore': GITIGNORE,
     'tsconfig.json': TSCONFIG,
     'README.md': `# {{appName}}\n\nA MindeesNative app using the Atlas UI kit. Run \`mindees dev\`.\n`,
-    'src/App.tsx': `import { createElement } from '@mindees/core'
-import { Button, Card, Switch, Text, useToggle } from '@mindees/atlas'
+    'src/App.tsx': `import { Button, Card, Switch, Text, useToggle } from '@mindees/atlas'
 
 export function App() {
   const dark = useToggle(false)

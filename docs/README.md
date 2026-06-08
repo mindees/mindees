@@ -10,8 +10,9 @@ This directory holds project documentation that lives in the repository.
   written here (e.g. `prs/phase-0.md`).
 - [`benchmarks.md`](./benchmarks.md) - reproducible benchmark evidence for
   implemented hot paths.
+- [`getting-started.md`](./getting-started.md) - **zero to a running web app**:
+  create, dev, the signals/JSX/components model, theming, and configuration.
 
-The full documentation site (getting started, guides, API reference, the
-honest maturity matrix) is still a later phase and has not been built yet. Until
-then, the source of truth for "what works today" is the root
-[`STATUS.md`](../STATUS.md), which tracks the current **0.13.0** release line.
+A full documentation site (per-API reference + guides) is still a later phase.
+For "what works today", the source of truth is the root [`STATUS.md`](../STATUS.md)
+plus each package's README.

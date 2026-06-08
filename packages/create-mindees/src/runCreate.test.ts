@@ -46,6 +46,11 @@ describe('runCreate (create-mindees)', () => {
     const fs = createMemoryFileSystem()
     const result = runCreate(fs, { appName: 'app', targetDir: 'app' })
     expect(result.written).toContain('src/main.tsx')
-    expect(fs.snapshot()['app/src/App.tsx']).toContain('createElement')
+    const snap = fs.snapshot()
+    // Automatic JSX: the App writes import-free JSX; the tsconfig points the JSX runtime at @mindees/core.
+    expect(snap['app/src/App.tsx']).toContain('export function App')
+    expect(snap['app/src/App.tsx']).toContain('<view>')
+    expect(snap['app/src/App.tsx']).not.toContain('createElement')
+    expect(snap['app/tsconfig.json']).toContain('"jsxImportSource": "@mindees/core"')
   })
 })
