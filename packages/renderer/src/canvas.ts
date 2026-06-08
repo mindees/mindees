@@ -149,7 +149,13 @@ function drawNode(ctx: Scene2DContext, node: SceneNode): void {
  * frame loop for animations, or once for static art. `onDirty` fires after any mutation so a host can
  * schedule a repaint.
  */
-export function createCanvas2DBackend(options: { onDirty?: () => void } = {}): Canvas2DBackend {
+/** Options for {@link createCanvas2DBackend}. */
+export interface Canvas2DBackendOptions {
+  /** Called after any scene mutation so a host can schedule a repaint of the 2D context. */
+  readonly onDirty?: () => void
+}
+
+export function createCanvas2DBackend(options: Canvas2DBackendOptions = {}): Canvas2DBackend {
   const root = makeNode('canvas', false)
   const markDirty = (): void => options.onDirty?.()
 

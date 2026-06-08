@@ -36,17 +36,9 @@ export {
   type UpdateClient,
   type UpdateClientOptions,
 } from './client'
-export {
-  fromHex,
-  generateKeypair,
-  getPublicKey,
-  type Keypair,
-  sha256Hex,
-  sign,
-  toHex,
-  utf8,
-  verify,
-} from './crypto'
+// OTA key helpers. The low-level Ed25519/hex/hash primitives (sign/verify/sha256Hex/toHex/fromHex/utf8)
+// stay module-internal — the public OTA workflow is `signManifest`/`verifySignedManifest`/`parseManifest`.
+export { generateKeypair, getPublicKey, type Keypair } from './crypto'
 export { type ApplyDeltaOptions, applyDelta, diff } from './delta'
 export { UpdateError, type UpdateErrorCode } from './errors'
 export {

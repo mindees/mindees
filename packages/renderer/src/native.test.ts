@@ -1,6 +1,6 @@
 import { NotImplementedError } from '@mindees/core'
 import { describe, expect, it } from 'vitest'
-import { createCanvasBackend, createNativeBackend } from './native'
+import { createGpuCanvasBackend, createNativeBackend } from './native'
 
 describe('native + canvas backends (research tracks)', () => {
   it('createNativeBackend throws NotImplementedError (honest, not a silent stub)', () => {
@@ -8,8 +8,8 @@ describe('native + canvas backends (research tracks)', () => {
     expect(() => createNativeBackend('android')).toThrow(NotImplementedError)
   })
 
-  it('createCanvasBackend throws NotImplementedError', () => {
-    expect(() => createCanvasBackend()).toThrow(NotImplementedError)
+  it('createGpuCanvasBackend throws NotImplementedError', () => {
+    expect(() => createGpuCanvasBackend()).toThrow(NotImplementedError)
   })
 
   it('the error names the feature as a research track (no spurious RFC reference)', () => {

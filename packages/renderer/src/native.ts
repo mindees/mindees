@@ -48,7 +48,7 @@ export interface NativeBackend<N> extends HostBackend<N> {
  * UI. Composes with the native strand: a canvas subtree renders to a GPU surface
  * embedded among native host nodes.
  */
-export interface CanvasBackend<N> extends HostBackend<N> {
+export interface GpuCanvasBackend<N> extends HostBackend<N> {
   /** Marks this backend as drawing to a GPU canvas surface. */
   readonly surface: 'gpu-canvas'
 }
@@ -68,11 +68,12 @@ export function createNativeBackend(_platform: 'ios' | 'android'): never {
 }
 
 /**
- * 🔬 Research track — not implemented. Throws {@link NotImplementedError}.
+ * 🔬 Research track — not implemented. Throws {@link NotImplementedError}. (Named `Gpu…` to distinguish it
+ * from the IMPLEMENTED 2D scene backend {@link import('./canvas').createCanvas2DBackend}.)
  *
  * @experimental
  */
-export function createCanvasBackend(): never {
+export function createGpuCanvasBackend(): never {
   throw new NotImplementedError('GPU canvas renderer backend (wgpu/WebGPU)')
 }
 
