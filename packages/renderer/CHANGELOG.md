@@ -1,5 +1,11 @@
 # @mindees/renderer
 
+## 0.34.0
+
+### Patch Changes
+
+- @mindees/core@0.34.0
+
 ## 0.33.0
 
 ### Patch Changes
