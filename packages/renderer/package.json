@@ -1,6 +1,6 @@
 {
   "name": "@mindees/renderer",
-  "version": "0.35.0",
+  "version": "0.36.0",
   "description": "MindeesNative Helix — fine-grained reactive renderer with a web/DOM backend, SSR + hydration, and a headless test backend. Native and GPU-canvas backends are research tracks.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
