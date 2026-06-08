@@ -1,6 +1,6 @@
 {
   "name": "@mindees/cli",
-  "version": "0.22.8",
+  "version": "0.23.0",
   "description": "MindeesNative Forge — the `mindees` CLI: create, build (via the compiler), dev (rebuild orchestrator), doctor, info.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
