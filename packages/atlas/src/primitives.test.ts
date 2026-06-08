@@ -239,3 +239,62 @@ describe('layout primitives', () => {
     expect((vertical.props.style as Record<string, unknown>).flexDirection).toBeUndefined()
   })
 })
+
+describe('TextInput / Image — extended props', () => {
+  it('TextInput lowers multiline → textarea with keyboard/secure/autofill attrs', () => {
+    const node = TextInput({
+      multiline: true,
+      rows: 4,
+      secureTextEntry: true,
+      keyboardType: 'email',
+      returnKeyType: 'send',
+      autoCapitalize: 'none',
+      autoComplete: 'email',
+      maxLength: 50,
+      autoFocus: true,
+    }) as MindeesElement
+    expect(node.type).toBe('textarea')
+    expect(node.props.rows).toBe(4)
+    expect(node.props.type).toBe('password') // secureTextEntry overrides type
+    expect(node.props.inputmode).toBe('email')
+    expect(node.props.enterkeyhint).toBe('send')
+    expect(node.props.autocapitalize).toBe('none')
+    expect(node.props.autocomplete).toBe('email')
+    expect(node.props.maxlength).toBe(50)
+    expect(node.props.autofocus).toBe(true)
+  })
+
+  it('TextInput onSubmitEditing fires only on Enter, with the value', () => {
+    const onSubmit = vi.fn()
+    const node = TextInput({ onSubmitEditing: onSubmit }) as MindeesElement
+    const onKeyDown = node.props.onKeyDown as (e: unknown) => void
+    onKeyDown({ key: 'a', target: { value: 'hi' } })
+    expect(onSubmit).not.toHaveBeenCalled()
+    onKeyDown({ key: 'Enter', target: { value: 'hi' } })
+    expect(onSubmit).toHaveBeenCalledWith('hi')
+  })
+
+  it('Image lowers resizeMode → objectFit + loading/decoding/fetchPriority + fallback swap', () => {
+    const node = Image({
+      src: 'a.png',
+      label: 'A',
+      resizeMode: 'cover',
+      loading: 'lazy',
+      decoding: 'async',
+      fetchPriority: 'high',
+      width: 100,
+      height: 80,
+      fallbackSrc: 'fb.png',
+    }) as MindeesElement
+    expect((node.props.style as Record<string, unknown>).objectFit).toBe('cover')
+    expect(node.props.loading).toBe('lazy')
+    expect(node.props.decoding).toBe('async')
+    expect(node.props.fetchpriority).toBe('high')
+    expect(node.props.width).toBe(100)
+    expect(node.props.height).toBe(80)
+    const onError = node.props.onError as (e: unknown) => void
+    const target = { src: 'a.png' }
+    onError({ target }) // a load failure swaps in the fallback
+    expect(target.src).toBe('fb.png')
+  })
+})
