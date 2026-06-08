@@ -8,6 +8,8 @@
  * @module
  */
 
+import { MindeesError } from '@mindees/core'
+
 /** Stable code identifying why an OTA update operation failed. */
 export type UpdateErrorCode =
   /** The manifest JSON is missing required fields or has the wrong shape. */
@@ -32,15 +34,16 @@ export type UpdateErrorCode =
   | 'GENERATION_FAILED'
   /** A WASM feature module is malformed, too large, or missing a required capability import. */
   | 'MODULE_INVALID'
+  /** A client/server factory was given invalid configuration (e.g. empty trusted keys, bad threshold). */
+  | 'CLIENT_MISCONFIGURED'
 
-/** An OTA update error carrying a stable {@link UpdateErrorCode}. */
-export class UpdateError extends Error {
-  /** Stable, machine-readable cause. */
-  readonly code: UpdateErrorCode
+/** An OTA update error carrying a stable {@link UpdateErrorCode}. Extends {@link MindeesError}. */
+export class UpdateError extends MindeesError {
+  /** Stable, machine-readable cause (narrows {@link MindeesError.code}). */
+  declare readonly code: UpdateErrorCode
 
   constructor(code: UpdateErrorCode, message: string) {
-    super(message)
+    super(code, message)
     this.name = 'UpdateError'
-    this.code = code
   }
 }

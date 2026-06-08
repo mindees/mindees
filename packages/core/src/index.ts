@@ -58,7 +58,7 @@ export {
   type SelectorEquals,
   useContext,
 } from './component'
-export { NotImplementedError } from './errors'
+export { MindeesError, NotImplementedError } from './errors'
 /**
  * Gesture recognizers: tap/longPress/pan/pinch/swipe → reactive state that drives styles and the
  * animation engine (RN Gesture Handler / Flutter GestureDetector parity).

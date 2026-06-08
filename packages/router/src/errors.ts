@@ -6,6 +6,7 @@
  * @module
  */
 
+import { MindeesError } from '@mindees/core'
 import type { StandardSchemaV1 } from './standard-schema'
 
 /** Machine-readable router error codes. */
@@ -21,11 +22,13 @@ export type RouterErrorCode =
    * synchronous, so async schemas are rejected.
    */
   | 'ASYNC_SCHEMA'
+  /** A `useRouter`/`useParams`/… hook ran with no active router (no router has rendered yet). */
+  | 'NO_ACTIVE_ROUTER'
 
-/** An error thrown by the Quantum router. */
-export class RouterError extends Error {
-  /** Machine-readable error code. */
-  readonly code: RouterErrorCode
+/** An error thrown by the Quantum router. Extends {@link MindeesError}. */
+export class RouterError extends MindeesError {
+  /** Machine-readable error code (narrows {@link MindeesError.code}). */
+  declare readonly code: RouterErrorCode
   /** Standard Schema issues, present only for `VALIDATE_SEARCH`. */
   readonly issues?: ReadonlyArray<StandardSchemaV1.Issue>
 
@@ -34,9 +37,8 @@ export class RouterError extends Error {
     message: string,
     issues?: ReadonlyArray<StandardSchemaV1.Issue>,
   ) {
-    super(message)
+    super(code, message)
     this.name = 'RouterError'
-    this.code = code
     if (issues !== undefined) this.issues = issues
   }
 }

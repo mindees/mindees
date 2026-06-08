@@ -7,6 +7,8 @@
  * @module
  */
 
+import { MindeesError } from '@mindees/core'
+
 /** Stable code identifying why a Continuum operation failed. */
 export type DataErrorCode =
   /** `insert` was given an id that already exists (use `upsert` to replace). */
@@ -18,14 +20,13 @@ export type DataErrorCode =
   /** `optimistic()` was called inside another `optimistic()` block (not reentrant). */
   | 'OPTIMISTIC_NESTED'
 
-/** A Continuum data error carrying a stable {@link DataErrorCode}. */
-export class DataError extends Error {
-  /** Stable, machine-readable cause. */
-  readonly code: DataErrorCode
+/** A Continuum data error carrying a stable {@link DataErrorCode}. Extends {@link MindeesError}. */
+export class DataError extends MindeesError {
+  /** Stable, machine-readable cause (narrows {@link MindeesError.code}). */
+  declare readonly code: DataErrorCode
 
   constructor(code: DataErrorCode, message: string) {
-    super(message)
+    super(code, message)
     this.name = 'DataError'
-    this.code = code
   }
 }

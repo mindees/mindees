@@ -20,6 +20,7 @@
  * @module
  */
 
+import { MindeesError } from '@mindees/core'
 import type { NativeCommand, NativeNodeId, NativePropValue } from './native-protocol'
 
 /** A reconstructed host node. */
@@ -60,10 +61,23 @@ export interface ReferenceHost {
   serialize(): string
 }
 
-/** Thrown when a command stream violates the host contract. */
-export class NativeHostError extends Error {
-  constructor(message: string) {
-    super(message)
+/** Machine-readable reason a {@link NativeHostError} was thrown. */
+export type NativeHostErrorCode =
+  | 'UNKNOWN_NODE'
+  | 'DUPLICATE_ID'
+  | 'UPDATE_TEXT_NON_TEXT'
+  | 'ALREADY_PARENTED'
+  | 'INDEX_OUT_OF_RANGE'
+  | 'NOT_A_CHILD'
+  | 'DISPOSE_ROOT'
+  | 'UNKNOWN_COMMAND'
+
+/** Thrown when a command stream violates the host contract. Extends {@link MindeesError}. */
+export class NativeHostError extends MindeesError {
+  /** Narrows {@link MindeesError.code} to the host-contract codes. */
+  declare readonly code: NativeHostErrorCode
+  constructor(code: NativeHostErrorCode, message: string) {
+    super(code, message)
     this.name = 'NativeHostError'
   }
 }
@@ -92,12 +106,13 @@ export function createReferenceHost(rootId: NativeNodeId = 'host-root'): Referen
 
   function requireNode(id: NativeNodeId): ReferenceHostNode {
     const node = nodes.get(id)
-    if (!node) throw new NativeHostError(`command references unknown node ${String(id)}`)
+    if (!node)
+      throw new NativeHostError('UNKNOWN_NODE', `command references unknown node ${String(id)}`)
     return node
   }
 
   function create(id: NativeNodeId, kind: 'element' | 'text', tag: string, text: string): void {
-    if (nodes.has(id)) throw new NativeHostError(`duplicate node id ${String(id)}`)
+    if (nodes.has(id)) throw new NativeHostError('DUPLICATE_ID', `duplicate node id ${String(id)}`)
     nodes.set(id, { id, kind, tag, text, props: {}, events: new Map(), parent: null, children: [] })
   }
 
@@ -126,7 +141,10 @@ export function createReferenceHost(rootId: NativeNodeId = 'host-root'): Referen
       case 'updateText': {
         const node = requireNode(command.id)
         if (node.kind !== 'text') {
-          throw new NativeHostError(`updateText on non-text node ${String(command.id)}`)
+          throw new NativeHostError(
+            'UPDATE_TEXT_NON_TEXT',
+            `updateText on non-text node ${String(command.id)}`,
+          )
         }
         node.text = command.text
         break
@@ -136,11 +154,15 @@ export function createReferenceHost(rootId: NativeNodeId = 'host-root'): Referen
         const child = requireNode(command.childId)
         if (child.parent) {
           throw new NativeHostError(
+            'ALREADY_PARENTED',
             `insertChild: ${String(command.childId)} already has a parent (detach it first)`,
           )
         }
         if (command.index < 0 || command.index > parent.children.length) {
-          throw new NativeHostError(`insertChild: index ${command.index} out of range`)
+          throw new NativeHostError(
+            'INDEX_OUT_OF_RANGE',
+            `insertChild: index ${command.index} out of range`,
+          )
         }
         parent.children.splice(command.index, 0, child)
         child.parent = parent
@@ -151,6 +173,7 @@ export function createReferenceHost(rootId: NativeNodeId = 'host-root'): Referen
         const child = requireNode(command.childId)
         if (child.parent !== parent) {
           throw new NativeHostError(
+            'NOT_A_CHILD',
             `removeChild: ${String(command.childId)} is not a child of ${String(command.parentId)}`,
           )
         }
@@ -158,7 +181,8 @@ export function createReferenceHost(rootId: NativeNodeId = 'host-root'): Referen
         break
       }
       case 'disposeNode': {
-        if (command.id === rootId) throw new NativeHostError('cannot dispose the root node')
+        if (command.id === rootId)
+          throw new NativeHostError('DISPOSE_ROOT', 'cannot dispose the root node')
         const node = requireNode(command.id) // throws if already freed → catches double dispose
         detach(node) // interior subtree nodes are freed without an explicit removeChild
         nodes.delete(command.id)
@@ -173,7 +197,10 @@ export function createReferenceHost(rootId: NativeNodeId = 'host-root'): Referen
       default: {
         // Exhaustiveness: every NativeCommand variant is handled above.
         const _exhaustive: never = command
-        throw new NativeHostError(`unknown command ${JSON.stringify(_exhaustive)}`)
+        throw new NativeHostError(
+          'UNKNOWN_COMMAND',
+          `unknown command ${JSON.stringify(_exhaustive)}`,
+        )
       }
     }
   }
