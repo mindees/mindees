@@ -15,7 +15,14 @@
  * @module
  */
 
-import { computed, createRoot, getOwner, signal } from '../reactive'
+import {
+  computed,
+  createRoot,
+  getOwner,
+  getOwnerContext,
+  setOwnerContext,
+  signal,
+} from '../reactive'
 
 // ---------------------------------------------------------------------------
 // Element tree
@@ -244,6 +251,30 @@ export interface ContextProvider<T> {
 /** Create a context with a default value. */
 export function createContext<T>(defaultValue: T): Context<T> {
   return { id: Symbol('mindees.context'), defaultValue }
+}
+
+/**
+ * **Tree-scoped** context: provide `value` for `context` to the current reactive scope and everything
+ * rendered beneath it. Unlike {@link createProvider} (an explicit handle you pass around), this flows
+ * implicitly down the owner tree — a deeply-nested {@link useContext} (even inside a `portal`, whose host
+ * nodes move but whose logical scope is preserved) finds the nearest provided value. Call it during a
+ * component/region's render (re-provided on each re-run). No-op outside any reactive scope.
+ *
+ * @example
+ * const Visible = createContext<() => boolean>(() => true)
+ * // in a parent region:
+ * provideContext(Visible, () => activeIndex() === i)
+ * // in a descendant (even a portaled overlay):
+ * const visible = useContext(Visible) // () => boolean
+ */
+export function provideContext<T>(context: Context<T>, value: T): void {
+  setOwnerContext(context.id, value)
+}
+
+/** Read the nearest tree-scoped value for `context` (see {@link provideContext}), or its default. */
+export function useContext<T>(context: Context<T>): T {
+  const hit = getOwnerContext(context.id)
+  return hit.found ? (hit.value as T) : context.defaultValue
 }
 
 /**
