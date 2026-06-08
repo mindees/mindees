@@ -1,5 +1,15 @@
 # @mindees/atlas
 
+## 0.31.1
+
+### Patch Changes
+
+- bbde774: `createTabNavigator`'s returned component now accepts **per-render overrides** (`tabBarPosition`,
+  `tabBarStyle`) that win over the factory defaults — matching `createStackNavigator`'s ergonomics, so the
+  two navigator factories behave consistently (a pre-1.0 API-consistency fix from the integration review).
+  - @mindees/core@0.31.1
+  - @mindees/router@0.31.1
+
 ## 0.31.0
 
 ### Patch Changes
