@@ -3,7 +3,7 @@
 import { createElement, signal } from '@mindees/core'
 import { createDomBackend, render } from '@mindees/renderer'
 import { describe, expect, it, vi } from 'vitest'
-import { Modal, Toast } from './overlay'
+import { FocusScope, Modal, Toast } from './overlay'
 
 const doc = () => document as never
 
@@ -134,5 +134,35 @@ describe('Toast', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('FocusScope — focus trap', () => {
+  it('wraps Tab from the last focusable back to the first (WCAG 2.4.3)', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    render(
+      createElement(
+        FocusScope,
+        { label: 'dialog' },
+        createElement('button', { id: 'b1' }, 'one'),
+        createElement('button', { id: 'b2' }, 'two'),
+      ),
+      createDomBackend(doc()),
+      container as never,
+    )
+    const dialog = container.querySelector('[role="dialog"]') as unknown as HTMLElement
+    const b1 = container.querySelector('#b1') as unknown as HTMLElement
+    const b2 = container.querySelector('#b2') as unknown as HTMLElement
+    b2.focus()
+    expect(document.activeElement).toBe(b2)
+    // Tab on the last element wraps to the first.
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    expect(document.activeElement).toBe(b1)
+    // Shift+Tab on the first wraps to the last.
+    dialog.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }),
+    )
+    expect(document.activeElement).toBe(b2)
   })
 })

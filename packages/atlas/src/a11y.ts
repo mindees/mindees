@@ -115,3 +115,51 @@ export function toA11yProps(a11y: A11yProps): Record<string, unknown> {
 
   return out
 }
+
+/** Politeness for {@link announce} — `'polite'` waits for a pause; `'assertive'` interrupts. */
+export type Announce = 'polite' | 'assertive'
+
+// One persistent visually-hidden live region per politeness, reused across calls (created lazily).
+const liveRegions: Partial<Record<Announce, { textContent: string }>> = {}
+
+interface DocLike {
+  createElement(tag: string): {
+    setAttribute(name: string, value: string): void
+    style: { cssText: string }
+    textContent: string
+  }
+  body: { appendChild(node: unknown): void } | null
+}
+
+/**
+ * Imperatively announce `message` to screen readers (programmatic, not tied to a rendered node) — for
+ * results that aren't otherwise voiced ("3 results found", "Saved", validation errors). Writes into a
+ * persistent visually-hidden `aria-live` region (one per politeness), clearing first so the SAME message
+ * re-announces. SSR/native-safe: a no-op without a DOM.
+ */
+export function announce(message: string, politeness: Announce = 'polite'): void {
+  const doc = (globalThis as unknown as { document?: DocLike }).document
+  if (!doc || typeof doc.createElement !== 'function' || !doc.body) return
+  let region = liveRegions[politeness]
+  if (!region) {
+    const el = doc.createElement('div')
+    el.setAttribute('aria-live', politeness)
+    el.setAttribute('aria-atomic', 'true')
+    el.setAttribute('role', politeness === 'assertive' ? 'alert' : 'status')
+    // Visually hidden but still announced (the standard sr-only clip pattern).
+    el.style.cssText =
+      'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0'
+    doc.body.appendChild(el)
+    region = el
+    liveRegions[politeness] = el
+  }
+  // Clear then set on the next tick so a repeated identical message is still re-announced.
+  region.textContent = ''
+  const r = region
+  const schedule =
+    (globalThis as { requestAnimationFrame?: (cb: () => void) => void }).requestAnimationFrame ??
+    ((cb: () => void) => setTimeout(cb, 16))
+  schedule(() => {
+    r.textContent = message
+  })
+}

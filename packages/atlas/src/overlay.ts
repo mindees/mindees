@@ -51,12 +51,24 @@ export interface FocusScopeProps {
   readonly style?: Reactive<StyleInput>
 }
 
-/** A focus-scoped, `aria-modal` container. Captures + restores focus on web; declarative elsewhere. */
+/** Tabbable descendants of a focus scope (the standard focusable set, minus `tabindex="-1"`). */
+const FOCUSABLE_SELECTOR =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
+interface FocusableNode {
+  focus?: () => void
+  querySelectorAll?: (selector: string) => ArrayLike<{ focus?: () => void }>
+  isConnected?: boolean
+}
+
+/** A focus-scoped, `aria-modal` container. Captures + restores focus AND traps Tab on web; declarative elsewhere. */
 export const FocusScope: Component<FocusScopeProps> = (props) => {
   let restore: (() => void) | null = null
+  let scopeNode: FocusableNode | null = null
   const captureAndFocus = (host: unknown): void => {
     if (typeof document === 'undefined') return // native/headless: declarative only
-    const node = host as { focus?: () => void } | null
+    const node = host as FocusableNode | null
+    scopeNode = node
     const doc = document as unknown as { activeElement?: { focus?: () => void } | null }
     const previous = doc.activeElement ?? null
     if (props.restoreFocus !== false && previous && typeof previous.focus === 'function') {
@@ -66,8 +78,30 @@ export const FocusScope: Component<FocusScopeProps> = (props) => {
       // Defer: `ref` fires before the portal subtree is connected to the document, so a synchronous
       // focus() would no-op. By the microtask the subtree is mounted; skip if it closed first.
       queueMicrotask(() => {
-        if ((node as { isConnected?: boolean }).isConnected) node.focus?.()
+        if (node.isConnected) node.focus?.()
       })
+    }
+  }
+  // Trap Tab within the scope (WCAG 2.4.3): wrap focus from the last tabbable to the first (and back on
+  // Shift+Tab), so keyboard focus can't escape an open modal. No-op if the scope has no tabbable children.
+  const trapTab = (e: { shiftKey?: boolean; preventDefault?: () => void }): void => {
+    const node = scopeNode
+    if (typeof document === 'undefined' || !node?.querySelectorAll) return
+    const all = Array.from(node.querySelectorAll(FOCUSABLE_SELECTOR))
+    if (all.length === 0) {
+      e.preventDefault?.()
+      node.focus?.() // nothing tabbable inside → keep focus on the dialog itself
+      return
+    }
+    const first = all[0]
+    const last = all[all.length - 1]
+    const active = (document as unknown as { activeElement?: unknown }).activeElement
+    if (e.shiftKey && active === first) {
+      e.preventDefault?.()
+      last?.focus?.()
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault?.()
+      first?.focus?.()
     }
   }
   onCleanup(() => restore?.())
@@ -87,10 +121,10 @@ export const FocusScope: Component<FocusScopeProps> = (props) => {
     style,
   }
   if (props.label !== undefined) hostProps['aria-label'] = props.label
-  if (props.onEscape !== undefined) {
-    hostProps.onKeyDown = (e: unknown) => {
-      if ((e as { key?: string }).key === 'Escape') props.onEscape?.()
-    }
+  hostProps.onKeyDown = (e: unknown) => {
+    const ev = e as { key?: string; shiftKey?: boolean; preventDefault?: () => void }
+    if (ev.key === 'Escape') props.onEscape?.()
+    else if (ev.key === 'Tab') trapTab(ev)
   }
   // A RAW host `view` (not the curated View primitive) so ref/tabindex/onKeyDown/aria-modal pass through.
   return createElement('view', hostProps, props.children)
