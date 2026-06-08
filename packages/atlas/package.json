@@ -4,6 +4,9 @@
   "description": "MindeesNative Atlas - accessible, signals-native UI primitives + a virtualized recycling list. Renderer-agnostic (web real, native research track).",
   "license": "MIT OR Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "sideEffects": false,
   "files": [
     "dist"

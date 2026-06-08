@@ -4,6 +4,9 @@
   "description": "Create a new MindeesNative app — `npm create mindees@latest`.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "sideEffects": false,
   "bin": {
     "create-mindees": "./dist/bin.js"

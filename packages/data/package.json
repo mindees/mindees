@@ -4,6 +4,9 @@
   "description": "MindeesNative Continuum - local-first reactive store and sync: a signals-native document store with fine-grained reactive queries, optimistic updates, CRDT conflict resolution, and delta sync.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "sideEffects": false,
   "files": [
     "dist"
