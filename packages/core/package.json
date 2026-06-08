@@ -1,6 +1,6 @@
 {
   "name": "@mindees/core",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "description": "MindeesNative core — fine-grained reactivity (signals/computed/effect/batch), component model with selector-isolated context, priority scheduler, and a thread-pool abstraction (Web Worker + inline; native is a research track).",
   "license": "MIT OR Apache-2.0",
   "type": "module",
