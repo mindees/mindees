@@ -3,8 +3,8 @@
  * over `@mindees/core`'s `createElement` that return renderer-agnostic `MindeesNode` trees:
  * web rendering is real via the Helix DOM backend; native is a labeled 🔬 research track (the
  * same serializable tree, interpreted by a native host later). A curated cross-platform
- * `StyleObject`, typed accessibility, and a structural theme (on the `@mindees/atlas/theme`
- * subpath). The virtualized recycling `List` is on the `@mindees/atlas/list` subpath.
+ * `StyleObject`, typed accessibility, and design-token theming (`useTheme`/`tokens`, on the main entry).
+ * The virtualized recycling `List` is on the `@mindees/atlas/list` subpath.
  *
  * @module
  */

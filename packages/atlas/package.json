@@ -13,10 +13,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./theme": {
-      "types": "./dist/theme.d.ts",
-      "import": "./dist/theme.js"
-    },
     "./list": {
       "types": "./dist/list.d.ts",
       "import": "./dist/list.js"

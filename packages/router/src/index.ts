@@ -106,8 +106,8 @@ export const VERSION = '0.24.0'
  */
 export const maturity: Maturity = 'experimental'
 
-/** Static identity + maturity metadata for this package. */
-export const info: PackageInfo = { name, version: VERSION, maturity }
+/** Static identity + maturity metadata for this package (frozen — matches every other `@mindees/*`). */
+export const info: PackageInfo = Object.freeze({ name, version: VERSION, maturity })
 
 export type { Maturity, PackageInfo }
 export { NotImplementedError, notImplemented }
